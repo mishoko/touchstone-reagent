@@ -1,0 +1,242 @@
+{
+ "chainId": 11155111,
+ "generated_by": "script/deploy/record.py",
+ "steps": {
+  "refpool": {
+   "script": "RefPool.s.sol",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T20:22:10+00:00",
+   "note": "step 0b: mock tokens, v3 ref pool (card 400), RefDriver. Broadcast at --gas-estimate-multiplier 800: Sepolia runs Glamsterdam pricing (blockAccessListHash present); forge's simulator underestimates (DemoToken CREATE 3.34M on Sepolia vs 0.52M on 1301). Two earlier attempts failed out of gas (0x32de8990\u2026, 0xe21e08a6\u2026) and one stray mUSDC copy 0xee16\u2026e552 (tx 0x786fdcf5\u2026) plus two 0-value cap probes at 20M/40M limit (0xa96fa2c3\u2026, 0x33b93d38\u2026) are unused.",
+   "txs": [
+    {
+     "type": "CREATE",
+     "tx": "0x4db98ba05036e3333ad16073a62ae4b6581efbe7e77528c5823a822bb80943cc",
+     "block": 12197953,
+     "gasUsed": 3344134,
+     "contract": "DemoToken",
+     "address": "0xe47c05e3c8013221508eae78628dfcf623dc93fb"
+    },
+    {
+     "type": "CREATE",
+     "tx": "0xcf63fa33b82e592daa3870fde1028f4e0ed907b1e9cddbb53de0c38b4eddc0ee",
+     "block": 12197954,
+     "gasUsed": 3344134,
+     "contract": "DemoToken",
+     "address": "0xdde7e4f51fa544dd3f23e60e8c258fa6868ebcfe"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x0853a92be306d5ab9bc3f069ea38ed473a633ccfb0a1472ffd7d4a6a03fa96b3",
+     "block": 12197955,
+     "gasUsed": 34345722,
+     "function": "createPool(address,address,uint24)",
+     "to": "0x0227628f3f023bb0b980b67d528571c95c6dac1c",
+     "created": [
+      {
+       "contract": null,
+       "address": "0x7e7d579eacfb38790fb24c3ea986b7f38d068610"
+      }
+     ]
+    },
+    {
+     "type": "CALL",
+     "tx": "0xdf4065831dc9989b16c16634331455bfebefc3943a2c4ccc6784dbba3ee33f01",
+     "block": 12197956,
+     "gasUsed": 240566,
+     "function": "initialize(uint160)",
+     "to": "0x7e7d579eacfb38790fb24c3ea986b7f38d068610"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x86918ee90513db7f317d1b3586c95e74d484c0eb05f2b87b50ab9642aef6690e",
+     "block": 12197957,
+     "gasUsed": 27484346,
+     "function": "increaseObservationCardinalityNext(uint16)",
+     "to": "0x7e7d579eacfb38790fb24c3ea986b7f38d068610"
+    },
+    {
+     "type": "CREATE",
+     "tx": "0xebcae482ad53ce5ad2d8d31014cb9f2e779a885f644e432015d34744d741c2d1",
+     "block": 12197958,
+     "gasUsed": 2637023,
+     "contract": "RefDriver",
+     "address": "0xf6d3fffd3b370373de8970a87d63871c7ba71ea3"
+    },
+    {
+     "type": "CALL",
+     "tx": "0xc468c3100de47d8bcc4946728167f2adaf2757b1e5da427478bac3de07f8c637",
+     "block": 12197959,
+     "gasUsed": 238192,
+     "function": "mint(address,uint256)",
+     "to": "0xdde7e4f51fa544dd3f23e60e8c258fa6868ebcfe"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x2159e07c1ddb3f247e06f86a04c7a55d4ef9072588f809f96f403b49ef5ba7a8",
+     "block": 12197960,
+     "gasUsed": 238228,
+     "function": "mint(address,uint256)",
+     "to": "0xe47c05e3c8013221508eae78628dfcf623dc93fb"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x27d5d71ea20dbbf98c10ff2b2dc730d07c97da416b9b4a466b7cea2245f61cca",
+     "block": 12197961,
+     "gasUsed": 1228309,
+     "function": "addLiquidity(int24,int24,uint128)",
+     "to": "0xf6d3fffd3b370373de8970a87d63871c7ba71ea3"
+    },
+    {
+     "type": "CALL",
+     "tx": "0xc33db0fcd49b487438e52b208426af6167768785cbc2f9eb786afe9208577b3f",
+     "block": 12197962,
+     "gasUsed": 140260,
+     "function": "mint(address,uint256)",
+     "to": "0xdde7e4f51fa544dd3f23e60e8c258fa6868ebcfe"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x3c0280216488ee77f620d27a4aaf83da2276c7ab9862dc62436a268afd90d5f3",
+     "block": 12197963,
+     "gasUsed": 140296,
+     "function": "mint(address,uint256)",
+     "to": "0xe47c05e3c8013221508eae78628dfcf623dc93fb"
+    }
+   ]
+  },
+  "cardinality400": {
+   "source": "receipts",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T21:53:41+00:00",
+   "note": "the TEST tier needs MIN_CARD 400; RefPool's first loop stopped at 250 (fixed in RefPool.s.sol); live cardinality reached 400 after warm-up swaps wrapped the observation index (output/warmup-11155111-*.log)",
+   "txs": [
+    {
+     "label": "increaseObservationCardinalityNext_400",
+     "tx": "0xe40fbb7c97e50ea8dda7db7b2f2200345e45a2d48608d6f495edcbc35e935606",
+     "block": 12198070,
+     "gasUsed": 16568816,
+     "status": "ok",
+     "to": "0x7e7d579eacfb38790fb24c3ea986b7f38d068610"
+    }
+   ]
+  },
+  "touchstone": {
+   "source": "receipts",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T21:53:45+00:00",
+   "note": "TEST tier on 11155111 (Glamsterdam pricing). Vault 0xc599571D2643FeE6Fe92AFDb2b19cB7BcB00E6c5, hook 0x1eF5a7D438DAebcc0fc263c9C2873A76040AA0A0, extension in deployAndPlace. Libraries via 0x4e59 CREATE2. The first factory CREATE ran out of gas at forge's 7x estimate (node needs 10.2M); deployAndPlace was sent by cast with an explicit 160M limit because the RPC caps eth_call/eth_estimateGas at 50M (used 82,956,188 gas; 1301: 12,653,560). Calldata from forge's broadcast run-1795470623831.",
+   "txs": [
+    {
+     "label": "ExecLedger_lib",
+     "tx": "0xd528e70357abcff1f048abaab5d0513fd2e0ae80383cc18b8220fd9eaa0f58e0",
+     "block": 12198375,
+     "gasUsed": 12146122,
+     "status": "ok",
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+    },
+    {
+     "label": "FeeBank_lib",
+     "tx": "0xcb6c4f51a023cf87384b909b1e3a29f623119418ef6c741f0e0a132a25b123c4",
+     "block": 12198376,
+     "gasUsed": 7006310,
+     "status": "ok",
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+    },
+    {
+     "label": "failed_TouchstoneFactory_oog",
+     "tx": "0x05b4996314632d8fcfae0134bc3802d2000b889725a1aa45ac3c10be5d004ed8",
+     "block": 12198377,
+     "gasUsed": 10092628,
+     "status": "FAILED",
+     "address": "0x5a019c2e32f060f966da17f73dcb86da0f8f8812"
+    },
+    {
+     "label": "TouchstoneFactory",
+     "tx": "0xabbeb100179e733e62ce66a3cf4134034b2b0e56b65f47aa8dd3c59691b21f01",
+     "block": 12198381,
+     "gasUsed": 10130890,
+     "status": "ok",
+     "address": "0x2a8f5c8b455aacdcb4aeddf41986f4a60b24a05d"
+    },
+    {
+     "label": "CuratorBundler",
+     "tx": "0x4aa09cd097203113403d90a3ccfb3cc7bed35534991bd691ebf8aa39b246f3c3",
+     "block": 12198382,
+     "gasUsed": 14419550,
+     "status": "ok",
+     "address": "0x842d3e1762db070aa9b241a90cd7f5a8daa7731f"
+    },
+    {
+     "label": "seed_transfer0",
+     "tx": "0xd92e7ad691c407d094e44f0a36cf862dcea3cfb51891e300d1a32301eb3422d6",
+     "block": 12198383,
+     "gasUsed": 140492,
+     "status": "ok",
+     "to": "0xdde7e4f51fa544dd3f23e60e8c258fa6868ebcfe"
+    },
+    {
+     "label": "seed_transfer1",
+     "tx": "0x53affd76a9520f50c78c13aeb9a233145ea294c8f4617dc40eb67c1fc76edd86",
+     "block": 12198384,
+     "gasUsed": 140528,
+     "status": "ok",
+     "to": "0xe47c05e3c8013221508eae78628dfcf623dc93fb"
+    },
+    {
+     "label": "deployAndPlace",
+     "tx": "0x2ec9674dc719daf328cbd1334dff3664b2534ebdd82e057847d62608b854ba41",
+     "block": 12198396,
+     "gasUsed": 82956188,
+     "status": "ok",
+     "to": "0x842d3e1762db070aa9b241a90cd7f5a8daa7731f"
+    }
+   ]
+  },
+  "reagent": {
+   "script": "Reagent.s.sol",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T23:55:30+00:00",
+   "note": "final s2 code; same salt and arguments as 1301; node gas estimates (--skip-simulation, Glamsterdam pricing)",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0x8b7f977fa6f287737dd5883c33f0f28a27e49e98f766f319e826467bcfe4dc88",
+     "block": 12198941,
+     "gasUsed": 19473061,
+     "contract": "CovenantExt",
+     "address": "0x39Da1F404B98fe0390A4d4E648C0bC8E030Aa061",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0x33e1b911542f266c4f2a34e68a619a171c16635375e2a66642453ceda434a131",
+     "block": 12198942,
+     "gasUsed": 34282795,
+     "contract": "Covenant",
+     "address": "0xDEb3E647AC0f9f972D5Ba6A45aCb5Bd572541731",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0x76b04fab61481d9c53bfbe91b2f95fbe7397cf5fe9d02894618ffe077b9a9a70",
+     "block": 12198943,
+     "gasUsed": 15812265,
+     "contract": "CovenantFactory",
+     "address": "0x2bCb1F62915797D6813A0C1c66b7aA8a285229E0",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    }
+   ],
+   "reads": {
+    "source": "cast call at record time (script/deploy/record.py companion read)",
+    "at": "2026-11-23T23:55:42+00:00",
+    "CovenantFactory.HUB()": "0x5887f7051A208778df71A08DD1223a1CB12b15d9",
+    "ReagentHub.FACTORY()": "0x2bCb1F62915797D6813A0C1c66b7aA8a285229E0",
+    "ReagentHub.RC()": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
+    "ReagentHub.PROXY()": "0xAa14d9Cd0f788Ca23d11805986C1d8bd035D23b4"
+   }
+  }
+ }
+}

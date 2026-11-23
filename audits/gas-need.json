@@ -1,0 +1,109 @@
+{
+ "generated_by": "script/deploy/gasneed.py",
+ "from": "test/GasNeed.t.sol (T-GAS-*)",
+ "generated_at": "2026-11-23T22:31:10+00:00",
+ "commit": "1502bcb",
+ "method": "entry gas = minimum succeeding entry gas at a constructed worst-case state, every account cold (vm.cool); 11155111 = that + fresh slots x (110,980 - 22,274) + creations x (210,421 - 53,799) (spec 5.6 method (b)); NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F",
+ "F": {
+  "1301": 177200,
+  "11155111": 243300
+ },
+ "RESERVE": 40000,
+ "kinds": {
+  "rcConduct": {
+   "entry_1301": 26404,
+   "fresh_slots": 1,
+   "creates": 0,
+   "chains": {
+    "1301": {
+     "entry": 26404,
+     "need_min": 34326,
+     "need": 35000,
+     "gasLimit": 261631
+    },
+    "11155111": {
+     "entry": 115110,
+     "need_min": 149643,
+     "need": 150000,
+     "gasLimit": 458279
+    }
+   }
+  },
+  "rcVault": {
+   "entry_1301": 69404,
+   "fresh_slots": 3,
+   "creates": 0,
+   "chains": {
+    "1301": {
+     "entry": 69404,
+     "need_min": 90226,
+     "need": 91000,
+     "gasLimit": 325202
+    },
+    "11155111": {
+     "entry": 335522,
+     "need_min": 436179,
+     "need": 437000,
+     "gasLimit": 784080
+    }
+   }
+  },
+  "rcBudget": {
+   "entry_1301": 265196,
+   "fresh_slots": 1,
+   "creates": 0,
+   "chains": {
+    "1301": {
+     "entry": 265196,
+     "need_min": 344755,
+     "need": 345000,
+     "gasLimit": 613542
+    },
+    "11155111": {
+     "entry": 353902,
+     "need_min": 460073,
+     "need": 461000,
+     "gasLimit": 811325
+    }
+   }
+  },
+  "rcExit": {
+   "entry_1301": 639397,
+   "fresh_slots": 9,
+   "creates": 0,
+   "chains": {
+    "1301": {
+     "entry": 639397,
+     "need_min": 831217,
+     "need": 832000,
+     "gasLimit": 1166383
+    },
+    "11155111": {
+     "entry": 1437751,
+     "need_min": 1869077,
+     "need": 1870000,
+     "gasLimit": 2410819
+    }
+   }
+  },
+  "rcAllocate": {
+   "entry_1301": 921192,
+   "fresh_slots": 9,
+   "creates": 0,
+   "chains": {
+    "1301": {
+     "entry": 921192,
+     "need_min": 1197550,
+     "need": 1198000,
+     "gasLimit": 1581866
+    },
+    "11155111": {
+     "entry": 1719546,
+     "need_min": 2235410,
+     "need": 2236000,
+     "gasLimit": 2826301
+    }
+   }
+  }
+ }
+}

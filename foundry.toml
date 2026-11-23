@@ -11,6 +11,7 @@ via_ir = true
 optimizer = true
 optimizer_runs = 200
 gas_limit = "18446744073709551615"
+no_match_path = "test/fork/*"  # network tests: `forge test --match-path "test/fork/*" --no-match-path "none"` (s2 r3 m3-1)
 fs_permissions = [{ access = "read", path = "./audits" }, { access = "read-write", path = "./output" }]
 
 [profile.default.fuzz]

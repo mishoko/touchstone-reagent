@@ -1,0 +1,164 @@
+{
+ "generated_by": "script/deploy/g2.py",
+ "chainId": 11155111,
+ "vault": "0xc599571D2643FeE6Fe92AFDb2b19cB7BcB00E6c5",
+ "hook": "0x1eF5a7D438DAebcc0fc263c9C2873A76040AA0A0",
+ "placement": {
+  "grids": 4,
+  "anchors": 4,
+  "latched": 0,
+  "pass": true,
+  "rows": [
+   {
+    "utc": "2026-11-23T21:55:13+00:00",
+    "tx": "0x9d040dacabee6ce1b01eef0bc74892da3321011862a2ae664a7618c8f972eb7a",
+    "block": 12198407,
+    "status": "0x1",
+    "anchor": 0,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609920",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T21:57:27+00:00",
+    "tx": "0x3b41943d4c6992de92ca6ff20eb117dcc2412c1266270bf7f739ef404518872f",
+    "block": 12198418,
+    "status": "0x1",
+    "anchor": 1,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609920",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T21:59:38+00:00",
+    "tx": "0x004176916b4a322e65baa3a84f949df1cee830b045c51b75e210875f0e5e5eec",
+    "block": 12198426,
+    "status": "0x1",
+    "anchor": 0,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609921",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T22:01:49+00:00",
+    "tx": "0x90e6d4563c1b8b3bc6ef39871da44c9cfdc78f0e7d8ba877e55b9b0a66da70ad",
+    "block": 12198437,
+    "status": "0x1",
+    "anchor": 1,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609921",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T22:04:02+00:00",
+    "tx": "0x1e011dfddca23775bc679465aeb503ad06c08a61f988b23c535a9cd7dffdbe18",
+    "block": 12198448,
+    "status": "0x1",
+    "anchor": 1,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609922",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T22:06:16+00:00",
+    "tx": "0x70a34a8128ca62583cbc8d112f06d7d3c5c273c1ef8dd4443c0f4dddcf2d56c5",
+    "block": 12198459,
+    "status": "0x1",
+    "anchor": 0,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609922",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T22:08:26+00:00",
+    "tx": "0xace5fc05b78caff1b03bea27502906ecc26cdc1d635bfa059e1030a091d26158",
+    "block": 12198470,
+    "status": "0x1",
+    "anchor": 1,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609923",
+    "mode": 0,
+    "error": null
+   },
+   {
+    "utc": "2026-11-23T22:10:38+00:00",
+    "tx": "0x7dc77b3fa66386f4db6638a1f8e603f01302e505078856787f7e394856888175",
+    "block": 12198480,
+    "status": "0x1",
+    "anchor": 0,
+    "outBlocks": "0",
+    "refFresh": "true",
+    "emptyRange": "false",
+    "breachSeq": "0",
+    "pendingBreaches": "0",
+    "gridIndex": "609924",
+    "mode": 0,
+    "error": null
+   }
+  ]
+ },
+ "gas_leg": {
+  "pass": false,
+  "witness_lw": 0,
+  "tries": [
+   {
+    "eth_call_min_gasLimit": 1315722
+   },
+   {
+    "gasLimit": 1315722,
+    "status": "0x1",
+    "tx": "0xe4f024bb3e318eabb7184bea54d2acad2f966c977d7578a8c084fc15f5d4123d",
+    "gasUsed": 1225295,
+    "error": null
+   }
+  ],
+  "note": "the first poke at the minimum passing gas limit is the starve case; lw = 0 would be a recorded failed roll"
+ },
+ "gas_leg_control": {
+  "gasLimit": 6000000,
+  "tx": "0xe43a96da3e4e73b7ef02d75ea12f5e0cabc2c17d8fa7779a9d211ea274eae5db",
+  "status": "0x1",
+  "gasUsed": 1773695,
+  "witness_lw": 1000,
+  "note": "the next epoch roll with ample gas: lw > 0 means the starve-case lw = 0 was a gas failure"
+ },
+ "verdict": {
+  "placement": "PASS",
+  "gas_leg": "FAIL (confirmed by control)",
+  "gate": "G2 split: placement holds on 13.2 s blocks; the witness roll is starvable at the 400k guard under Glamsterdam pricing (owner decision, PA-13)"
+ }
+}

@@ -1,0 +1,301 @@
+{
+ "chainId": 1301,
+ "generated_by": "script/deploy/record.py",
+ "steps": {
+  "refpool": {
+   "script": "RefPool.s.sol",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T20:15:49+00:00",
+   "note": "step 0b: mock tokens, v3 ref pool (card 1000), RefDriver",
+   "txs": [
+    {
+     "type": "CREATE",
+     "tx": "0xb3c859cbbae7c809cadbc5e7c98642921011154bac3240bc2d37ccff9eaf090e",
+     "block": 68612495,
+     "gasUsed": 519390,
+     "contract": "DemoToken",
+     "address": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64"
+    },
+    {
+     "type": "CREATE",
+     "tx": "0xd9f32e23a35df76ad3315292ec868c08b115377c5b730262186082f5f8876210",
+     "block": 68612497,
+     "gasUsed": 519390,
+     "contract": "DemoToken",
+     "address": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x07b58712ded1c727ba73e25461516181059daa95b3c92838d3ec73a9079e4835",
+     "block": 68612499,
+     "gasUsed": 4558970,
+     "function": "createPool(address,address,uint24)",
+     "to": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+     "created": [
+      {
+       "contract": null,
+       "address": "0x11e4fa37a5fa4ecb517a1e76d0de481758bdeed6"
+      }
+     ]
+    },
+    {
+     "type": "CALL",
+     "tx": "0xee94c906bb594dfa8611c0ba7d653103a3c55c2e4e908b37fbbd8961c899d02a",
+     "block": 68612501,
+     "gasUsed": 70526,
+     "function": "initialize(uint160)",
+     "to": "0x11e4fa37a5fa4ecb517a1e76d0de481758bdeed6"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x544e539fabae689c28cde67b5c52eb7fa2855132707fe788aa83eaba580bce61",
+     "block": 68612503,
+     "gasUsed": 5566166,
+     "function": "increaseObservationCardinalityNext(uint16)",
+     "to": "0x11e4fa37a5fa4ecb517a1e76d0de481758bdeed6"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x53accaa766df977e4f19b8b310b2a688116bf5e9534215e51d196c93a13ba04b",
+     "block": 68612505,
+     "gasUsed": 5588416,
+     "function": "increaseObservationCardinalityNext(uint16)",
+     "to": "0x11e4fa37a5fa4ecb517a1e76d0de481758bdeed6"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x9a400cca3542a2526e6d6ec404905758523745c091342a32c93d4a860d98570a",
+     "block": 68612507,
+     "gasUsed": 5588416,
+     "function": "increaseObservationCardinalityNext(uint16)",
+     "to": "0x11e4fa37a5fa4ecb517a1e76d0de481758bdeed6"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x685c5b2341d28e8120f2b2673c388e61d820ff78c97124dad822df665bb21f31",
+     "block": 68612509,
+     "gasUsed": 5588416,
+     "function": "increaseObservationCardinalityNext(uint16)",
+     "to": "0x11e4fa37a5fa4ecb517a1e76d0de481758bdeed6"
+    },
+    {
+     "type": "CREATE",
+     "tx": "0x8e0d76a8b68808cfd2e5973e9db48829135c41de5940872bcd9ff0a1675f4e6c",
+     "block": 68612511,
+     "gasUsed": 400279,
+     "contract": "RefDriver",
+     "address": "0x27aa7be0feddee069892227c3557192ab4f4f749"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x94ce0e515d7282deed45d32357ecd3dc53ec8d073eb66d9393ff75c1cf8d7f78",
+     "block": 68612513,
+     "gasUsed": 68152,
+     "function": "mint(address,uint256)",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64"
+    },
+    {
+     "type": "CALL",
+     "tx": "0xa829b12c522aba689ae31a0bf8e40b9a7e5b909298cdcfe5dba7758c93b8106c",
+     "block": 68612514,
+     "gasUsed": 68188,
+     "function": "mint(address,uint256)",
+     "to": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d"
+    },
+    {
+     "type": "CALL",
+     "tx": "0xb425582514666858507058a60d0c1fa2957d6ac47614350e8c58c697f7db9f3b",
+     "block": 68612516,
+     "gasUsed": 324209,
+     "function": "addLiquidity(int24,int24,uint128)",
+     "to": "0x27aa7be0feddee069892227c3557192ab4f4f749"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x6e157787767460bfa4e1d13054ee3c7d9bef567d8c792f0295295a0d0e41581d",
+     "block": 68612518,
+     "gasUsed": 51040,
+     "function": "mint(address,uint256)",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x71a8297357624f75755897f2fd6823032813b8a8060b81f9b60e2d26242f2f1c",
+     "block": 68612520,
+     "gasUsed": 51076,
+     "function": "mint(address,uint256)",
+     "to": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d"
+    }
+   ]
+  },
+  "touchstone": {
+   "script": "TsDeploy.s.sol",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T20:42:26+00:00",
+   "note": "DEMO tier: TouchstoneFactory, CuratorBundler, vault+hook via deployAndPlace (G2-side liveness vault; production bundlers are registered with the RC before they deploy, s3). Warm-up: 54 swaps over 1,000 s (output/warmup-1301.log).",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0xe197f651b8efc9f0d218e8a3de29ac047124146a92bd3f4755bb791e0302875f",
+     "block": 68614100,
+     "gasUsed": 1724790,
+     "function": null,
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0xd25da619074cda97fd31a711417aaab84d47b0f493288c5c1950d4a7b389d121",
+     "block": 68614102,
+     "gasUsed": 1003862,
+     "function": null,
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+    },
+    {
+     "type": "CREATE",
+     "tx": "0x5992d37f3177f8bd71e0e82798ee5c8dfa6c8bd512ba373d3892440fdc2fd274",
+     "block": 68614105,
+     "gasUsed": 1441792,
+     "contract": "TouchstoneFactory",
+     "address": "0x9d973976fc211ac7425f34f1060641339451f75c"
+    },
+    {
+     "type": "CREATE",
+     "tx": "0xae41526b1bc0945470419c4f78f04aae941c05f60a681468613293ae38b20f2a",
+     "block": 68614107,
+     "gasUsed": 2041452,
+     "contract": "CuratorBundler",
+     "address": "0xd6a4a276a3a859dd64b9166dea1c2a9c6c111c4f"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x79334269c0d0c3bf9849ef801e1a54afedfbed25c4b58ea0ef620195ea51e38a",
+     "block": 68614109,
+     "gasUsed": 51272,
+     "function": "transfer(address,uint256)",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x84802bef8e966a7b70de38f5218f3d7c260b66e61cfed9a8048fb7bf2205612d",
+     "block": 68614110,
+     "gasUsed": 51308,
+     "function": "transfer(address,uint256)",
+     "to": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d"
+    },
+    {
+     "type": "CALL",
+     "tx": "0xa1e1456da27f95761f56b03001b62a598f853064b67a4b7c3852bd55c258f39f",
+     "block": 68614113,
+     "gasUsed": 12653560,
+     "function": "deployAndPlace((bytes,bytes,bytes,(address,address,address,address,uint24,int24,uint160,(address,uint32,int24,uint32,uint32,uint16,uint160,uint32,uint32,uint32,uint32,uint32,uint32,uint64,uint64,uint128,uint128,uint64,uint32,uint64,uint64,uint16,int24,int24,int24,uint64,uint32,uint8,uint128)),bytes32,bytes32,(uint256,uint256,address,uint256,uint256)),int24,int24,(bool,bool,uint128),uint256)",
+     "to": "0xd6a4a276a3a859dd64b9166dea1c2a9c6c111c4f",
+     "created": [
+      {
+       "contract": "TouchstoneVaultExtension",
+       "address": "0xbc763aa8476265fd0b90d31f3eb2e4a380df349f"
+      },
+      {
+       "contract": "TouchstoneVault",
+       "address": "0x3f3683fd487cd54d8d6ee5604accb32e332979ed"
+      },
+      {
+       "contract": "TouchstoneHook",
+       "address": "0x43299eeb3ffbac8c311a99677bd3166d631fe0a0"
+      }
+     ]
+    }
+   ]
+  },
+  "reagent_superseded_s2r1": {
+   "script": "Reagent.s.sol",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T21:56:41+00:00",
+   "note": "deterministic deployer through 0x4e59 (salt keccak256('touchstone-reagent/v1')); RC = CREATE(RC deployer 0x67941b1eA81913B45a6eE1d9B2e1aFfa98b2aea1, nonce 0) = 0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9 (reserved: that key's first Lasna tx must deploy the RC); admin = deployer EOA",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0x7e89c02fdc27235f1e866c8eb0ab8f37d4d8447f3c5813fb7665196a73b2632c",
+     "block": 68618567,
+     "gasUsed": 2701650,
+     "function": null,
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0x8a1bfa2bc06d2bd2bad91dfffd222a485715f669b3673e03229651833639e8fe",
+     "block": 68618569,
+     "gasUsed": 4785733,
+     "function": null,
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0x106859bfed2ad4d05d3ceddbcb1d3a4729e5084695003e9182946a627d96d3d5",
+     "block": 68618572,
+     "gasUsed": 2239077,
+     "function": null,
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "created": [
+      {
+       "contract": "ReagentHub",
+       "address": "0x6ba4c7c6024d0f2fa08603573fc568d90dc8d68a"
+      }
+     ]
+    }
+   ],
+   "superseded": "s2 fix review r1 F1-01/F1-02 changed the Covenant (and so the factory and Hub addresses); never cite this Hub as evidence"
+  },
+  "reagent": {
+   "script": "Reagent.s.sol",
+   "commit": "1502bcb",
+   "recorded_at": "2026-11-23T23:55:29+00:00",
+   "note": "final s2 code (after fix review r1-r3); through 0x4e59, salt keccak256('touchstone-reagent/v1'); RC = CREATE(0x67941b1eA81913B45a6eE1d9B2e1aFfa98b2aea1, nonce 0) = 0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9 (reserved); admin = deployer EOA",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0xa3d0325b253bfa20e1f71a06b56651d822e8ed081840736137eb4b19d4173244",
+     "block": 68625145,
+     "gasUsed": 2749301,
+     "contract": "CovenantExt",
+     "address": "0x39Da1F404B98fe0390A4d4E648C0bC8E030Aa061",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0xb4d93c83a0e3486c3c51d6b0113245354886a64537bef20f13ceca70ce162623",
+     "block": 68625148,
+     "gasUsed": 4836399,
+     "contract": "Covenant",
+     "address": "0xDEb3E647AC0f9f972D5Ba6A45aCb5Bd572541731",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    },
+    {
+     "type": "CREATE2",
+     "tx": "0x3e7f947cf31f132071e4cfd9cafddff4dedd63b0b3fcd2403590c78d3ece358f",
+     "block": 68625150,
+     "gasUsed": 2251681,
+     "contract": "CovenantFactory",
+     "address": "0x2bCb1F62915797D6813A0C1c66b7aA8a285229E0",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13",
+     "created": [
+      {
+       "contract": "ReagentHub",
+       "address": "0x5887f7051a208778df71a08dd1223a1cb12b15d9"
+      }
+     ]
+    }
+   ],
+   "reads": {
+    "source": "cast call at record time (script/deploy/record.py companion read)",
+    "at": "2026-11-23T23:55:40+00:00",
+    "CovenantFactory.HUB()": "0x5887f7051A208778df71A08DD1223a1CB12b15d9",
+    "ReagentHub.FACTORY()": "0x2bCb1F62915797D6813A0C1c66b7aA8a285229E0",
+    "ReagentHub.RC()": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
+    "ReagentHub.PROXY()": "0x775c9B990ADe401060B78D0e98684eEf8d2466C1"
+   }
+  }
+ }
+}
