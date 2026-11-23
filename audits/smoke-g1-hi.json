@@ -1,0 +1,378 @@
+{
+ "gate": "G1",
+ "generated_by": "script/smoke/g1.py collect",
+ "generated_at": 1795463724,
+ "gasLimitRequested": 1000000,
+ "contracts": {
+  "rc": {
+   "chain": 5318007,
+   "address": "0xb5e58161897a13c1b43dedbd7d4f5caee139fffa",
+   "tx": "0xa3276c9961fc72c7764033f590d13713f4cc11bdaa0c6ae203e983831024c287"
+  },
+  "ping_1301": {
+   "address": "0x461a3ff754b9b9afdefdc14c05239267c435a660",
+   "tx": "0x471fea3eb3a3d222a77ff1a9f3bff13b565f04bf0cbb1a98bda9e6d7d9dfa61c"
+  },
+  "ping_11155111": {
+   "address": "0x4ffee6c4c0b7b8f6874aaf5083b74abedc6b7da2",
+   "tx": "0xd2098d271d4f87afcb507a93f9687800ee5f55b5de65c41f00046cca25401d42"
+  },
+  "receiver_1301": {
+   "address": "0xaeaf19f4c37133b12583afea2862ba2e39382d40",
+   "tx": "0xa07e46fb2b05abbc21214bbb5f6a2ecc2d677a05c3be65631fd9ccebd066eff0"
+  },
+  "receiver_11155111": {
+   "address": "0x9d6c8584760a35fea1537e76667a7fb237ee5acf",
+   "tx": "0x319f65fa4c93e9371ba6686aae1c89b0a8e5c59ecd5a95ed2d0133246ced38b1"
+  }
+ },
+ "funding": {
+  "rc_depositTo": "0x8e885da8cee95887149aa90bd0cf6efb268a1ca6f83ae0ac694f07b2ad3ec7b1",
+  "receiver_1301": "0xcf700151886e7bcd0a4cb0cf0cf3be8e8e11c6802b62dd6b261ac6bcc9a0aa57",
+  "receiver_11155111": "0x4f57fb29bfb3e49341908f54d4b23e238f44f5be94406c6960161ba8f08f12a4"
+ },
+ "selectors": {
+  "lasna_system": {
+   "proxy": "0x8888888888888888888888888888888888888888",
+   "implementation": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "checks": [
+    {
+     "sig": "subscribe(uint256,address,uint256,uint256,uint256,uint256)",
+     "selector": "0x5a6aced0",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "unsubscribe(uint256,address,uint256,uint256,uint256,uint256)",
+     "selector": "0x2f807336",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "requestCallbackV_1_0((uint256,address,uint64,bytes))",
+     "selector": "0x6407b0c1",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "depositTo(address)",
+     "selector": "0xb760faf9",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "debt(address)",
+     "selector": "0x9b6c56ec",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "reserves(address)",
+     "selector": "0xd66bd524",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "react((uint256,address,uint256,uint256,uint256,uint256,bytes,uint256,uint256,uint256,uint256,uint256))",
+     "selector": "0x0d152c2c",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "pay(uint256)",
+     "selector": "0xc290d691",
+     "in_impl_bytecode": true
+    }
+   ],
+   "all_found": true
+  },
+  "proxy_1301": {
+   "proxy": "0x775c9B990ADe401060B78D0e98684eEf8d2466C1",
+   "implementation": "0xd00a7f9034337d900e68b20c0da45c3a4f1bf784",
+   "checks": [
+    {
+     "sig": "depositTo(address)",
+     "selector": "0xb760faf9",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "debt(address)",
+     "selector": "0x9b6c56ec",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "reserves(address)",
+     "selector": "0xd66bd524",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "pay(uint256)",
+     "selector": "0xc290d691",
+     "in_impl_bytecode": true
+    }
+   ],
+   "all_found": true
+  },
+  "proxy_11155111": {
+   "proxy": "0xAa14d9Cd0f788Ca23d11805986C1d8bd035D23b4",
+   "implementation": "0xf11dfbd53599332ef3bb14cead24d7776e23dd80",
+   "checks": [
+    {
+     "sig": "depositTo(address)",
+     "selector": "0xb760faf9",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "debt(address)",
+     "selector": "0x9b6c56ec",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "reserves(address)",
+     "selector": "0xd66bd524",
+     "in_impl_bytecode": true
+    },
+    {
+     "sig": "pay(uint256)",
+     "selector": "0xc290d691",
+     "in_impl_bytecode": true
+    }
+   ],
+   "all_found": true
+  }
+ },
+ "pings": [
+  {
+   "chain": 1301,
+   "nonce": 2,
+   "tx": "0x9cd8232c26fcb4ba4ead0fd27c6b2fdd34f53f3377e011c7ed8f445e151b92b7",
+   "sent_at": 1795452469
+  },
+  {
+   "chain": 11155111,
+   "nonce": 2,
+   "tx": "0x5347b72c9bc09efa011a2e0cf8f2df098626d06b07a164907f4ec3a103464b2b",
+   "sent_at": 1795452482
+  }
+ ],
+ "reactions": [
+  {
+   "originChain": 1301,
+   "nonce": 2,
+   "originTx": "0x9cd8232c26fcb4ba4ead0fd27c6b2fdd34f53f3377e011c7ed8f445e151b92b7",
+   "reactTs": 1795452467,
+   "reactiveTx": "0x25853431da7e56d0a2307f4c4d367ea6cfc58d37bed586326e791c814c15a75f",
+   "lasnaBlock": 9070149
+  },
+  {
+   "originChain": 11155111,
+   "nonce": 2,
+   "originTx": "0x5347b72c9bc09efa011a2e0cf8f2df098626d06b07a164907f4ec3a103464b2b",
+   "reactTs": 1795452481,
+   "reactiveTx": "0x016e84cc17b308ada0c014729edd0c53ab0299d4779d60f7aeb5775cd070eb11",
+   "lasnaBlock": 9070162
+  }
+ ],
+ "callbacks": [
+  {
+   "destChain": 1301,
+   "originChain": 1301,
+   "nonce": 2,
+   "gasAtEntry": 810004,
+   "gasLimitAsked": 1000000,
+   "originBlock": 68600040,
+   "originTs": 1795452468,
+   "originTx": "0x9cd8232c26fcb4ba4ead0fd27c6b2fdd34f53f3377e011c7ed8f445e151b92b7",
+   "reactTs": 1795452467,
+   "destTs": 1795452470,
+   "destTx": "0x41742203125df77efbb35ebaae798cc995afd0f4591043c139a08bb91525d40f",
+   "destTxFrom": "0xf9f61c1d3325e2d4abb55dd9e0db84f7a0d914b0",
+   "destTxTo": "0x775c9b990ade401060b78d0e98684eef8d2466c1",
+   "destTxGasLimit": 1000000,
+   "destTxGasUsed": 66249,
+   "originToReactS": -1,
+   "reactToDestS": 3,
+   "originToDestS": 2,
+   "fixedOverheadF": 177138,
+   "url": "https://sepolia.uniscan.xyz/tx/0x41742203125df77efbb35ebaae798cc995afd0f4591043c139a08bb91525d40f"
+  },
+  {
+   "destChain": 1301,
+   "originChain": 11155111,
+   "nonce": 2,
+   "gasAtEntry": 810004,
+   "gasLimitAsked": 1000000,
+   "originBlock": 12196935,
+   "originTs": 1795452480,
+   "originTx": "0x5347b72c9bc09efa011a2e0cf8f2df098626d06b07a164907f4ec3a103464b2b",
+   "reactTs": 1795452481,
+   "destTs": 1795452484,
+   "destTx": "0xdec66401fb33647e1b4c10f2973ad5ee9fe64b09120f0ffaa293aeddda387af0",
+   "destTxFrom": "0xf9f61c1d3325e2d4abb55dd9e0db84f7a0d914b0",
+   "destTxTo": "0x775c9b990ade401060b78d0e98684eef8d2466c1",
+   "destTxGasLimit": 1000000,
+   "destTxGasUsed": 66249,
+   "originToReactS": 1,
+   "reactToDestS": 3,
+   "originToDestS": 4,
+   "fixedOverheadF": 177138,
+   "url": "https://sepolia.uniscan.xyz/tx/0xdec66401fb33647e1b4c10f2973ad5ee9fe64b09120f0ffaa293aeddda387af0"
+  },
+  {
+   "destChain": 11155111,
+   "originChain": 1301,
+   "nonce": 2,
+   "gasAtEntry": 744906,
+   "gasLimitAsked": 1000000,
+   "originBlock": 68600040,
+   "originTs": 1795452468,
+   "originTx": "0x9cd8232c26fcb4ba4ead0fd27c6b2fdd34f53f3377e011c7ed8f445e151b92b7",
+   "reactTs": 1795452467,
+   "destTs": 1795452480,
+   "destTx": "0x06e9039bed12f86d6717ad865b43306665f17fe0942a398710cab148b736a13c",
+   "destTxFrom": "0xf9f61c1d3325e2d4abb55dd9e0db84f7a0d914b0",
+   "destTxTo": "0xaa14d9cd0f788ca23d11805986c1d8bd035d23b4",
+   "destTxGasLimit": 1000000,
+   "destTxGasUsed": 70761,
+   "originToReactS": -1,
+   "reactToDestS": 13,
+   "originToDestS": 12,
+   "fixedOverheadF": 243270,
+   "url": "https://sepolia.etherscan.io/tx/0x06e9039bed12f86d6717ad865b43306665f17fe0942a398710cab148b736a13c"
+  },
+  {
+   "destChain": 11155111,
+   "originChain": 11155111,
+   "nonce": 2,
+   "gasAtEntry": 744906,
+   "gasLimitAsked": 1000000,
+   "originBlock": 12196935,
+   "originTs": 1795452480,
+   "originTx": "0x5347b72c9bc09efa011a2e0cf8f2df098626d06b07a164907f4ec3a103464b2b",
+   "reactTs": 1795452481,
+   "destTs": 1795452492,
+   "destTx": "0x49a506f3ee121d1b5a40929f07d4780819f62220b7e80c27f79405eb68090a80",
+   "destTxFrom": "0xf9f61c1d3325e2d4abb55dd9e0db84f7a0d914b0",
+   "destTxTo": "0xaa14d9cd0f788ca23d11805986c1d8bd035d23b4",
+   "destTxGasLimit": 1000000,
+   "destTxGasUsed": 70761,
+   "originToReactS": 1,
+   "reactToDestS": 11,
+   "originToDestS": 12,
+   "fixedOverheadF": 243270,
+   "url": "https://sepolia.etherscan.io/tx/0x49a506f3ee121d1b5a40929f07d4780819f62220b7e80c27f79405eb68090a80"
+  }
+ ],
+ "paths_delivered": [
+  "11155111->11155111",
+  "11155111->1301",
+  "1301->11155111",
+  "1301->1301"
+ ],
+ "missing_callbacks": [],
+ "timestamps_note": "latencies are differences of block timestamps on different chains (\u00b11 s skew; may read negative)",
+ "mcp_trace_origin_event": {
+  "0x9cd8232c26fcb4ba4ead0fd27c6b2fdd34f53f3377e011c7ed8f445e151b92b7": {
+   "verdict": "CALLBACK_NOT_POSTED",
+   "confidence": "cannot_prove",
+   "summary": "Reaction succeeded; callback problem: No delivery result for the callback (log 1) to Unichain Sepolia, and no CallbackPosted event exists on this network in the last 30,000 blocks: results are not being posted back, so delivery cannot be read from Reactive.",
+   "stages": [
+    [
+     "sequencing",
+     "SEQUENCED_CARRIED"
+    ],
+    [
+     "reaction",
+     "REACTED"
+    ],
+    [
+     "callback",
+     "GAS_BUDGET"
+    ],
+    [
+     "callback",
+     "DEST_FUNDING"
+    ],
+    [
+     "callback",
+     "GAS_BUDGET"
+    ],
+    [
+     "callback",
+     "DEST_FUNDING"
+    ],
+    [
+     "delivery",
+     "CALLBACK_NOT_POSTED"
+    ],
+    [
+     "delivery",
+     "NO_FAILURE_SEEN"
+    ],
+    [
+     "delivery",
+     "CALLBACK_NOT_POSTED"
+    ],
+    [
+     "delivery",
+     "NO_FAILURE_SEEN"
+    ]
+   ]
+  },
+  "0x5347b72c9bc09efa011a2e0cf8f2df098626d06b07a164907f4ec3a103464b2b": {
+   "verdict": "CALLBACK_NOT_POSTED",
+   "confidence": "cannot_prove",
+   "summary": "Reaction succeeded; callback problem: No delivery result for the callback (log 1) to Unichain Sepolia, and no CallbackPosted event exists on this network in the last 30,000 blocks: results are not being posted back, so delivery cannot be read from Reactive.",
+   "stages": [
+    [
+     "sequencing",
+     "SEQUENCED_CARRIED"
+    ],
+    [
+     "reaction",
+     "REACTED"
+    ],
+    [
+     "callback",
+     "GAS_BUDGET"
+    ],
+    [
+     "callback",
+     "DEST_FUNDING"
+    ],
+    [
+     "callback",
+     "GAS_BUDGET"
+    ],
+    [
+     "callback",
+     "DEST_FUNDING"
+    ],
+    [
+     "delivery",
+     "CALLBACK_NOT_POSTED"
+    ],
+    [
+     "delivery",
+     "NO_FAILURE_SEEN"
+    ],
+    [
+     "delivery",
+     "CALLBACK_NOT_POSTED"
+    ],
+    [
+     "delivery",
+     "NO_FAILURE_SEEN"
+    ]
+   ]
+  }
+ },
+ "mcp_rc_health": {
+  "verdict": "HEALTHY",
+  "summary": "No debt, reserves 4.9719846 REACT (at least 10 reactions), 2/2 subscriptions active, 0 recent reverts (0.0/hour)."
+ },
+ "mcp_check_rc_source": {
+  "verdict": "REVERT_AS_FILTER",
+  "summary": "1 likely problem(s); first: react() can revert. A reverted reaction is still charged in full; if this filters unwanted events, narrow the subscription topics or return early instead.",
+  "findings": [
+   [
+    "source",
+    "REVERT_AS_FILTER",
+    "react() can revert. A reverted reaction is still charged in full; if this filters unwanted events, narrow the subscription topics or return early instead."
+   ]
+  ]
+ }
+}
