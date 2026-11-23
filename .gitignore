@@ -1,0 +1,22 @@
+# Internal working material: kept in the local internal repo, never published
+/internal/
+/CLAUDE.md
+/AGENTS.md
+/.claude/
+/docs/HANDOFF.md
+/output/
+
+# Build artefacts
+out/
+cache/
+broadcast/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
