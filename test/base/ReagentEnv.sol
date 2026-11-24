@@ -38,7 +38,7 @@ abstract contract ReagentEnv is TsEnv {
 
     uint64 internal seq; // the RC's conduct seq in tests
 
-    function _setUpReagent(uint256 chainId) internal {
+    function _setUpReagent(uint256 chainId) internal virtual {
         _setUpTouchstone(chainId);
         ext = new CovenantExt();
         impl = new Covenant(address(ext));

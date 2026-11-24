@@ -6,12 +6,15 @@ hand). Reads `broadcast/<Script>.s.sol/<chain>/run-latest.json` and the receipts
       (CREATE2 txs: the address recomputed from deployer, salt and initcode, and checked for code with --rpc)
   python3 script/deploy/record.py tx <step> <chainId> <rpc> <label>=<txhash> ... [--note TEXT]
       (transactions sent outside a forge broadcast, read from their receipts; failed ones are kept and marked)
+  python3 script/deploy/record.py supersede <chainId> <step> --note TEXT
+      (renames the step to <step>_superseded_<n> and marks it, so it is never cited as current evidence)
 
 Each step stores: every CREATE (contract name, address, tx hash, block), every CALL (function, to, tx hash, block,
 gasUsed), the run's commit and a timestamp. Steps already recorded are replaced only with --replace. The forge
 console logs are not evidence; the receipts are.
 """
 import json, os, subprocess, sys, datetime as dt
+from prov import stamp
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -36,12 +39,49 @@ def record_txs(argv):
     if step in doc['steps'] and '--replace' not in argv:
         print(f'record: step {step} already recorded in {out}; pass --replace to overwrite')
         return 1
-    commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    doc['steps'][step] = {'source': 'receipts', 'commit': commit,
+    doc['steps'][step] = {'source': 'receipts', **stamp(),
                           'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'), 'note': note, 'txs': txs}
     open(out, 'w').write(json.dumps(doc, indent=1) + '\n')
     print(f'record: {step} -> {out} ({len(txs)} txs)')
     return 0
+
+
+def supersede(argv):
+    if len(argv) < 2 or '--note' not in argv:
+        print(__doc__)
+        return 2
+    chain, step, note = argv[0], argv[1], argv[argv.index('--note') + 1]
+    out = os.path.join(ROOT, 'audits', f'deployments-{chain}.json')
+    doc = json.load(open(out))
+    if step not in doc['steps']:
+        print(f'record: no step {step} in {out}')
+        return 1
+    n = 1 + sum(1 for k in doc['steps'] if k.startswith(step + '_superseded_'))
+    rec = doc['steps'].pop(step)
+    rec['superseded'] = note
+    rec['superseded_at'] = dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')
+    rec['superseded_by'] = 'script/deploy/record.py supersede'
+    doc['steps'][f'{step}_superseded_{n}'] = rec
+    open(out, 'w').write(json.dumps(doc, indent=1) + '\n')
+    print(f'record: {step} -> {step}_superseded_{n}')
+    return 0
+
+
+def _reagent_reads(txs, rpc):
+    """The deployed links read from chain at record time: the factory's HUB(), the Hub's FACTORY(), RC(), PROXY()
+    and needs() (s3: formerly a hand-run companion read)."""
+    f = [t['address'] for t in txs if t.get('contract') == 'CovenantFactory' and t.get('address')]
+    if len(f) != 1:
+        return None
+    c = lambda *a: subprocess.run(['cast', 'call', *a, '--rpc-url', rpc], capture_output=True, text=True).stdout.strip()
+    hub = c(f[0], 'HUB()(address)')
+    impl = c(f[0], 'IMPL()(address)')
+    return {'addresses': {'ext': c(impl, 'EXT()(address)'), 'impl': impl, 'factory': f[0], 'hub': hub},
+            'source': 'script/deploy/record.py (cast call at record time)',
+            'at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+            'CovenantFactory.HUB()': hub, 'ReagentHub.FACTORY()': c(hub, 'FACTORY()(address)'),
+            'ReagentHub.RC()': c(hub, 'RC()(address)'), 'ReagentHub.PROXY()': c(hub, 'PROXY()(address)'),
+            'ReagentHub.needs()': c(hub, 'needs()(uint256,uint256)').replace('\n', ' ')}
 
 
 def create2(deployer, salt, initcode):
@@ -54,6 +94,8 @@ def create2(deployer, salt, initcode):
 def main(argv):
     if argv and argv[0] == 'tx':
         return record_txs(argv[1:])
+    if argv and argv[0] == 'supersede':
+        return supersede(argv[1:])
     if len(argv) < 3:
         print(__doc__)
         return 2
@@ -67,10 +109,18 @@ def main(argv):
     for t in run['transactions']:
         h = t.get('hash')
         r = rec.get(h)
-        if r is None or int(r['status'], 16) != 1:
-            print(f'record: tx {h} has no successful receipt; refusing to record a partial step')
+        if r is None:
+            print(f'record: tx {h} has no receipt; refusing to record a partial step')
             return 1
-        e = {'type': t['transactionType'], 'tx': h, 'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16)}
+        ok = int(r['status'], 16) == 1
+        e = {'type': t['transactionType'], 'tx': h, 'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16),
+             'status': 'ok' if ok else 'FAILED'}
+        if not ok:
+            # a failed tx is kept and marked, never dropped (tools review m-7), and records no address
+            print(f'record: tx {h} FAILED; recorded as FAILED')
+            e.update(contract=t.get('contractName'), function=t.get('function'))
+            txs.append(e)
+            continue
         if t['transactionType'] == 'CREATE':
             e.update(contract=t.get('contractName'), address=t.get('contractAddress'))
         elif t['transactionType'] == 'CREATE2':
@@ -98,8 +148,8 @@ def main(argv):
     if step in doc['steps'] and '--replace' not in argv:
         print(f'record: step {step} already recorded in {out}; pass --replace to overwrite')
         return 1
-    commit = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    doc['steps'][step] = {'script': script, 'commit': commit, 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+    reads = _reagent_reads(txs, rpc) if script == 'Reagent.s.sol' and rpc else None
+    doc['steps'][step] = {'script': script, **stamp(), **({'reads': reads} if reads else {}), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
                           'note': note, 'txs': txs}
     open(out, 'w').write(json.dumps(doc, indent=1) + '\n')
     print(f'record: {step} -> {out} ({len(txs)} txs)')

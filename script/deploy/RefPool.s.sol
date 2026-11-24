@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {DemoToken, IV3Factory, IV3Pool, RefDriver} from "touchstone-script/demo/DemoKit.sol";
 import {Chains} from "./Chains.sol";
+import {Tier} from "touchstone/types/Tier.sol";
 
 /// @notice Step 0b on either Reagent chain (ported from Touchstone's `script/demo/DemoRef.s.sol`, spec OQ-2): the mock
 ///         tokens (mUSDC, 6 decimals, as token0 and mWETH, 18 decimals, as token1: Touchstone's orientation, so the
@@ -23,6 +24,8 @@ contract RefPool is Script {
 
     function run() external {
         Chains.C memory c = Chains.get(block.chainid);
+        (Tier memory tier_,) = Chains.tier(block.chainid);
+        uint16 minCard = tier_.MIN_CARD;
         vm.startBroadcast();
         address me = msg.sender;
         uint64 n = vm.getNonce(me);
@@ -42,10 +45,10 @@ contract RefPool is Script {
         pool.initialize(TickMath.getSqrtPriceAtTick(START_TICK));
         // in chunks of 250 (a per-transaction gas cap on 1301), ending exactly at MIN_CARD (s2: 400 is not a
         // multiple of 250; the first 11155111 run stopped at 250 and the hook refused the pool, BadRef)
-        for (uint16 k = 250; k < c.minCard; k += 250) {
+        for (uint16 k = 250; k < minCard; k += 250) {
             pool.increaseObservationCardinalityNext(k);
         }
-        pool.increaseObservationCardinalityNext(c.minCard);
+        pool.increaseObservationCardinalityNext(minCard);
         RefDriver driver = new RefDriver(me, pool);
         usdc.mint(address(driver), 10_000_000e6);
         weth.mint(address(driver), 5_000e18);

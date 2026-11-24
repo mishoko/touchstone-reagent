@@ -246,7 +246,7 @@ contract ReagentHub is IReagentHub {
     ///         Glamsterdam price of each fresh slot the path writes). A floor for the pre-check, never a cap (D2-01).
     function needs() public view returns (uint256 exit, uint256 plan) {
         // [MU-019] the per-chain table (selected by chain id, like PROXY, so T-ADDR holds)
-        if (block.chainid == 11155111) return (1_870_000, 2_236_000);
+        if (block.chainid == 11155111) return (2_220_000, 2_310_000);
         return (832_000, 1_198_000);
     }
 

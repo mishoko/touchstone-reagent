@@ -60,8 +60,11 @@ abstract contract TsEnv is Test {
         (Tier memory t, uint256 bt) = Tiers.testing();
         tier = t;
         blocktime = bt;
-        vm.roll(100_000);
-        vm.warp(100_000 * bt);
+        // the timeline's origin; the 11155111 gas twins start it just above Sepolia's head (eth_simulateV1 needs
+        // increasing block numbers and times), every other test uses the defaults
+        uint256 sb = vm.envOr("TS_START_BLOCK", uint256(100_000));
+        vm.roll(sb);
+        vm.warp(vm.envOr("TS_START_TIME", sb * bt));
         manager = new PoolManager(address(this));
         MockToken a = new MockToken("mUSDC", 6);
         MockToken b = new MockToken("mWETH", 18);
@@ -95,11 +98,20 @@ abstract contract TsEnv is Test {
     /// @notice A fresh vault through a new bundler (one bundler deploys one vault), placed on [-1000, 1000) around a
     ///         reference at tick 0 with two hours of history.
     function _deployVault() internal returns (V memory v) {
+        return _deployVaultWith(_newBundler());
+    }
+
+    /// @notice A bundler for this chain's Touchstone factory (registered with an RC before it deploys, spec §12).
+    function _newBundler() internal returns (CuratorBundler) {
+        return new CuratorBundler(curatorOwner, tsFactory);
+    }
+
+    function _deployVaultWith(CuratorBundler b) internal returns (V memory v) {
         v.ref = new MockRefPool(address(token0), address(token1), 500, uint32(block.timestamp - 2 hours), 0);
         Tier memory t = tier;
         t.REF_POOL = address(v.ref);
         t.REF_SQRT_PRICE = TickMath.getSqrtPriceAtTick(0);
-        v.bundler = new CuratorBundler(curatorOwner, tsFactory);
+        v.bundler = b;
         bytes32 saltV = bytes32(uint256(1));
         HookArgs memory args = HookArgs({
             poolManager: address(manager),
@@ -123,7 +135,7 @@ abstract contract TsEnv is Test {
 
     // ------------------------------------------------------------------ clock and conduct
 
-    function advance(uint256 n) internal {
+    function advance(uint256 n) internal virtual {
         vm.roll(vm.getBlockNumber() + n);
         vm.warp(vm.getBlockTimestamp() + n * blocktime);
     }

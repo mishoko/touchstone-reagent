@@ -18,11 +18,18 @@ contract ReagentDeploy is Script {
     function run() external {
         address rc = vm.envAddress("RC");
         address admin = vm.envAddress("ADMIN");
+        address d = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+        bytes memory extInit = type(CovenantExt).creationCode;
+        address extA = vm.computeCreate2Address(SALT, keccak256(extInit), d);
+        bytes memory implInit = abi.encodePacked(type(Covenant).creationCode, abi.encode(extA));
+        address implA = vm.computeCreate2Address(SALT, keccak256(implInit), d);
         vm.startBroadcast();
-        CovenantExt ext = new CovenantExt{salt: SALT}();
-        Covenant impl = new Covenant{salt: SALT}(address(ext));
+        // unchanged contracts keep their CREATE2 address: deploy only what is not there yet (s3 redeploy)
+        CovenantExt ext = extA.code.length > 0 ? CovenantExt(extA) : new CovenantExt{salt: SALT}();
+        Covenant impl = implA.code.length > 0 ? Covenant(payable(implA)) : new Covenant{salt: SALT}(address(ext));
         CovenantFactory f = new CovenantFactory{salt: SALT}(rc, admin, address(impl));
         vm.stopBroadcast();
+        require(address(ext) == extA && address(impl) == implA, "CREATE2 prediction");
         ReagentHub hub = ReagentHub(payable(f.HUB()));
         require(hub.FACTORY() == address(f) && hub.RC() == rc && f.ADMIN() == admin && f.IMPL() == address(impl));
         console2.log("CovenantExt", address(ext));

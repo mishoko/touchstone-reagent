@@ -82,6 +82,20 @@ def wired(m):
                 and m.get('kill') and m['kill'] != 'pending')
 
 
+TAG_WINDOW = 2
+
+
+def _tag_near(src, mid, find, window=None):
+    """A per-mutant `tag_window` (with a `tag_reason`) widens the window where the source cannot move: a deployed
+    contract's source is frozen, since even a comment changes its metadata hash and so its CREATE2 address."""
+    window = window or TAG_WINDOW
+    i = src.find(find)
+    a = src[:i].count('\n')
+    b = a + find.count('\n')
+    lines = [src[:t.start()].count('\n') for t in re.finditer(r'\[' + re.escape(mid) + r'\]', src)]
+    return any(a - window <= ln <= b for ln in lines)
+
+
 def audit(muts):
     tags = {}
     for d, _, fs in os.walk(os.path.join(ROOT, 'src')):
@@ -95,6 +109,15 @@ def audit(muts):
     for m in muts:
         if m.get('file') and m['file'] not in tags.get(m['id'], set()):
             errs.append(f"mutant without its tag in {m['file']}: {m['id']}")
+    # a tag is bound to its mutant by POSITION (TRAPS: a lint fooled by its neighbours): the tag line lies within
+    # TAG_WINDOW lines above the single find occurrence, or inside it (tools review m-2)
+    for m in muts:
+        if wired(m) and m['file'] in tags.get(m['id'], set()):
+            src = open(os.path.join(ROOT, m['file'])).read()
+            if src.count(m['find']) == 1 and not _tag_near(src, m['id'], m['find'], m.get('tag_window')):
+                errs.append(f"tag of {m['id']} is not within {m.get('tag_window') or TAG_WINDOW} lines above its find in {m['file']}")
+            if m.get('tag_window') and not str(m.get('tag_reason') or '').strip():
+                errs.append(f"{m['id']}: a wider tag_window needs a tag_reason")
     # every wired mutant's find string matches its file exactly once (a stale or ambiguous pattern is not a kill)
     for m in muts:
         if wired(m):
@@ -192,6 +215,20 @@ def _killer_files(kill):
     return sorted(deps)
 
 
+def _src_imports(f0):
+    """Every src/ file `f0` imports, transitively (relative imports only; tools review m-3). A change to an imported
+    contract (e.g. CovenantBase for a Covenant mutant) re-runs the mutant under --changed."""
+    deps, todo = set(), [f0]
+    while todo:
+        f = todo.pop()
+        for imp in re.findall(r'import\s+[^;]*?"(\.[^"]+)"', _read(f)):
+            p = os.path.normpath(os.path.join(os.path.dirname(f), imp))
+            if p.startswith('src' + os.sep) and p not in deps and p != f0:
+                deps.add(p)
+                todo.append(p)
+    return sorted(deps)
+
+
 def _tree_files(*dirs):
     out = []
     for d0 in dirs:
@@ -213,6 +250,7 @@ def basis_parts(m):
     files += kf
     extra = ['foundry.toml', 'remappings.txt']
     extra += _tree_files('src/libraries', 'src/types', 'src/interfaces')
+    extra += [f for f in _src_imports(m['file']) if f not in extra]
     for f in extra:
         h.update(f'dep:{f}:'.encode() + _read(f).encode())
     files += extra
@@ -310,14 +348,34 @@ def drop_new_failures(root, before):
     return n
 
 
+def _sha(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
 def restore_leftovers(root=ROOT):
-    """Restores any file left mutated by an interrupted run (its `.mutorig` backup is the original)."""
+    """Restores a file left mutated by an interrupted run, only while it still holds exactly the mutated text (its
+    `.mutsha`); an edit made after the crash is never overwritten (tools review m-4). Returns the refused paths."""
+    refused = []
     for d, _, fs in os.walk(os.path.join(root, 'src')):
         for f in fs:
-            if f.endswith('.mutorig'):
-                orig = os.path.join(d, f)
-                os.replace(orig, orig[:-len('.mutorig')])
-                print('restored', orig[:-len('.mutorig')])
+            if not f.endswith('.mutorig'):
+                continue
+            orig = os.path.join(d, f)
+            tgt = orig[:-len('.mutorig')]
+            cur = open(tgt).read() if os.path.exists(tgt) else None
+            want = open(tgt + '.mutsha').read().strip() if os.path.exists(tgt + '.mutsha') else None
+            if cur is not None and cur == open(orig).read():
+                os.remove(orig)
+            elif cur is not None and want is not None and _sha(cur) == want:
+                os.replace(orig, tgt)
+                print('restored', tgt)
+            else:
+                refused.append(tgt)
+                print(f'REFUSED to restore {tgt}: it changed after the interrupted run; compare it with {orig} by hand')
+                continue
+            if os.path.exists(tgt + '.mutsha'):
+                os.remove(tgt + '.mutsha')
+    return refused
 
 
 def run_one(m, root, full, clean_ok):
@@ -332,7 +390,10 @@ def run_one(m, root, full, clean_ok):
     # atomic backup: a kill mid-write never leaves a truncated original (tools review m-4)
     open(f + '.mutorig.tmp', 'w').write(src)
     os.replace(f + '.mutorig.tmp', f + '.mutorig')
-    open(f, 'w').write(src.replace(m['find'], m['replace']))
+    mutated = src.replace(m['find'], m['replace'])
+    open(f + '.mutsha.tmp', 'w').write(_sha(mutated))
+    os.replace(f + '.mutsha.tmp', f + '.mutsha')
+    open(f, 'w').write(mutated)
     before = _failure_files(root)
     try:
         t = time.time()
@@ -345,8 +406,9 @@ def run_one(m, root, full, clean_ok):
         return (m['id'], v, f"{m['desc']} [{'full' if full else k}] {time.time() - t:.0f}s{tag}" + (f' <{why}>' if why else ''))
     finally:
         open(f, 'w').write(src)
-        if os.path.exists(f + '.mutorig'):
-            os.remove(f + '.mutorig')
+        for x in (f + '.mutorig', f + '.mutsha'):
+            if os.path.exists(x):
+                os.remove(x)
         dropped = drop_new_failures(root, before)
         if dropped:
             print(f"{m['id']}: deleted {dropped} invariant counterexample(s) written by the mutant's run (F-056)")
@@ -497,7 +559,8 @@ def main(argv):
             return 1
         except (ValueError, ProcessLookupError):
             print('mutate: removing a stale', MARK)
-    restore_leftovers()
+    if restore_leftovers():
+        return 1  # a file changed after an interrupted run: the owner compares it by hand (never auto-overwritten)
     full = '--full' in argv
     args = [a for a in argv if not a.startswith('--')]
     if since:
@@ -609,6 +672,26 @@ def selftest():
         eq('audit-missing-tag', audit([dict(base, id='MU-001', find='a = 1;', replace='a = 2;'),
                                        dict(base, id='MU-003', find='b = 1; b', replace='b'),
                                        dict(base, id='MU-004', find='a = 1;', replace='a = 3;')]), False)
+        # m-2: a tag far from its find is not bound to it
+        open(os.path.join(d, 'src', 'C.sol'), 'w').write('// [MU-001]\nx;\nx2;\nx3;\na = 1;\nb = 1; b = 1; // [MU-003]\n')
+        eq('audit-far-tag', audit([dict(base, id='MU-001', find='a = 1;', replace='a = 2;'),
+                                   dict(base, id='MU-003', find='b = 1; b', replace='b')]), False)
+        open(os.path.join(d, 'src', 'C.sol'), 'w').write('x;\n// [MU-001]\na = 1;\nb = 1; b = 1; // [MU-003]\n')
+        eq('audit-near-tag', audit([dict(base, id='MU-001', find='a = 1;', replace='a = 2;'),
+                                    dict(base, id='MU-003', find='b = 1; b', replace='b')]), True)
+        # m-3: the basis follows src/ imports transitively
+        open(os.path.join(d, 'src', 'A.sol'), 'w').write('import {B} from "./B.sol";\n')
+        open(os.path.join(d, 'src', 'B.sol'), 'w').write('import {Cc} from "./C.sol";\n')
+        eq('imports', _src_imports('src/A.sol'), ['src/B.sol', 'src/C.sol'])
+        # m-4: restore only the exact mutated text; an edit after the crash is refused, an unmutated file is kept
+        t = os.path.join(d, 'src', 'R.sol')
+        for case, cur, want in (('restore', 'MUT', 'ORIG'), ('refuse', 'EDITED', 'EDITED'), ('clean', 'ORIG', 'ORIG')):
+            open(t, 'w').write(cur); open(t + '.mutorig', 'w').write('ORIG'); open(t + '.mutsha', 'w').write(_sha('MUT'))
+            ref = restore_leftovers(d)
+            eq('restore-' + case, (open(t).read(), bool(ref)), (want, case == 'refuse'))
+            for x in (t + '.mutorig', t + '.mutsha'):
+                if os.path.exists(x):
+                    os.remove(x)
     ROOT = old
     print('selftest', 'OK' if ok else 'FAIL')
     return 0 if ok else 1

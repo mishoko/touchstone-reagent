@@ -14,19 +14,20 @@ library Chains {
     address internal constant SEPOLIA_POOL_MANAGER = 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;
     address internal constant SEPOLIA_V3_FACTORY = 0x0227628f3F023bb0B980b67D528571c95c6DaC1c;
 
+    /// @dev The reference pool's minimum cardinality is the tier's `MIN_CARD` (read from `tier()`, never duplicated:
+    ///      tools review m-7).
     struct C {
         address poolManager;
         address v3Factory;
-        uint16 minCard;
         uint256 blocktime;
         bool demo;
     }
 
     function get(uint256 chainId) internal pure returns (C memory c) {
         if (chainId == 1301) {
-            return C(Addresses.UNICHAIN_SEPOLIA_POOL_MANAGER, Addresses.UNICHAIN_SEPOLIA_V3_FACTORY, 1000, 1, true);
+            return C(Addresses.UNICHAIN_SEPOLIA_POOL_MANAGER, Addresses.UNICHAIN_SEPOLIA_V3_FACTORY, 1, true);
         }
-        if (chainId == 11155111) return C(SEPOLIA_POOL_MANAGER, SEPOLIA_V3_FACTORY, 400, 12, false);
+        if (chainId == 11155111) return C(SEPOLIA_POOL_MANAGER, SEPOLIA_V3_FACTORY, 12, false);
         revert("Chains: not a Reagent chain");
     }
 

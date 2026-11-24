@@ -64,7 +64,7 @@ contract GasNeedTest is ReagentEnv {
         return 1301;
     }
 
-    function setUp() public {
+    function setUp() public virtual {
         _setUpReagent(_chain());
         _setUpVaults();
         X3 = _deployVault();
@@ -139,6 +139,8 @@ contract GasNeedTest is ReagentEnv {
     /// @dev Records one kind's measurement to `output/gas-need-<kind>.json` (merged into `audits/gas-need.json` by
     ///      `script/deploy/gasneed.py`).
     function _record(string memory kind, Need memory n) internal {
+        // a mutated run never overwrites the measurements (tools review m-6)
+        if (bytes(vm.envOr("TS_MUTATION_RUN", string(""))).length != 0) return;
         string memory row = _put(kind, kind, n);
         vm.writeJson(row, string.concat("./output/gas-need-", kind, ".json"));
     }

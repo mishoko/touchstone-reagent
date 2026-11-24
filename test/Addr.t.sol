@@ -92,4 +92,24 @@ contract AddrTest is Test {
         );
         assertFalse(ok, "the factory's constructor reverts (the Hub's chain table)");
     }
+
+    /// @notice The local build reproduces the LIVE addresses recorded by script in `audits/deployments-*.json` (with the
+    ///         live RC and admin): any change to a deployed contract's source, even a comment (the metadata hash), moves
+    ///         them, so the deployed contracts' source is frozen (s3: caught a comment edit before it shipped).
+    function test_T_ADDR__localBuildReproducesTheLiveAddresses() public {
+        RC = 0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9;
+        admin = 0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213;
+        string[2] memory files = ["./audits/deployments-1301.json", "./audits/deployments-11155111.json"];
+        uint256[2] memory ids = [uint256(1301), uint256(11155111)];
+        for (uint256 i; i < 2; ++i) {
+            string memory j = vm.readFile(files[i]);
+            uint256 snap = vm.snapshotState();
+            Set memory s = _deployOn(ids[i]);
+            vm.revertToState(snap);
+            assertEq(s.ext, vm.parseJsonAddress(j, ".steps.reagent.reads.addresses.ext"), "CovenantExt as deployed");
+            assertEq(s.impl, vm.parseJsonAddress(j, ".steps.reagent.reads.addresses.impl"), "Covenant impl as deployed");
+            assertEq(s.factory, vm.parseJsonAddress(j, ".steps.reagent.reads.addresses.factory"), "CovenantFactory as deployed");
+            assertEq(s.hub, vm.parseJsonAddress(j, ".steps.reagent.reads.addresses.hub"), "ReagentHub as deployed");
+        }
+    }
 }

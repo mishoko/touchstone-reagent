@@ -159,6 +159,6 @@
  "verdict": {
   "placement": "PASS",
   "gas_leg": "FAIL (confirmed by control)",
-  "gate": "G2 split: placement holds on 13.2 s blocks; the witness roll is starvable at the 400k guard under Glamsterdam pricing (owner decision, PA-13)"
+  "computed_by": "script/deploy/g2.py verdict"
  }
 }

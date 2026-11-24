@@ -21,6 +21,10 @@ import {Tiers} from "touchstone-script/Tiers.sol";
 import {DemoToken} from "touchstone-script/demo/DemoKit.sol";
 import {Chains} from "./Chains.sol";
 
+interface IV3Slot0 {
+    function slot0() external view returns (uint160, int24, uint16, uint16, uint16, uint8, bool);
+}
+
 /// @notice A fresh Touchstone vault on a Reagent chain (ported from Touchstone's `script/demo/DeployDemo.s.sol`; R-02:
 ///         never the hookathon vault): the factory against the chain's canonical v4 PoolManager (or an existing one,
 ///         `FACTORY`), a new `CuratorBundler` (the curator; one bundler deploys one vault), the hook salt mined for
@@ -37,6 +41,8 @@ contract TsDeploy is Script {
 
     error History();
     error NotDemoToken();
+    error Decimals();
+    error Cardinality(uint16 have, uint16 want);
 
     function run() external {
         address refPool = vm.envAddress("REF_POOL");
@@ -59,6 +65,11 @@ contract TsDeploy is Script {
         IERC20 t0 = IERC20(r.token0());
         IERC20 t1 = IERC20(r.token1());
         if (DemoToken(address(t0)).minter() != msg.sender || DemoToken(address(t1)).minter() != msg.sender) revert NotDemoToken();
+        // token0 = mUSDC (6 dp), token1 = mWETH (18 dp, the B6 unit) on both chains (spec §3.1; tools review m-7)
+        if (DemoToken(address(t0)).decimals() != 6 || DemoToken(address(t1)).decimals() != 18) revert Decimals();
+        // the reference holds enough history slots before the hook sees it (TRAPS s2: BadRef at 250 < 400)
+        (,,, uint16 card,,,) = IV3Slot0(refPool).slot0();
+        if (card < t.MIN_CARD) revert Cardinality(card, t.MIN_CARD);
 
         vm.startBroadcast();
         address me = msg.sender;

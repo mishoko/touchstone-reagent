@@ -192,7 +192,7 @@
     }
    ]
   },
-  "reagent": {
+  "reagent_superseded_1": {
    "script": "Reagent.s.sol",
    "commit": "1502bcb",
    "recorded_at": "2026-11-23T23:55:30+00:00",
@@ -236,7 +236,46 @@
     "ReagentHub.FACTORY()": "0x2bCb1F62915797D6813A0C1c66b7aA8a285229E0",
     "ReagentHub.RC()": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
     "ReagentHub.PROXY()": "0xAa14d9Cd0f788Ca23d11805986C1d8bd035D23b4"
-   }
+   },
+   "superseded": "s3 LF-S3-1: NEED[11155111] exit/plan raised to 2.22M/2.31M changes the Hub code, so the factory/Hub pair is redeployed; never cite this Hub",
+   "superseded_at": "2026-11-24T01:58:31+00:00",
+   "superseded_by": "script/deploy/record.py supersede"
+  },
+  "reagent": {
+   "script": "Reagent.s.sol",
+   "commit": "6b52e95",
+   "dirty": true,
+   "src_sha": "a734a7a1826c243c",
+   "reads": {
+    "addresses": {
+     "ext": "0x39Da1F404B98fe0390A4d4E648C0bC8E030Aa061",
+     "impl": "0xDEb3E647AC0f9f972D5Ba6A45aCb5Bd572541731",
+     "factory": "0xbd589073F4B3B210158F466451A9650AcFF2Bee7",
+     "hub": "0x057Ee66bD1c706c5852320E47c4BadAA75900010"
+    },
+    "source": "script/deploy/record.py (cast call at record time)",
+    "at": "2026-11-24T01:58:33+00:00",
+    "CovenantFactory.HUB()": "0x057Ee66bD1c706c5852320E47c4BadAA75900010",
+    "ReagentHub.FACTORY()": "0xbd589073F4B3B210158F466451A9650AcFF2Bee7",
+    "ReagentHub.RC()": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
+    "ReagentHub.PROXY()": "0xAa14d9Cd0f788Ca23d11805986C1d8bd035D23b4",
+    "ReagentHub.needs()": "2220000 [2.22e6] 2310000 [2.31e6]"
+   },
+   "recorded_at": "2026-11-24T01:58:36+00:00",
+   "note": "s3 redeploy after LF-S3-1; same salt and arguments as 1301; ext and impl reused; node gas estimates (--skip-simulation, Glamsterdam pricing)",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0xba25bdafbb3e40580ef569cb66444cfde454955b2fff7eddaee81b26ee54f69f",
+     "block": 12199583,
+     "gasUsed": 15812265,
+     "status": "ok",
+     "contract": "CovenantFactory",
+     "address": "0xbd589073F4B3B210158F466451A9650AcFF2Bee7",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    }
+   ]
   }
  }
 }
