@@ -1180,10 +1180,11 @@
    "desc": "at most one send per pair per EPOCH_TICKS",
    "killer_id": "R-EXIT-SCHED",
    "file": "src/RcExt.sol",
-   "find": "        // [MU-236] at most one send per pair per EPOCH_TICKS (plus the drip re-targets)\n        if (p.waitSeq == 0 && now_ >= p.nextTick && bud.sends > 0 && bud.exits > 0 && gasleft() >= GAS_GUARD) {",
-   "replace": "        // [MU-236] at most one send per pair per EPOCH_TICKS (plus the drip re-targets)\n        if (p.waitSeq == 0 && bud.sends > 0 && bud.exits > 0 && gasleft() >= GAS_GUARD) {",
+   "find": "        // (no second gas gate here: the evaluation was admitted whole by its caller's guard, v13 r3 V3-01)\n        // [MU-281]\n        if (p.waitSeq == 0 && now_ >= p.nextTick && bud.sends > 0 && bud.exits > 0) {",
+   "replace": "        // (no second gas gate here: the evaluation was admitted whole by its caller's guard, v13 r3 V3-01)\n        // [MU-281]\n        if (p.waitSeq == 0 && bud.sends > 0 && bud.exits > 0) {",
    "kill": "test_R_EXIT_SCHED__relayFailedThrice|test_A_EXIT_DENY__failures",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e2c03fd3590d6f52"
   },
   {
    "id": "MU-237",
@@ -1270,30 +1271,50 @@
    "file": "src/RcB6.sol",
    "find": "        // [MU-244] the nonce gate on STATE: an older budget never overwrites a newer answer (r4 D4-02; LF-S4-2)\n        if (nonce < x.appliedNonce) return;",
    "replace": "        // [MU-244] the nonce gate on STATE: an older budget never overwrites a newer answer (r4 D4-02; LF-S4-2)\n        if (false) return;",
-   "kill": "test_R_B6SCHED__seed",
+   "kill": "test_R_B6SCHED__aStaleStateBudgetNeverOverwritesANewerAnswer",
    "status": "new"
   },
   {
    "id": "MU-245",
    "area": "rc",
    "desc": "a stale head costs one pop",
-   "killer_id": "R-COUNTERS",
+   "killer_id": "R-GAS",
    "file": "src/RcB6.sol",
-   "find": "            _lowersRemove(_lHead); // [MU-245] a stale head costs one pop (never a correctness fault)\n        }",
+   "find": "            _lowersRemove(h); // [MU-245] a stale head costs one pop (never a correctness fault)\n        }",
    "replace": "            break; // [MU-245] a stale head costs one pop (never a correctness fault)\n        }",
-   "kill": "test_R_B6SCHED__seed",
-   "status": "new"
+   "kill": "test_R_GAS__atTheExactReservationFloorTwoPopsAndServes",
+   "status": "KILLED",
+   "basis": "04214c44c0876795"
   },
   {
    "id": "MU-246",
    "area": "rc",
    "desc": "the nonce gate on answers",
-   "killer_id": "R-B6SCHED",
-   "file": "src/RcB6.sol",
-   "find": "        // [MU-246] the nonce gate on answers (A-REPLAY class; r4 D4-02); the applied B only from a strictly newer\n        // nonce, so a same-nonce answer never overwrites a STATE emitted after it (s4 rc-fix r1 C1-07)\n        if (n >= x.appliedNonce) {",
-   "replace": "        // [MU-246] the nonce gate on answers (A-REPLAY class; r4 D4-02); the applied B only from a strictly newer\n        // nonce, so a same-nonce answer never overwrites a STATE emitted after it (s4 rc-fix r1 C1-07)\n        if (true) {",
-   "kill": "test_R_B6SCHED__seed",
-   "status": "new"
+   "killer_id": null,
+   "file": null,
+   "find": null,
+   "replace": null,
+   "kill": "pending",
+   "status": "EQUIVALENT",
+   "reason": "The outer gate `if (n >= x.appliedNonce)` only guards writes that are each guarded more strictly or unreachable for an older answer (n < appliedNonce): the applied B is written only under `n > x.appliedNonce`; F_UN is cleared only under `n >= bb.nonce`, and appliedNonce ≤ bb.nonce always (the Hub's budget nonces come only from this RC's sends, `_sendBudget` sets bb.nonce = max(bb.nonce, appliedNonce) + 1, and a STATE records the Hub's n0 ≤ the last sent nonce), so n < appliedNonce ≤ bb.nonce never clears it; `unsettledR` is set only for r > k.rulesNonce and r > k.unsettledR, and an older answer's r is ≤ the r of the answer or STATE that raised appliedNonce past it (r is the Covenant's monotone rulesNonce at the Hub when it processed that nonce), which already set unsettledR to ≥ r or brought rulesNonce ≥ r. Removing the outer gate changes no stored value. (mutation: if (n >= x.appliedNonce) { → if (true) {)",
+   "anchors": [
+    {
+     "file": "src/RcB6.sol",
+     "find": "            if (n > x.appliedNonce) (x.appliedNonce, x.appliedB) = (_sat24(n), _sat(nb));"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "            if (bb.flags & F_UN != 0 && n >= bb.nonce) {"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "            if (r > k.rulesNonce && r > k.unsettledR) k.unsettledR = uint32(r);"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "        uint32 n = (bb.nonce > an ? bb.nonce : an) + 1;"
+    }
+   ]
   },
   {
    "id": "MU-247",
@@ -1314,7 +1335,7 @@
    "file": "src/RcB6.sol",
    "find": "            // [MU-248] a newer rulesNonce than the RC's: rules-unsettled until its STATE arrives (r1 D1-03)\n            if (r > k.rulesNonce && r > k.unsettledR) k.unsettledR = uint32(r);",
    "replace": "            // [MU-248] a newer rulesNonce than the RC's: rules-unsettled until its STATE arrives (r1 D1-03)\n            if (false) k.unsettledR = uint32(r);",
-   "kill": "test_R_B6SCHED__seed|test_A_OWNER_RACE__a",
+   "kill": "test_R_B6SCHED__aRaiseRejectedByARuleChangeWaitsForItsState",
    "status": "new"
   },
   {
@@ -1332,33 +1353,48 @@
    "id": "MU-250",
    "area": "rc",
    "desc": "a re-mark extends the sweep, never restarts it",
-   "killer_id": "R-EXIT-SCHED",
+   "killer_id": "R-COUNTERS",
    "file": "src/RcBase.sol",
    "find": "            // [MU-250] extend, never restart (LF-S4-4)\n            uint32 e = w.pos == 0 ? w.lap + 1 : w.lap + 2;",
    "replace": "            // [MU-250] extend, never restart (LF-S4-4)\n            uint32 e = w.lap + 1;",
-   "kill": "test_R_B6SCHED__seed|test_R_EXIT_SCHED__",
+   "kill": "test_R_COUNTERS__aMidLapMarkGetsAnotherFullLap",
    "status": "new"
   },
   {
    "id": "MU-251",
    "area": "rc",
    "desc": "an unreported chain counts capRC/2",
-   "killer_id": "R-B6SCHED",
-   "file": "src/RcB6.sol",
-   "find": "        // [MU-251] an unreported chain counts capRC/2 (step 0, r22 m-3)\n        if (k.noteNonce == 0) return capRC / 2;",
-   "replace": "        // [MU-251] an unreported chain counts capRC/2 (step 0, r22 m-3)\n        if (k.noteNonce == 0) return 0;",
-   "kill": "test_R_B6SCHED__",
-   "status": "new"
+   "killer_id": null,
+   "file": null,
+   "find": null,
+   "replace": null,
+   "kill": "pending",
+   "status": "EQUIVALENT",
+   "reason": "An unreported other chain (noteNonce 0) counts capRC/2 in step 1; the mutant counts 0. Neither value can owe a lower: while the other chain is unreported, no raise is ever sent (steps 1b/2/3-raise require both chains listing the id: `_restMove`/`_restIgnoring` check `_listing` on both), and the Hub writes a chain's B only by an RC message or `min(B, cap/2)` on a tighten (spec §5.2), so the reporting chain's appliedB ≤ its cap/2 = capRC/2 (capRC = that chain's cap); a lower needs appliedB > max(E, capRC − o) ≥ capRC/2 for any o ∈ [0, capRC/2]. Spec §5.5 step 0 already says 'any value is safe: raises need both STATEs'. (mutation: if (k.noteNonce == 0) return capRC / 2; → if (k.noteNonce == 0) return 0;)",
+   "anchors": [
+    {
+     "file": "src/RcB6.sol",
+     "find": "        if (k.noteNonce == 0) return capRC / 2;"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "        if (!_listing(CA, cov, id) || !_listing(CB, cov, id)) return false;"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "        if (!_listing(c, cov, id) || !_listing(o, cov, id)) return false;"
+    }
+   ]
   },
   {
    "id": "MU-252",
    "area": "rc",
    "desc": "committed counts the unanswered sends",
-   "killer_id": "I-CAP",
+   "killer_id": "R-B6SCHED",
    "file": "src/RcB6.sol",
    "find": "        // [MU-252] committed counts the unanswered sends (r1 D1-02: never \"applied only\")\n        if (bb.flags & F_UN != 0 && bb.unB > m) m = bb.unB;",
    "replace": "        // [MU-252] committed counts the unanswered sends (r1 D1-02: never \"applied only\")\n        m = m;",
-   "kill": "test_I_CAP__",
+   "kill": "test_R_B6SCHED__aTightenUnderARaiseInFlightLowersTheOtherChain",
    "status": "new"
   },
   {
@@ -1376,12 +1412,31 @@
    "id": "MU-254",
    "area": "rc",
    "desc": "lowers only while the sum exceeds capRC",
-   "killer_id": "R-B6SCHED",
-   "file": "src/RcB6.sol",
-   "find": "        // [MU-254] lowers only while Σ committed exceeds capRC\n        if (_committed(c, cov, id, capRC) + o <= capRC) return (false, 0);",
-   "replace": "        // [MU-254] lowers only while Σ committed exceeds capRC\n        if (false) return (false, 0);",
-   "kill": "test_R_B6SCHED__",
-   "status": "new"
+   "killer_id": null,
+   "file": null,
+   "find": null,
+   "replace": null,
+   "kill": "pending",
+   "status": "EQUIVALENT",
+   "reason": "The early exit `if (committed(c) + o <= capRC) return (false, 0)` is implied by the next test: with committed(c) = max(appliedB, E, unB) ≥ appliedB, Σ ≤ capRC gives appliedB ≤ committed(c) ≤ capRC − o ≤ t (t = max(capRC − o, E)), so `if (x.appliedB <= t) return (false, 0)` returns the same (false, 0) on every input where the early exit fires; removing it changes no outcome, only gas. (mutation: if (_committed(c, cov, id, capRC) + o <= capRC) return (false, 0); → if (false) return (false, 0);) Premise (rc-fix r2 C2-06): a listed id always has F_BASE, because the Covenant emits a Base for every id in `ids` (CovenantExt anchor).",
+   "anchors": [
+    {
+     "file": "src/RcB6.sol",
+     "find": "        if (_committed(c, cov, id, capRC) + o <= capRC) return (false, 0);"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "        if (x.appliedB <= t) return (false, 0);"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "        m = x.appliedB > x.E ? x.appliedB : x.E;"
+    },
+    {
+     "file": "src/CovenantExt.sol",
+     "find": "        // a Base for every id in ids or with exposure on this chain (r25 D25-03)"
+    }
+   ]
   },
   {
    "id": "MU-255",
@@ -1431,11 +1486,11 @@
    "id": "MU-259",
    "area": "rc",
    "desc": "unpark only on a callback result after the park",
-   "killer_id": "R-B6SCHED",
+   "killer_id": "R-COUNTERS",
    "file": "src/RcB6.sol",
    "find": "        // [MU-259] unpark only on a callback result after the park (r18 m-4)\n        if (bb.parkLog == 0 || _seq[c][id].hubLogCount < bb.parkLog) return (false, false);",
    "replace": "        // [MU-259] unpark only on a callback result after the park (r18 m-4)\n        if (bb.parkLog == 0) return (false, false);",
-   "kill": "test_R_B6SCHED__park",
+   "kill": "test_R_COUNTERS__aMidLapMarkGetsAnotherFullLap",
    "status": "new"
   },
   {
@@ -1468,8 +1523,9 @@
    "file": "src/RcExt.sol",
    "find": "        // [MU-262] the tail kept back for the rest of the reaction (the entry bookkeeping and the Cron subscribe)\n        (ok, r) = B6.delegatecall{gas: gasleft() - TAIL}(data);",
    "replace": "        // [MU-262] the tail kept back for the rest of the reaction (the entry bookkeeping and the Cron subscribe)\n        (ok, r) = B6.delegatecall(data);",
-   "kill": "test_R_GAS__anOptionalStepOutOfGas",
-   "status": "new"
+   "kill": "test_R_GAS__aStepOutOfGasLeavesTheCallerItsTail",
+   "status": "KILLED",
+   "basis": "d8fb0af583a81d79"
   },
   {
    "id": "MU-263",
@@ -1508,11 +1564,11 @@
    "id": "MU-266",
    "area": "rc",
    "desc": "round-robin over the dirty ids",
-   "killer_id": "R-EXIT-SCHED",
+   "killer_id": "R-COUNTERS",
    "file": "src/RcExt.sol",
    "find": "            // [MU-266] round-robin over the dirty ids, one item each (s4 rc-fix r1 C1-10: no head-of-line)\n            if (_dirtyPtr >= _nDirty) _dirtyPtr = 0;",
    "replace": "            // [MU-266] round-robin over the dirty ids, one item each (s4 rc-fix r1 C1-10: no head-of-line)\n            _dirtyPtr = 0;",
-   "kill": "test_R_COUNTERS__aSweepUnparks|test_R_B6SCHED__seed",
+   "kill": "test_R_COUNTERS__dirtyIdsAreServedRoundRobin",
    "status": "new"
   },
   {
@@ -1523,7 +1579,7 @@
    "file": "src/RcExt.sol",
    "find": "                // [MU-267] an unpark shrinks the walked list: step back so the next element is not skipped, whether\n                // the swap-remove moved one here or the last element left (s4 rc-fix r1 C1-02)\n                if (unparked) w.pos -= 1;",
    "replace": "                // [MU-267] an unpark shrinks the walked list: step back so the next element is not skipped, whether\n                // the swap-remove moved one here or the last element left (s4 rc-fix r1 C1-02)\n                if (false) w.pos -= 1;",
-   "kill": "test_R_COUNTERS__aSweepUnparks",
+   "kill": "test_R_COUNTERS__oneResultWakesEveryParkInTheSweepsOnlyLap",
    "status": "new"
   },
   {
@@ -1541,12 +1597,13 @@
    "id": "MU-269",
    "area": "rc",
    "desc": "a still-owing head rotates",
-   "killer_id": "R-GAS",
+   "killer_id": "R-COUNTERS",
    "file": "src/RcB6.sol",
    "find": "            // [MU-269] a head that still owes after its sends goes to the tail (round-robin; rc-fix r1 C1-01)\n            _lowersRemove(cov);\n            _lowersAdd(cov);",
    "replace": "            // [MU-269] a head that still owes after its sends goes to the tail (round-robin; rc-fix r1 C1-01)\n            _lowersRemove(cov);",
-   "kill": "test_R_B6SCHED__aTightenUnderAnUnanswered|test_R_B6SCHED__seed",
-   "status": "new"
+   "kill": "test_R_COUNTERS__aHeadThatStillOwesAfterItsSendsStaysListed",
+   "status": "KILLED",
+   "basis": "c12a112718257427"
   },
   {
    "id": "MU-270",
@@ -1558,6 +1615,198 @@
    "replace": "            // [MU-270] a re-sent lower carries its recomputed target (never degraded to a hold by its own flight)\n            (bool need, uint256 t) = _lowerOwed(c, cov, id, cap);",
    "kill": "test_R_COUNTERS__aSweepUnparks|test_R_B6SCHED__aTightenUnderAnUnanswered",
    "status": "new"
+  },
+  {
+   "id": "MU-271",
+   "area": "rc",
+   "desc": "a head rotates only after it sent (v13 r1 V1-04)",
+   "killer_id": null,
+   "file": null,
+   "find": null,
+   "replace": null,
+   "kill": "pending",
+   "status": "EQUIVALENT",
+   "reason": "`sent != 0` in b6Lowers' rotate is unreachable as false while the head still owes: a visit admitted by `_b6Opt` (outer gasleft ≥ GAS_GUARD) is always admitted inside (GUARD_IN = GAS_GUARD − TAIL − 5,000 leaves the delegatecall's overhead; the flip-point cell shows gasleft G + 301 → the visit sends), and its first owed lower is then sent unless the send budget is 0; every caller passes a positive budget (non-Cron reactions a fresh SENDS_PER_REACTION, Cron unlimited) with max = all. Kept as a defence for any future caller (spec §5.5 v1.3: a head that could not send keeps its place). (mutation: `sent != 0 && _lHead == cov` → `_lHead == cov`)",
+   "anchors": [
+    {
+     "file": "src/RcB6.sol",
+     "find": "                if (sent >= max || bud.sends == 0 || (sent != 0 && gasleft() < GUARD_IN)) return (sent, true);"
+    },
+    {
+     "file": "src/RcBase.sol",
+     "find": "    uint256 internal constant GUARD_IN = GAS_GUARD - TAIL - 5_000;"
+    },
+    {
+     "file": "test/RcGasGuard.t.sol",
+     "find": "        assertGt(sP, 0, \"G + eps: the visit is admitted inside and sends (two frames)\");"
+    }
+   ]
+  },
+  {
+   "id": "MU-272",
+   "area": "rc",
+   "desc": "the Cron floors rotate with the Cron event's phase (v1.3)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "            // [MU-272] the floors rotate with the Cron event's phase\n            uint256 cls = (phase + k) % 3;",
+   "replace": "            // [MU-272] the floors rotate with the Cron event's phase\n            uint256 cls = k;",
+   "kill": "test_R_GAS__theFirstFloorIsServedInFullAtTheLiveForward",
+   "status": "KILLED",
+   "basis": "54fd336574bf05c4"
+  },
+  {
+   "id": "MU-273",
+   "area": "rc",
+   "desc": "a lap end is the sweep step's item (v13 r1 V1-09)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "                --max; // [MU-273] a lap end is the step's item",
+   "replace": "                // [MU-273] a lap end is the step's item",
+   "kill": "test_R_GAS__aLapEndIsFloorThreesItem",
+   "status": "KILLED",
+   "basis": "c36c0fc3abdb96d2"
+  },
+  {
+   "id": "MU-274",
+   "area": "rc",
+   "desc": "GAS_GUARD from the largest measured item (v1.3: 250k; v1.2 placeholder 150k)",
+   "killer_id": "R-GAS",
+   "file": "src/RcBase.sol",
+   "find": "    uint256 internal constant GAS_GUARD = 250_000; // [MU-274]",
+   "replace": "    uint256 internal constant GAS_GUARD = 150_000; // [MU-274]",
+   "kill": "test_R_GAS__theGuardCoversTheLargestMeasuredItem",
+   "status": "KILLED",
+   "basis": "ff7077a3fa969d31"
+  },
+  {
+   "id": "MU-275",
+   "area": "rc",
+   "desc": "SENDS_PER_REACTION = 4 optional callbacks per non-Cron reaction",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "    uint256 internal constant SENDS_PER_REACTION = 4; // [MU-275]",
+   "replace": "    uint256 internal constant SENDS_PER_REACTION = 5; // [MU-275]",
+   "kill": "test_R_COUNTERS__aHeadThatStillOwesAfterItsSendsStaysListed",
+   "status": "KILLED",
+   "basis": "6cefffa34d09c1c0"
+  },
+  {
+   "id": "MU-276",
+   "area": "rc",
+   "desc": "the rotation phase from the Cron log's own block (not the reaction block; v13 r1 V1-01)",
+   "killer_id": "R-GAS",
+   "file": "src/ReagentRC.sol",
+   "find": "_delegate(abi.encodeCall(RcExt.cron, ((l.blockNumber / 100) % 3))); // [MU-276]",
+   "replace": "_delegate(abi.encodeCall(RcExt.cron, ((block.number / 100) % 3))); // [MU-276]",
+   "kill": "test_R_GAS__aBacklogOfCronEventsStillRotates",
+   "status": "KILLED",
+   "basis": "cb06a83755bdf74c"
+  },
+  {
+   "id": "MU-277",
+   "area": "rc",
+   "desc": "an overflowed park is not on the walked list (no step-back)",
+   "killer_id": null,
+   "file": null,
+   "find": null,
+   "replace": null,
+   "kill": "pending",
+   "status": "EQUIVALENT",
+   "reason": "`unparked = bb.flags & F_OVER == 0` in `_wakeB6` reads F_OVER only for an element of the walked b6Parked list, and `_parkB6` sets F_OVER exactly when it does NOT append to that list (the list is full); an element on the list therefore never has F_OVER, so the expression is always true where it runs and the mutant `unparked = true` changes no outcome (rc-fix r2 C2-03). (mutation: `unparked = bb.flags & F_OVER == 0` → `unparked = true`)",
+   "anchors": [
+    {
+     "file": "src/RcB6.sol",
+     "find": "        unparked = bb.flags & F_OVER == 0; // [MU-277] a counted park leaves the walked list"
+    },
+    {
+     "file": "src/RcB6.sol",
+     "find": "            bb.flags |= F_OVER;"
+    }
+   ]
+  },
+  {
+   "id": "MU-278",
+   "area": "rc",
+   "desc": "an overflowed park is on no list (unpark clears only the flag)",
+   "killer_id": "R-COUNTERS",
+   "file": "src/RcB6.sol",
+   "find": "        if (bb.flags & F_OVER != 0) { // [MU-278]",
+   "replace": "        if (false) { // [MU-278]",
+   "kill": "test_R_COUNTERS__anOverflowedParkUnparksThroughItsOwnState",
+   "status": "KILLED",
+   "basis": "cae25b77cd77cb0d"
+  },
+  {
+   "id": "MU-279",
+   "area": "rc",
+   "desc": "CURSOR_FLOOR = 4 (the reservation with its 10% margin rule; 5 fits with 1.0% only)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "    uint256 internal constant CURSOR_FLOOR = 4; // [MU-279]",
+   "replace": "    uint256 internal constant CURSOR_FLOOR = 5; // [MU-279]",
+   "kill": "test_R_GAS__theFirstFloorIsServedInFullAtTheLiveForward",
+   "status": "KILLED",
+   "basis": "2bc376d65bf0352c"
+  },
+  {
+   "id": "MU-280",
+   "area": "rc",
+   "desc": "the cursor drops a vault without Covenants (one counted step, once; v13 r4 V4-01)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "            if (nc == 0) {\n                _vaultList[_cursorV] = _vaultList[nv - 1];",
+   "replace": "            if (nc == 0 && false) {\n                _vaultList[_cursorV] = _vaultList[nv - 1];",
+   "kill": "test_R_GAS__vaultsWithoutCovenantsCostTheCursorOneStepOnce",
+   "status": "KILLED",
+   "basis": "b98f9c8d039e51b2"
+  },
+  {
+   "id": "MU-281",
+   "area": "rc",
+   "desc": "no second gas gate on an admitted evaluation's exit (v13 r3 V3-01)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "        // [MU-281]\n        if (p.waitSeq == 0 && now_ >= p.nextTick && bud.sends > 0 && bud.exits > 0) {",
+   "replace": "        // [MU-281]\n        if (p.waitSeq == 0 && now_ >= p.nextTick && bud.sends > 0 && bud.exits > 0 && gasleft() >= GAS_GUARD) {",
+   "kill": "test_R_GAS__atTheExactCursorReservationEveryEvaluationExits",
+   "status": "KILLED",
+   "basis": "9dc62e86d1ba1585"
+  },
+  {
+   "id": "MU-282",
+   "area": "rc",
+   "desc": "an admitted evaluation's PB-7 resend is not re-gated (guard 0, v13 r3 V3-01)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "_resendOnce(c, id, 0)) bud.sends -= 1; // [MU-282]",
+   "replace": "_resendOnce(c, id, GAS_GUARD)) bud.sends -= 1; // [MU-282]",
+   "kill": "test_R_GAS__atTheExactCursorReservationEveryEvaluationResends",
+   "status": "KILLED",
+   "basis": "67cc5a3e0b43f494"
+  },
+  {
+   "id": "MU-283",
+   "area": "rc",
+   "desc": "a dropped vault re-joins the cursor at its first Covenant (v13 r4 V4-01)",
+   "killer_id": "R-GAS",
+   "file": "src/RcExt.sol",
+   "find": "        if (v.nCov == 0 && v.unlisted) {",
+   "replace": "        if (v.nCov == 0 && v.unlisted && false) {",
+   "kill": "test_R_GAS__aDroppedEmptyVaultRejoinsTheCursorAtItsFirstCovenant",
+   "status": "KILLED",
+   "basis": "f92bbb85e4b6ce25"
+  },
+  {
+   "id": "MU-284",
+   "area": "rc",
+   "desc": "a registration taking a stale cursor slot leaves a new one at the high-water mark (rc-fix r4 C4-01)",
+   "killer_id": "R-GAS",
+   "file": "src/ReagentRC.sol",
+   "find": "        if (nv < _vaultHigh) {\n            _vaultList[_vaultHigh] = (c << 160) | uint160(vault);",
+   "replace": "        if (nv < _vaultHigh && false) {\n            _vaultList[_vaultHigh] = (c << 160) | uint160(vault);",
+   "kill": "test_R_GAS__firstStateAtTheBoundsWithFourPlans",
+   "status": "KILLED",
+   "basis": "6100649f78df1678"
   }
  ]
 }

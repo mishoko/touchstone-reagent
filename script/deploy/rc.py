@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-"""The ReagentRC deploy on Lasna (spec §3.2, §9.2 R-DEPLOY; F-007), recorded by script into
+"""The ReagentRC deploy on Lasna (spec §3.2, §9.2 R-DEPLOY; F-007, F-013), recorded by script into
 `audits/deployments-5318007.json` (R-04).
 
-  python3 script/deploy/rc.py check      the pre-flight: RC deployer nonce 0 and funded, the reserved address free,
-                                         both live Hubs' RC() = the reserved address and their needs() equal to the
-                                         RC's NEED constants and to audits/gas-need.json (D5-05, D6-03)
-  python3 script/deploy/rc.py ext        deploy RcExt from the owner key (any nonce), recorded
+  python3 script/deploy/rc.py check      the pre-flight: RC deployer nonce 0 (latest AND pending) and funded, the
+                                         reserved address free, both live Hubs' RC() = the reserved address and their
+                                         needs() equal to the RC's NEED constants and to audits/gas-need.json
+  python3 script/deploy/rc.py pin        record the REVIEWED build (audits/rc-build.json): initcode and immutable-masked
+                                         runtime hashes of RcB6, RcExt, ReagentRC from a clean `forge build --force`;
+                                         run once, at the RC fix review's close, on the reviewed tree
+  python3 script/deploy/rc.py b6         deploy RcB6 from the owner key, after the build check; recorded
+  python3 script/deploy/rc.py ext        deploy RcExt(B6) from the owner key, after the build check; recorded
   python3 script/deploy/rc.py rc         simulate the RC creation from the RC deployer at nonce 0 (eth_call --create:
-                                         the exact runtime), send it with 1.5 x the estimate, assert status 1, the
-                                         address, code = the simulated runtime, OWNER(), EXT(); recorded
+                                         the exact runtime), send it with `--nonce 0` and 1.5 x the estimate, assert
+                                         status 1, the address, code = the simulated runtime, OWNER(), EXT(); recorded
   python3 script/deploy/rc.py register   addHub and addFactory on both chains, fund the RC's reserves; recorded
+  python3 script/deploy/rc.py --selftest the refusals, offline: swapped keys, a mutated artifact, a dirty tree
 
 Keys: DEPLOYER_PK (owner), RC_DEPLOYER_PK (its ONLY transaction is the RC creation); never printed, never on argv
-(cast reads ETH_PRIVATE_KEY from the environment).
+(cast reads ETH_PRIVATE_KEY from the environment). Before ANY send: the keys' identities are asserted (F-010 H3-02),
+and every artifact sent is checked against the reviewed-build pin after a forced rebuild (H3-01).
 """
-import json, os, re, subprocess, sys, hashlib, datetime as dt
+import json, os, re, subprocess, sys, hashlib, tempfile, datetime as dt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from prov import stamp  # noqa: E402
@@ -25,7 +31,9 @@ RESERVED = '0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9'
 RC_DEPLOYER = '0x67941b1eA81913B45a6eE1d9B2e1aFfa98b2aea1'
 SYSTEM = '0x8888888888888888888888888888888888888888'
 OUT = os.path.join(ROOT, 'audits', 'deployments-5318007.json')
+PIN = os.path.join(ROOT, 'audits', 'rc-build.json')
 RC_FUND = '5ether'  # the provisional floor (spec §6: RC >= 5 lREACT)
+MODULES = ('RcB6', 'RcExt', 'ReagentRC')
 
 
 def cast(*a, key=None, rpc=LASNA):
@@ -38,6 +46,26 @@ def cast(*a, key=None, rpc=LASNA):
     return r.stdout.strip()
 
 
+def addr_of(pk):
+    r = subprocess.run(['cast', 'wallet', 'address'], capture_output=True, text=True,
+                       env={**os.environ, 'ETH_PRIVATE_KEY': pk})
+    if r.returncode != 0:
+        raise SystemExit('rc: a key does not parse (not printed)')
+    return r.stdout.strip()
+
+
+def assert_keys(env=os.environ):
+    """F-010 H3-02: before any send, the RC deployer key IS the reserved deployer and the owner key is NOT."""
+    owner_pk, rc_pk = env.get('DEPLOYER_PK'), env.get('RC_DEPLOYER_PK')
+    if not owner_pk or not rc_pk:
+        raise SystemExit('rc: DEPLOYER_PK and RC_DEPLOYER_PK must both be set')
+    if addr_of(rc_pk).lower() != RC_DEPLOYER.lower():
+        raise SystemExit('rc: RC_DEPLOYER_PK does not derive to the RC deployer: refusing before any send')
+    if addr_of(owner_pk).lower() == RC_DEPLOYER.lower():
+        raise SystemExit('rc: DEPLOYER_PK derives to the RC deployer (swapped keys?): refusing before any send')
+    return addr_of(owner_pk)
+
+
 def load():
     return json.load(open(OUT)) if os.path.exists(OUT) else {'chainId': 5318007, 'generated_by': 'script/deploy/rc.py', 'steps': {}}
 
@@ -46,19 +74,80 @@ def save(doc):
     open(OUT, 'w').write(json.dumps(doc, indent=1) + '\n')
 
 
-def art(name):
-    a = json.load(open(os.path.join(ROOT, 'out', f'{name}.sol', f'{name}.json')))
-    return a['bytecode']['object'], a['deployedBytecode']['object']
+# ------------------------------------------------------------------ the reviewed build (F-010 H3-01)
+
+def art(name, root=ROOT):
+    return json.load(open(os.path.join(root, 'out', f'{name}.sol', f'{name}.json')))
 
 
-def owner():
-    return subprocess.run(['cast', 'wallet', 'address'], capture_output=True, text=True,
-                          env={**os.environ, 'ETH_PRIVATE_KEY': os.environ['DEPLOYER_PK']}).stdout.strip()
+def masked_runtime(a, code_hex=None):
+    """The runtime with every immutable's bytes zeroed (they are set at construction)."""
+    code = bytearray(bytes.fromhex((code_hex or a['deployedBytecode']['object'])[2:]))
+    for refs in a['deployedBytecode'].get('immutableReferences', {}).values():
+        for r in refs:
+            code[r['start']:r['start'] + r['length']] = bytes(r['length'])
+    return hashlib.sha256(bytes(code)).hexdigest()
 
+
+def build_ids(root=ROOT):
+    out = {}
+    for m in MODULES:
+        a = art(m, root)
+        out[m] = {'initcodeSha': hashlib.sha256(bytes.fromhex(a['bytecode']['object'][2:])).hexdigest(),
+                  'runtimeMaskedSha': masked_runtime(a)}
+    return out
+
+
+def tree_clean(root=ROOT):
+    """No uncommitted src/, no mutation in progress, no `*.mutorig` anywhere under src/."""
+    st = subprocess.run(['git', 'status', '--porcelain', '--', 'src'], cwd=root, capture_output=True, text=True).stdout
+    if st.strip():
+        return 'src/ has uncommitted changes'
+    if os.path.exists(os.path.join(root, 'output', 'MUTATION_IN_PROGRESS')):
+        return 'a mutation run is in progress'
+    for d, _, fs in os.walk(os.path.join(root, 'src')):
+        if any(f.endswith('.mutorig') for f in fs):
+            return 'a *.mutorig file exists (a mutant was applied)'
+    return None
+
+
+def forced_build(root=ROOT):
+    r = subprocess.run(['forge', 'build', '--force'], cwd=root, capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit('rc: forge build --force failed')
+
+
+def check_build(root=ROOT, pin=PIN, rebuild=True):
+    """Refuses unless the tree is clean, a forced rebuild ran, and every module equals the reviewed-build pin."""
+    why = tree_clean(root)
+    if why:
+        raise SystemExit(f'rc: refusing: {why}')
+    if not os.path.exists(pin):
+        raise SystemExit('rc: no reviewed-build pin (audits/rc-build.json): run `rc.py pin` at the review close')
+    if rebuild:
+        forced_build(root)
+    want = json.load(open(pin))['modules']
+    got = build_ids(root)
+    for m in MODULES:
+        if got[m] != want[m]:
+            raise SystemExit(f'rc: refusing: {m} differs from the reviewed build (audits/rc-build.json)')
+
+
+def pin():
+    why = tree_clean()
+    if why:
+        raise SystemExit(f'rc pin: refusing: {why}')
+    forced_build()
+    doc = {**stamp(), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+           'generated_by': 'script/deploy/rc.py pin', 'modules': build_ids()}
+    open(PIN, 'w').write(json.dumps(doc, indent=1) + '\n')
+    print('rc pin: written audits/rc-build.json at', doc['commit'])
+
+
+# ------------------------------------------------------------------ the pre-flight
 
 def rc_needs():
-    """The RC's NEED constants for exit and plan (NEED_EXIT_<chain>, NEED_PLAN_<chain> in src/ReagentRC.sol or
-    src/RcBase.sol)."""
+    """The RC's NEED constants for exit and plan (NEED_EXIT_<chain>, NEED_PLAN_<chain> in src/RcBase.sol)."""
     src = ''.join(open(os.path.join(ROOT, 'src', f)).read() for f in ('ReagentRC.sol', 'RcBase.sol')
                   if os.path.exists(os.path.join(ROOT, 'src', f)))
     out = {}
@@ -74,8 +163,9 @@ def rc_needs():
 def check():
     errs = []
     n = int(cast('nonce', RC_DEPLOYER))
-    if n != 0:
-        errs.append(f'RC deployer nonce {n} != 0: the reserved address is lost (F-007)')
+    pn = int(cast('nonce', '--block', 'pending', RC_DEPLOYER))
+    if n != 0 or pn != 0:
+        errs.append(f'RC deployer nonce latest {n} / pending {pn} != 0: the reserved address is lost or a send is in flight (F-007)')
     bal = int(cast('balance', RC_DEPLOYER))
     if bal < 10**18:
         errs.append(f'RC deployer balance {bal} < 1 lREACT')
@@ -106,51 +196,69 @@ def check():
     return not errs
 
 
-def deploy_ext():
-    doc = load()
-    if 'rcext' in doc['steps']:
-        raise SystemExit('rc: RcExt already recorded')
-    code, _ = art('RcExt')
-    r = json.loads(cast('send', '--json', '--create', code, key='DEPLOYER_PK'))
-    assert r['status'] in ('0x1', 1), r
-    addr = r['contractAddress']
-    doc['steps']['rcext'] = {**stamp(), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
-                             'from': owner(), 'tx': r['transactionHash'], 'address': addr,
-                             'codeSha': hashlib.sha256(bytes.fromhex(cast('code', addr)[2:])).hexdigest()}
+# ------------------------------------------------------------------ the sends
+
+def _record(doc, step, rec):
+    doc['steps'][step] = {**stamp(), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'), **rec}
     save(doc)
-    print('RcExt', addr)
+
+
+def deploy_module(step, name, args_sig=None, args=()):
+    me = assert_keys()
+    check_build()
+    doc = load()
+    if step in doc['steps']:
+        raise SystemExit(f'rc: {step} already recorded')
+    code = art(name)['bytecode']['object']
+    if args_sig:
+        code += cast('abi-encode', args_sig, *args)[2:]
+    r = json.loads(cast('send', '--json', '--create', code, key='DEPLOYER_PK'))
+    if r['status'] not in ('0x1', 1):
+        raise SystemExit(f'rc: {name} creation failed: {r["transactionHash"]}')
+    a = r['contractAddress']
+    live = cast('code', a)
+    if masked_runtime(art(name), live) != json.load(open(PIN))['modules'][name]['runtimeMaskedSha']:
+        raise SystemExit(f'rc: the live {name} runtime differs from the reviewed build')
+    _record(doc, step, {'from': me, 'tx': r['transactionHash'], 'address': a, 'contract': name,
+                        'runtimeMaskedSha': masked_runtime(art(name), live)})
+    print(name, a)
+    return a
 
 
 def deploy_rc():
+    me = assert_keys()
+    check_build()
     if not check():
         raise SystemExit('rc: pre-flight failed; nothing sent')
     doc = load()
     ext = doc['steps']['rcext']['address']
-    me = owner()
-    code, _ = art('ReagentRC')
-    initcode = code + cast('abi-encode', 'f(address,address)', me, ext)[2:]
-    # the exact runtime the creation returns, simulated from the RC deployer at nonce 0
+    b6 = doc['steps']['rcb6']['address']
+    if cast('call', ext, 'B6()(address)').lower() != b6.lower():
+        raise SystemExit('rc: the recorded RcExt does not bind the recorded RcB6')
+    initcode = art('ReagentRC')['bytecode']['object'] + cast('abi-encode', 'f(address,address)', me, ext)[2:]
     runtime = cast('call', '--from', RC_DEPLOYER, '--create', initcode)
     est = int(cast('estimate', '--from', RC_DEPLOYER, '--create', initcode))
-    r = json.loads(cast('send', '--json', '--gas-limit', str(est * 3 // 2), '--create', initcode, key='RC_DEPLOYER_PK'))
+    r = json.loads(cast('send', '--json', '--nonce', '0', '--gas-limit', str(est * 3 // 2), '--create', initcode,
+                        key='RC_DEPLOYER_PK'))
     ok = r['status'] in ('0x1', 1)
-    rec = {**stamp(), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
-           'from': RC_DEPLOYER, 'tx': r['transactionHash'], 'status': 'ok' if ok else 'FAILED', 'estimate': est,
+    rec = {'from': RC_DEPLOYER, 'tx': r['transactionHash'], 'status': 'ok' if ok else 'FAILED', 'estimate': est,
            'gasUsed': int(r['gasUsed'], 16), 'address': r.get('contractAddress')}
-    doc['steps']['rc'] = rec
-    save(doc)
+    _record(doc, 'rc', rec)
     assert ok, 'the RC creation failed: nonce 0 is spent (F-007): owner action'
     assert r['contractAddress'].lower() == RESERVED.lower(), 'RC landed off the reserved address'
     live = cast('code', RESERVED)
     assert live.lower() == runtime.lower(), 'the live runtime differs from the simulated one'
+    assert masked_runtime(art('ReagentRC'), live) == json.load(open(PIN))['modules']['ReagentRC']['runtimeMaskedSha'], \
+        'the live RC runtime differs from the reviewed build'
     assert cast('call', RESERVED, 'OWNER()(address)').lower() == me.lower()
     assert cast('call', RESERVED, 'EXT()(address)').lower() == ext.lower()
-    rec.update(runtimeSha=hashlib.sha256(bytes.fromhex(live[2:])).hexdigest(), owner=me, ext=ext, asserted=True)
-    save(doc)
+    rec.update(runtimeSha=hashlib.sha256(bytes.fromhex(live[2:])).hexdigest(), owner=me, ext=ext, b6=b6, asserted=True)
+    _record(doc, 'rc', rec)
     print('ReagentRC', RESERVED, 'asserted')
 
 
 def register():
+    assert_keys()
     doc = load()
     txs = []
     for ch in ('1301', '11155111'):
@@ -167,11 +275,59 @@ def register():
     r = json.loads(cast('send', '--json', '--value', RC_FUND, SYSTEM, 'depositTo(address)', RESERVED, key='DEPLOYER_PK'))
     assert r['status'] in ('0x1', 1), r
     txs.append({'call': 'depositTo(address)', 'value': RC_FUND, 'tx': r['transactionHash']})
-    doc['steps']['register'] = {**stamp(), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'), 'txs': txs}
-    save(doc)
+    _record(doc, 'register', {'txs': txs})
     print('registered', len(txs), 'txs')
+
+
+# ------------------------------------------------------------------ selftest (offline)
+
+def selftest():
+    """The refusals, with no network and no real key: swapped keys, a mutated artifact, a dirty tree."""
+    k1 = '0x' + '11' * 32
+    k2 = '0x' + '22' * 32
+    fails = 0
+
+    def refused(fn, label):
+        nonlocal fails
+        try:
+            fn()
+        except SystemExit:
+            print('selftest ok:', label)
+            return
+        print('selftest FAIL:', label)
+        fails += 1
+
+    # (1) keys: neither fake key is the RC deployer → refused before any send
+    refused(lambda: assert_keys({'DEPLOYER_PK': k1, 'RC_DEPLOYER_PK': k2}), 'a wrong RC deployer key is refused')
+    refused(lambda: assert_keys({'DEPLOYER_PK': k1}), 'a missing key is refused')
+    # (2) a mutated artifact against a pin of the clean one → refused
+    with tempfile.TemporaryDirectory() as t:
+        for m in MODULES:
+            os.makedirs(os.path.join(t, 'out', f'{m}.sol'))
+            a = art(m)
+            json.dump(a, open(os.path.join(t, 'out', f'{m}.sol', f'{m}.json'), 'w'))
+        os.makedirs(os.path.join(t, 'src'))
+        subprocess.run(['git', 'init', '-q'], cwd=t)
+        p = os.path.join(t, 'pin.json')
+        json.dump({'modules': build_ids(t)}, open(p, 'w'))
+        check_build(t, p, rebuild=False)  # the clean copy passes
+        a = art('RcExt', t)
+        code = a['deployedBytecode']['object']
+        a['deployedBytecode']['object'] = code[:-2] + ('00' if code[-2:] != '00' else '01')
+        json.dump(a, open(os.path.join(t, 'out', 'RcExt.sol', 'RcExt.json'), 'w'))
+        refused(lambda: check_build(t, p, rebuild=False), 'a mutated artifact is refused')
+        open(os.path.join(t, 'src', 'X.sol.mutorig'), 'w').write('x')
+        refused(lambda: check_build(t, p, rebuild=False), 'a *.mutorig in src/ is refused')
+    print('rc selftest', 'OK' if not fails else 'FAIL')
+    return not fails
 
 
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else 'check'
-    {'check': lambda: sys.exit(0 if check() else 1), 'ext': deploy_ext, 'rc': deploy_rc, 'register': register}[what]()
+    cmds = {'check': lambda: sys.exit(0 if check() else 1), 'pin': pin, '--selftest': lambda: sys.exit(0 if selftest() else 1),
+            'b6': lambda: deploy_module('rcb6', 'RcB6'),
+            'ext': lambda: deploy_module('rcext', 'RcExt', 'f(address)', (load()['steps']['rcb6']['address'],)),
+            'rc': deploy_rc, 'register': register}
+    if what not in cmds:
+        raise SystemExit(f'rc: unknown command {what}')
+    cmds[what]()

@@ -20,6 +20,9 @@ contract RcB6SchedTest is B6Fixture {
     uint256 steps;
     uint256 parksSeen;
     uint256 raisesChecked;
+    bool wasRaising;
+    uint256 capAtRaise; // capRC when the in-flight raise was first seen: the cap it was sent under (sent only at rest)
+    uint256 tightenedMidRaise; // a tighten reached the RC while the raise was in flight (spec §4 I-CAP, §12)
     bool holdBudgets;
     bool noRuleChanges;
 
@@ -157,8 +160,18 @@ contract RcB6SchedTest is B6Fixture {
             if (cap < capRC) capRC = cap;
         }
         if (raising) {
-            assertLe(sum, capRC, "I-CAP (a): a raise in flight keeps sum committed <= capRC");
+            if (!wasRaising) capAtRaise = capRC;
+            wasRaising = true;
+            // I-CAP (a) bounds a raise by capRC at its send; a raise sent before the RC received the other chain's
+            // tighten may still land, and that chain's next STATE triggers a safety lower (spec §4, §12)
+            if (capRC < capAtRaise) {
+                ++tightenedMidRaise;
+                console2.log("I-CAP (a): tighten after the send; cap at send", capAtRaise, "now", capRC);
+            }
+            assertLe(sum, capAtRaise, "I-CAP (a): a raise in flight keeps sum committed <= capRC at its send");
             ++raisesChecked;
+        } else {
+            wasRaising = false;
         }
         _leave(p);
     }
@@ -307,6 +320,13 @@ contract RcB6SchedTest is B6Fixture {
         }
         _run2(12);
         assertGt(raisesChecked, 0, "I-CAP (a) was checked with a raise in flight");
+    }
+
+    /// @notice s5 counterexample (a tighten reached the RC while a raise was in flight; the checker compared against
+    ///         the new cap): kept as a fixed cell.
+    function test_R_B6SCHED__seedTightenMidRaise() public {
+        _run(33550280150062231128225087615149342456621128802140773398544284085856898931965);
+        assertGt(tightenedMidRaise, 0, "non-vacuous: the tighten landed while the raise was in flight");
     }
 
     /// @notice A former counterexample seed (s4: the checker used a fixed cap), kept as a fixed cell.

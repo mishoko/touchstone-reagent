@@ -37,7 +37,7 @@ contract RcGasTest is RcFixture {
 
     /// @dev The first-STATE cell's state, built here and committed: the test body is a new transaction in which the
     ///      measured STATE is the first reaction, every account and slot cold (F-011).
-    function setUp() public {
+    function setUp() public virtual {
         _setUpRc();
         V[4] memory vs;
         for (uint32 i; i < 4; ++i) {
@@ -83,7 +83,21 @@ contract RcGasTest is RcFixture {
     }
 
     /// @notice A Covenant's first STATE at the bounds: 4 holdings, 4 budgeted ids, 4 plans, 4 late arms.
+    /// @dev The cursor list (`_vaultList` slot 23, `_nVaults` 24; see RcGasCaps `_cursorTo`): the listed count, and
+    ///      whether the slots [n, n + k) hold non-zero (stale) entries.
+    function _cursorSlots(uint256 k) internal returns (uint256 n, bool staleOk) {
+        uint256 p = _lasna();
+        n = uint256(vm.load(address(rc), bytes32(uint256(24))));
+        staleOk = true;
+        for (uint256 i = n; i < n + k; ++i) {
+            if (vm.load(address(rc), keccak256(abi.encode(i, uint256(23)))) == bytes32(0)) staleOk = false;
+        }
+        _leave(p);
+    }
+
     function test_R_GAS__firstStateAtTheBoundsWithFourPlans() public {
+        (, bool stale) = _cursorSlots(4);
+        assertTrue(stale, "non-vacuous: the 4 vaults were dropped (empty), so the STATE takes the re-list path");
         uint256 mark0 = reactGas.length;
         forwardOverride = vm.envOr("RGAS_FORWARD", uint256(0));
         vm.prank(alice);
@@ -117,5 +131,25 @@ contract RcGasTest is RcFixture {
         assertGt(work, 0, "the work entry was written ahead");
         _elapse(10 * 113);
         assertEq(reactReverts, 0);
+    }
+}
+
+/// @notice rc-fix r4 C4-01: the same first STATE after 4 permissionless registrations took the stale slots the drops
+///         left (S = 0 without the high-water invariant): the re-lists still write non-zero slots, so the mandatory
+///         part stays within PB-8 and the reaction lands at the live forward (PC MU-284: fresh slots, ≈ +93k).
+contract RcGasFirstStateAfterRegistrationsTest is RcGasTest {
+    function setUp() public override {
+        super.setUp();
+        (uint256 n0,) = _cursorSlots(0);
+        for (uint32 i; i < 4; ++i) {
+            _registeredVault(CA, 11 + i); // they land in the slots [n0, n0 + 4)
+        }
+        (uint256 n1, bool stale) = _cursorSlots(4);
+        require(n1 == n0 + 4, "setUp: 4 registrations listed");
+        require(stale, "setUp: the registrations left stale slots for the re-lists (C4-01)");
+        (,,, bool cronOn) = rc.counters();
+        require(!cronOn, "setUp: Cron off");
+        _on(CA);
+        vm.store(address(rc), MARK, bytes32(0));
     }
 }

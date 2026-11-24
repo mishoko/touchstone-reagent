@@ -1,0 +1,196 @@
+{
+ "commit": "7981fca",
+ "dirty": true,
+ "src_sha": "bfddf58efc676879",
+ "recorded_at": "2026-11-24T16:57:21+00:00",
+ "generated_by": "script/rcgas.py",
+ "spec": "REAGENT-SPEC \u00a75.5 \"Deferred work\" (v1.3), \u00a79.2 R-GAS",
+ "forward_note": "the modelled HEAD forward (test/base/RcEnv.sol reactGasFor); L-GAS pins the live one",
+ "cells": {
+  "RcGasCapsCursorFirstTest": {
+   "shape": "cursor first: 8 curators (one target vault each, 1301), each Covenant holding 4 vaults with the target last, each evaluation entering its wait and resending (the dearest measured)",
+   "firstClass": 0,
+   "forward": 749597,
+   "overhead": 22054,
+   "floor1": 392100,
+   "maxEval1": 117479,
+   "floor2": 157125,
+   "item3": 3716,
+   "gasGuard": 250000,
+   "lhs": 624491,
+   "margin": 125106
+  },
+  "RcGasCapsLowersFirstTest": {
+   "shape": "lowers first: one 8-distinct-id stale head, then a head owing only its last (id, chain)",
+   "firstClass": 1,
+   "forward": 749597,
+   "overhead": 22092,
+   "floor1": 102036,
+   "maxEval1": 102036,
+   "floor2": 309603,
+   "item3": 143555,
+   "gasGuard": 250000,
+   "lhs": 581695,
+   "margin": 167902
+  },
+  "RcGasCapsDirtyFirstTest": {
+   "shape": "dirty first: a woken 4-id B6 park (its id without pairs)",
+   "firstClass": 2,
+   "forward": 749597,
+   "overhead": 21158,
+   "floor1": 223250,
+   "maxEval1": 79758,
+   "floor2": 138723,
+   "item3": 146066,
+   "gasGuard": 250000,
+   "lhs": 417224,
+   "margin": 332373
+  }
+ },
+ "minMargin": 125106,
+ "matrix": {
+  "RcGasCronCapsTest": {
+   "shape": "cursor 2 vaults x 24 Covenants; lowers [4 stale, H, 4 stale] 4 shared ids; 1-id park",
+   "overhead": 57216,
+   "worst(1)": 223260,
+   "maxEval1": 79767,
+   "evals1": 4,
+   "floor(2)": 208246,
+   "item(3)": 99070,
+   "used": 2722003,
+   "largest item": 490104
+  },
+  "RcGasCronCapsNoStaleTest": {
+   "shape": "as above, no stale head ahead (one visit that sends)",
+   "overhead": 57216,
+   "worst(1)": 223260,
+   "maxEval1": 79767,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99070,
+   "used": 2719935,
+   "largest item": 424347
+  },
+  "RcGasCronCaps8IdsTest": {
+   "shape": "8 distinct ids; 4 stale ahead; 4-id park",
+   "overhead": 57216,
+   "worst(1)": 223260,
+   "maxEval1": 79767,
+   "evals1": 4,
+   "floor(2)": 264510,
+   "item(3)": 143533,
+   "used": 2767984,
+   "largest item": 520072
+  },
+  "RcGasCronCaps8IdsNoStaleTest": {
+   "shape": "8 distinct ids; no stale ahead",
+   "overhead": 57216,
+   "worst(1)": 223260,
+   "maxEval1": 79767,
+   "evals1": 4,
+   "floor(2)": 163927,
+   "item(3)": 143533,
+   "used": 2767196,
+   "largest item": 505515
+  },
+  "RcGasCronCapsLastOnlyTest": {
+   "shape": "a head owing only its last (id, chain), 8 distinct ids",
+   "overhead": 57216,
+   "worst(1)": 223260,
+   "maxEval1": 79767,
+   "evals1": 4,
+   "floor(2)": 186148,
+   "item(3)": 143533,
+   "used": 2757080,
+   "largest item": 488981
+  },
+  "RcGasCronCapsColdCursorTest": {
+   "shape": "cursor 8 vaults of one curator, one Covenant each",
+   "overhead": 57216,
+   "worst(1)": 325156,
+   "maxEval1": 103741,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99070,
+   "used": 2727883,
+   "largest item": 424347
+  },
+  "RcGasCronCapsColdCursor8CuratorsTest": {
+   "shape": "cursor 8 curators, one vault each",
+   "overhead": 57216,
+   "worst(1)": 337156,
+   "maxEval1": 103741,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99070,
+   "used": 2728174,
+   "largest item": 424347
+  },
+  "RcGasCronCapsColdCursorResendTest": {
+   "shape": "cursor 8 curators, resends due",
+   "overhead": 57216,
+   "worst(1)": 363180,
+   "maxEval1": 110249,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99067,
+   "used": 2719365,
+   "largest item": 424348
+  },
+  "RcGasCronCapsColdCursor4HoldTest": {
+   "shape": "cursor 8 curators, each Covenant holding 4 vaults with the target last",
+   "overhead": 57216,
+   "worst(1)": 366076,
+   "maxEval1": 110971,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99070,
+   "used": 2718676,
+   "largest item": 424347
+  },
+  "RcGasCronCapsColdCursorResendParkTest": {
+   "shape": "cursor 8 curators, each evaluation resends and parks",
+   "overhead": 57216,
+   "worst(1)": 351888,
+   "maxEval1": 94601,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99067,
+   "used": 2718287,
+   "largest item": 424348
+  },
+  "RcGasCronCapsColdCursor4HoldResendTest": {
+   "shape": "cursor 8 curators, 4 holdings (target last), each entering its wait and resending",
+   "overhead": 57216,
+   "worst(1)": 392100,
+   "maxEval1": 117479,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99067,
+   "used": 2718225,
+   "largest item": 424348
+  },
+  "RcGasCronCapsEmptyVaultsTest": {
+   "shape": "cursor 8 curators with 16 vaults without Covenants between consecutive targets (V4-01)",
+   "overhead": 57216,
+   "worst(1)": 227057,
+   "maxEval1": 89571,
+   "evals1": 2,
+   "floor(2)": 157125,
+   "item(3)": 99070,
+   "used": 2732150,
+   "largest item": 422348
+  },
+  "RcGasCronCapsColdCursor4HoldResendParkTest": {
+   "shape": "cursor 8 curators, 4 holdings (target last), resend and park",
+   "overhead": 57216,
+   "worst(1)": 380808,
+   "maxEval1": 101831,
+   "evals1": 4,
+   "floor(2)": 157125,
+   "item(3)": 99067,
+   "used": 2711606,
+   "largest item": 424348
+  }
+ }
+}

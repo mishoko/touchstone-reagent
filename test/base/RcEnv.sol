@@ -183,6 +183,10 @@ abstract contract RcEnv is TsEnv {
     Inbox[] internal heldLogs; // origin logs held back by `_logPolicy`
     LogRecord[] internal originHist; // every origin log ever emitted, in order (evidence for positive controls)
     bool internal noAutoPump; // set by a cell that wants time to pass with nothing reacting
+    bool internal cronWithheld; // Cron100 ticks pass undelivered (a Lasna backlog): R-GAS builds a worst tick with it
+    bool internal cronBacklog; // Cron100 logs are queued, then reacted together at one later block (v13 r2 V2-06)
+    LogRecord[] internal cronQueue;
+    uint256[] internal cronQueueN;
     uint256 internal subLag; // Lasna blocks before a new subscription takes effect (s3 rc r2 D2-07)
     uint256 internal txSeq;
 
@@ -211,6 +215,7 @@ abstract contract RcEnv is TsEnv {
 
     GasRow[] internal reactGas; // every reaction's gas, in order (R-GAS)
     uint256 internal forwardOverride; // a cell may set the forward (0 = the live HEAD-semantics forward)
+    uint256 internal cronForwardOverride; // the same for Cron reactions only (the other reactions keep the live one)
     mapping(uint256 => bool) internal hubInDebt;
     bool internal rcInDebt;
 
@@ -501,7 +506,10 @@ abstract contract RcEnv is TsEnv {
                 } else if (nextCron <= nowBn) {
                     lastCronBn = nextCron;
                     LogRecord memory cl = _cronLog(nextCron);
-                    if (!rcInDebt) {
+                    if (cronBacklog) {
+                        cronQueue.push(cl);
+                        cronQueueN.push(_matchCount(cl, nextCron));
+                    } else if (!rcInDebt && !cronWithheld) {
                         uint256 n = _matchCount(cl, nextCron);
                         for (uint256 k; k < n; ++k) {
                             _react(cl, nextCron);
@@ -520,6 +528,22 @@ abstract contract RcEnv is TsEnv {
         // F-010 H1-02: the bound never truncates work silently (a test asserting "nothing happened" must not pass
         // on a cut pump)
         revert("RcEnv: the pump did not settle within 64 rounds");
+    }
+
+    /// @notice Delivers the queued Cron logs now, all at the current Lasna block (a backlog drained in one window).
+    function _releaseCronBacklog() internal {
+        _flush();
+        uint256 nowBn = _bn(LASNA);
+        cronBacklog = false;
+        for (uint256 i; i < cronQueue.length; ++i) {
+            for (uint256 k; k < cronQueueN[i]; ++k) {
+                _react(cronQueue[i], nowBn);
+            }
+            _deliverAll();
+            _flush();
+        }
+        delete cronQueue;
+        delete cronQueueN;
     }
 
     function _earliest() internal view returns (bool has, uint256 idx, uint256 at) {
@@ -543,7 +567,9 @@ abstract contract RcEnv is TsEnv {
         _on(LASNA);
         vm.roll(bn);
         bytes memory cd = abi.encodeCall(IReactive.react, (l));
-        uint256 g = forwardOverride != 0 ? forwardOverride : reactGasFor(cd);
+        uint256 g = forwardOverride != 0
+            ? forwardOverride
+            : cronForwardOverride != 0 && l.topic0 == CRON100 ? cronForwardOverride : reactGasFor(cd);
         ++reactCalls;
         // Every live reaction is its own transaction (accounts and slots cold). The harness never cools: under forge
         // 1.5.0 `vm.cool` cools an account but not its slots, and it un-touches the account, so a code account cooled

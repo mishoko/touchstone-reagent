@@ -112,7 +112,10 @@ contract ReagentRC is RcBase {
         if (msg.sender != SYSTEM) revert NotSystem();
         uint256 c = l.chainId;
         if (c == LASNA) {
-            if (l.emitter == CRON && l.topic0 == T_CRON100 && _cronOn) _delegate(abi.encodeCall(RcExt.cron, ()));
+            if (l.emitter == CRON && l.topic0 == T_CRON100 && _cronOn) {
+                // the rotation phase from the Cron log's OWN block (each Cron event distinct; v13 r1 V1-01)
+                _delegate(abi.encodeCall(RcExt.cron, ((l.blockNumber / 100) % 3))); // [MU-276]
+            }
         } else if (_isChain(c)) {
             address e = l.emitter;
             // [MU-210] the (chain, registered Hub) filter (A-XCHAIN, A-NOTE-FORGE)
@@ -155,12 +158,21 @@ contract ReagentRC is RcBase {
         if (n >= MAX_PER_CHAIN) return; // a fifth vault per id per chain is not bound (spec §5.5 Bounds)
         if (c == CA) k.nvA = n + 1;
         else k.nvB = n + 1;
-        _vault[c][vault] = VaultRec(id, hook, 0, false, 0);
+        _vault[c][vault] = VaultRec(id, hook, 0, false, 0, false);
         _vault2[c][vault].actionSub = true;
         _hookVault[c][hook] = vault;
         _idVaults[id][c][n] = vault;
-        _vaultList[_nVaults] = (c << 160) | uint160(vault);
-        _nVaults += 1;
+        uint256 nv = _nVaults;
+        _vaultList[nv] = (c << 160) | uint160(vault);
+        _nVaults = nv + 1;
+        // [MU-284] a registration that takes a stale slot (left by a drop) leaves a new one at the high-water mark,
+        // paid here, so a re-list never writes a fresh slot inside a STATE (rc-fix r4 C4-01)
+        if (nv < _vaultHigh) {
+            _vaultList[_vaultHigh] = (c << 160) | uint160(vault);
+            _vaultHigh += 1;
+        } else {
+            _vaultHigh = nv + 1;
+        }
         _sub(c, vault, T_PROCESSED, IGNORE);
         _sub(c, vault, T_MODE, IGNORE);
         _sub(c, vault, T_RETIRED, IGNORE);
@@ -367,6 +379,12 @@ contract ReagentRC is RcBase {
     function parkedOf(uint256 c, uint32 id) external view returns (uint16 parkedCount, uint16 b6ParkedCount) {
         SeqRec storage q = _seq[c][id];
         return (q.parkedCount, q.b6ParkedCount);
+    }
+
+    /// @notice A dirty id's sweep (spec §3.5): the next index of its walk, the lap in progress, the lap it ends at.
+    function sweepOf(uint32 id) external view returns (uint32 pos, uint32 lap, uint32 endLap, bool on) {
+        Sweep storage w = _sweep[id];
+        return (w.pos, w.lap, w.endLap, w.on);
     }
 
     function workAt(uint256 i) external view returns (uint256 chain, address cov) {

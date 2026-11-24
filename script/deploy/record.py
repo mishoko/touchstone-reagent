@@ -67,20 +67,38 @@ def supersede(argv):
     return 0
 
 
-def _reagent_reads(txs, rpc):
+RESERVED_RC = '0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9'  # CREATE(RC deployer, nonce 0) (F-007)
+
+
+def _reagent_reads(txs, rpc, chain):
     """The deployed links read from chain at record time: the factory's HUB(), the Hub's FACTORY(), RC(), PROXY()
-    and needs() (s3: formerly a hand-run companion read)."""
+    and needs() (s3: formerly a hand-run companion read). Every read must succeed and the RPC must be `chain`; the Hub
+    must name the reserved RC and this factory (F-010 H3-04: a failed read was once recorded as '')."""
     f = [t['address'] for t in txs if t.get('contract') == 'CovenantFactory' and t.get('address')]
     if len(f) != 1:
-        return None
-    c = lambda *a: subprocess.run(['cast', 'call', *a, '--rpc-url', rpc], capture_output=True, text=True).stdout.strip()
+        raise SystemExit(f'record: expected one CovenantFactory in the broadcast, found {len(f)}')
+
+    def c(*a):
+        r = subprocess.run(['cast', 'call', *a, '--rpc-url', rpc], capture_output=True, text=True)
+        if r.returncode != 0 or not r.stdout.strip():
+            raise SystemExit(f'record: cast call {a[1]} on {a[0]} failed: {(r.stderr or r.stdout).strip()[-200:]}')
+        return r.stdout.strip()
+
+    cid = subprocess.run(['cast', 'chain-id', '--rpc-url', rpc], capture_output=True, text=True).stdout.strip()
+    if cid != str(chain):
+        raise SystemExit(f'record: the RPC is chain {cid!r}, not {chain}')
     hub = c(f[0], 'HUB()(address)')
     impl = c(f[0], 'IMPL()(address)')
+    rc, fac = c(hub, 'RC()(address)'), c(hub, 'FACTORY()(address)')
+    if rc.lower() != RESERVED_RC.lower():
+        raise SystemExit(f'record: Hub RC() {rc} is not the reserved RC address')
+    if fac.lower() != f[0].lower():
+        raise SystemExit(f'record: Hub FACTORY() {fac} is not the recorded factory {f[0]}')
     return {'addresses': {'ext': c(impl, 'EXT()(address)'), 'impl': impl, 'factory': f[0], 'hub': hub},
             'source': 'script/deploy/record.py (cast call at record time)',
             'at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
-            'CovenantFactory.HUB()': hub, 'ReagentHub.FACTORY()': c(hub, 'FACTORY()(address)'),
-            'ReagentHub.RC()': c(hub, 'RC()(address)'), 'ReagentHub.PROXY()': c(hub, 'PROXY()(address)'),
+            'CovenantFactory.HUB()': hub, 'ReagentHub.FACTORY()': fac,
+            'ReagentHub.RC()': rc, 'ReagentHub.PROXY()': c(hub, 'PROXY()(address)'),
             'ReagentHub.needs()': c(hub, 'needs()(uint256,uint256)').replace('\n', ' ')}
 
 
@@ -148,7 +166,7 @@ def main(argv):
     if step in doc['steps'] and '--replace' not in argv:
         print(f'record: step {step} already recorded in {out}; pass --replace to overwrite')
         return 1
-    reads = _reagent_reads(txs, rpc) if script == 'Reagent.s.sol' and rpc else None
+    reads = _reagent_reads(txs, rpc, chain) if script == 'Reagent.s.sol' and rpc else None
     doc['steps'][step] = {'script': script, **stamp(), **({'reads': reads} if reads else {}), 'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
                           'note': note, 'txs': txs}
     open(out, 'w').write(json.dumps(doc, indent=1) + '\n')

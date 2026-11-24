@@ -50,6 +50,7 @@ interface IReagentRC is IReactive {
     function lowersOf() external view returns (address head, address tail, uint256 count);
     function lowersNext(address cov) external view returns (address next, address prev, bool listed);
     function parkedOf(uint256 chain, uint32 id) external view returns (uint16 parkedCount, uint16 b6ParkedCount);
+    function sweepOf(uint32 id) external view returns (uint32 pos, uint32 lap, uint32 endLap, bool on);
     function workAt(uint256 i) external view returns (uint256 chain, address cov);
     function covOf(uint256 chain, address cov)
         external

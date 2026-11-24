@@ -57,7 +57,7 @@ contract RcB6 is RcBase {
         // [MU-246] the nonce gate on answers (A-REPLAY class; r4 D4-02); the applied B only from a strictly newer
         // nonce, so a same-nonce answer never overwrites a STATE emitted after it (s4 rc-fix r1 C1-07)
         if (n >= x.appliedNonce) {
-            if (n > x.appliedNonce) (x.appliedNonce, x.appliedB) = (uint24(n), _sat(nb));
+            if (n > x.appliedNonce) (x.appliedNonce, x.appliedB) = (_sat24(n), _sat(nb));
             // [MU-247] every send ≤ the answered nonce is answered
             if (bb.flags & F_UN != 0 && n >= bb.nonce) {
                 bb.flags &= ~(F_UN | F_RAISE);
@@ -75,14 +75,16 @@ contract RcB6 is RcBase {
         if (_owesLower(cov)) _lowersAdd(cov);
     }
 
-    /// @notice Step 1: up to `max` owed safety lowers of `cov`; unlinks it from the lowers list when none remains.
+    /// @notice Step 1: up to `max` owed safety lowers of `cov` in ONE pass over its (id, chain) pairs; unlinks it from
+    ///         the lowers list when none remains, and moves a head that still owes to the tail only after it sent
+    ///         (v13 r1 V1-03, V1-04).
     function b6Lowers(address cov, uint256 sends, uint256 max) external delegated returns (uint256, bool owes) {
         Bud memory bud = Bud(sends);
-        _sendLowers(cov, bud, max);
-        owes = _owesLower(cov);
+        uint256 sent;
+        (sent, owes) = _sendLowers(cov, bud, max);
         if (!owes) {
             _lowersRemove(cov);
-        } else if (_lHead == cov) {
+        } else if (sent != 0 && _lHead == cov) { // [MU-271] only after progress (v13 r1 V1-04)
             // [MU-269] a head that still owes after its sends goes to the tail (round-robin; rc-fix r1 C1-01)
             _lowersRemove(cov);
             _lowersAdd(cov);
@@ -112,14 +114,14 @@ contract RcB6 is RcBase {
 
     /// @notice Pops the lowers list's stale heads and returns the owing head (0 = none).
     function b6Head() external delegated returns (address) {
-        while (_lHead != address(0) && gasleft() >= GAS_GUARD && !_owesLower(_lHead)) {
+        while (_lHead != address(0) && gasleft() >= GUARD_IN && !_owesLower(_lHead)) {
             _lowersRemove(_lHead);
         }
         return _lHead;
     }
 
     function _resend(uint256 c, uint32 id, Bud memory bud) internal {
-        if (bud.sends > 0 && _resendOnce(c, id)) bud.sends -= 1;
+        if (bud.sends > 0 && _resendOnce(c, id, GUARD_IN)) bud.sends -= 1;
     }
 
 
@@ -215,20 +217,26 @@ contract RcB6 is RcBase {
         return false;
     }
 
-    /// @dev Sends up to `max` owed safety lowers of a Covenant, each an item under the guard and the send budget.
-    function _sendLowers(address cov, Bud memory bud, uint256 max) internal {
+    /// @dev ONE pass over a Covenant's (id, chain) pairs (v13 r1 V1-03): sends up to `max` owed safety lowers, each an
+    ///      item under the guard and the send budget, and reports whether a lower is still owed after them (a sent
+    ///      lower is no longer owed: its target is in flight). A visited head costs one scan, never several.
+    ///      The visit is admitted ONCE, at its start (the measured item runs from here: the scan to the owed pair, the
+    ///      send, the rest of the scan, the list move); its first owed lower is then sent; each later send is gated
+    ///      at the send (v13 r2 V2-02). A visit not admitted reports "may owe", so nothing is ever unlisted by it.
+    function _sendLowers(address cov, Bud memory bud, uint256 max) internal virtual returns (uint256 sent, bool owes) {
+        if (gasleft() < GUARD_IN) return (0, true);
         uint256 cap = _capRC(cov);
-        if (cap == type(uint256).max) return;
+        if (cap == type(uint256).max) return (0, false);
         (uint32[8] memory u, uint256 n) = _b6Ids(cov);
-        for (uint256 i; i < n && max > 0; ++i) {
-            for (uint256 ci; ci < 2 && max > 0; ++ci) {
-                if (bud.sends == 0 || gasleft() < GAS_GUARD) return;
+        for (uint256 i; i < n; ++i) {
+            for (uint256 ci; ci < 2; ++ci) {
                 uint256 c = ci == 0 ? CA : CB;
                 (bool owed, uint256 t) = _lowerOwed(c, cov, u[i], cap);
                 if (!owed) continue;
+                if (sent >= max || bud.sends == 0 || (sent != 0 && gasleft() < GUARD_IN)) return (sent, true);
                 _sendBudget(c, cov, u[i], t, false);
                 bud.sends -= 1;
-                --max;
+                ++sent;
             }
         }
     }
@@ -290,12 +298,15 @@ contract RcB6 is RcBase {
         // [MU-255] the back-off
         if (bb.sentTick != 0 && now_ < bb.sentTick + delay) return true;
         bool raise = bb.flags & F_RAISE != 0;
+        // a park (≈ 55k cold: list slot, index, count) and a re-send are each a guarded item (v13 r2: a step of
+        // unguarded parks could run out of gas on every tick at the bounds, the A-CRON-PIN class)
+        if (gasleft() < GUARD_IN) return true;
         // [MU-256] park: a raise after MOVE_RESENDS, a lower after 6·EPOCH_TICKS (A-CRON-PIN)
         if (raise ? bb.resends >= MOVE_RESENDS : now_ > bb.runSince + 6 * et) {
             _parkB6(c, cov, id);
             return false;
         }
-        if (bud.sends == 0 || gasleft() < GAS_GUARD) return true;
+        if (bud.sends == 0) return true;
         uint256 o = _committed(_other(c), cov, id, cap);
         uint256 target;
         if (raise && _restIgnoring(c, cov, id, cap)) {
@@ -359,7 +370,7 @@ contract RcB6 is RcBase {
         } else {
             return false;
         }
-        if (bud.sends == 0 || gasleft() < GAS_GUARD) return true;
+        if (bud.sends == 0 || gasleft() < GUARD_IN) return true;
         _sendBudget(c, cov, id, target, raise);
         bud.sends -= 1;
         return false;
@@ -384,7 +395,7 @@ contract RcB6 is RcBase {
     function _unparkB6(uint256 c, address cov, uint32 id) internal returns (bool moved) {
         B6b storage bb = _b6b[cov][id][c];
         bb.parkLog = 0;
-        if (bb.flags & F_OVER != 0) {
+        if (bb.flags & F_OVER != 0) { // [MU-278] an overflowed park is on no list
             bb.flags &= ~F_OVER;
         } else {
             SeqRec storage q = _seq[c][id];
@@ -406,11 +417,11 @@ contract RcB6 is RcBase {
     /// @dev The sweep's b6Parked item: unparks when a callback result arrived after the park; the caller lists the
     ///      Covenant's work entry (keyed by the swept chain) iff `list` (the lifecycle predicate), and the lowers
     ///      list is written here if a lower is owed (s3 rc r12 D12-02).
-    function _wakeB6(uint256 c, address cov, uint32 id) internal returns (bool unparked, bool list) {
+    function _wakeB6(uint256 c, address cov, uint32 id) internal virtual returns (bool unparked, bool list) {
         B6b storage bb = _b6b[cov][id][c];
         // [MU-259] unpark only on a callback result after the park (r18 m-4)
         if (bb.parkLog == 0 || _seq[c][id].hubLogCount < bb.parkLog) return (false, false);
-        unparked = bb.flags & F_OVER == 0; // a counted park leaves the walked list
+        unparked = bb.flags & F_OVER == 0; // [MU-277] a counted park leaves the walked list
         _unparkB6(c, cov, id);
         bool owes = _owesLower(cov);
         list = bb.flags & F_UN != 0 || owes;
@@ -493,24 +504,22 @@ contract RcB6 is RcBase {
         _lowersCount -= 1;
     }
 
-    /// @dev Cron floor (2): pop ≤ STALE_POPS stale heads, then send ONE lower of an owing head and move it to the
-    ///      tail if it still owes (s3 rc r8 D8-01, r10 D10-01).
+    /// @dev Cron floor (2): visits the lowers list's heads, ONE scan each (v13 r1 V1-03): a stale head is popped (at most
+    ///      STALE_POPS of them); an owing head sends ONE lower and moves to the tail if it still owes (s3 rc r8 D8-01,
+    ///      r10 D10-01); an owing head that cannot send now keeps its place (V1-04).
     function _lowersFloor(Bud memory bud) internal {
-        for (uint256 pops; pops < STALE_POPS && _lHead != address(0) && gasleft() >= GAS_GUARD; ++pops) {
-            if (_owesLower(_lHead)) break;
-            _lowersRemove(_lHead); // [MU-245] a stale head costs one pop (never a correctness fault)
-        }
-        address h = _lHead;
-        if (h == address(0) || gasleft() < GAS_GUARD || !_owesLower(h)) return;
-        _sendLowers(h, bud, 1);
-        if (_owesLower(h)) {
-            _lowersRemove(h);
-            _lowersAdd(h);
-        } else {
-            _lowersRemove(h);
+        for (uint256 v; v <= STALE_POPS && _lHead != address(0) && gasleft() >= GUARD_IN; ++v) {
+            address h = _lHead;
+            (uint256 sent, bool owes) = _sendLowers(h, bud, 1);
+            if (sent != 0) {
+                _lowersRemove(h);
+                if (owes) _lowersAdd(h);
+                return;
+            }
+            if (owes) return;
+            _lowersRemove(h); // [MU-245] a stale head costs one pop (never a correctness fault)
         }
     }
-
 
     /// @dev Records a chain's (budget, exposure) for a (covenant, id) under the nonce gate (spec §5.5, r4 D4-02).
     function _recordBudget(uint256 c, address cov, uint32 id, uint128 budget, uint64 nonce, uint128 exposure)
@@ -523,11 +532,16 @@ contract RcB6 is RcBase {
         x.flags |= F_BASE;
         // [MU-244] the nonce gate on STATE: an older budget never overwrites a newer answer (r4 D4-02; LF-S4-2)
         if (nonce < x.appliedNonce) return;
-        (x.appliedNonce, x.appliedB, x.E) = (uint24(nonce), _sat(budget), _sat(exposure));
+        (x.appliedNonce, x.appliedB, x.E) = (_sat24(nonce), _sat(budget), _sat(exposure));
     }
 
 
 
+
+    /// @dev `appliedNonce` saturates (never wraps: a wrap would reopen the nonce gate; v13 r2 C2-04).
+    function _sat24(uint64 n) internal pure returns (uint24) {
+        return n > type(uint24).max ? type(uint24).max : uint24(n);
+    }
 
     function _baseIn(Base[] calldata b, uint32 id) internal pure returns (bool) {
         for (uint256 i; i < b.length; ++i) {

@@ -36,11 +36,18 @@ abstract contract RcBase {
     // ------------------------------------------------------------------ parameters (spec §6)
 
     uint256 internal constant ACTION_BUDGET = 8;
-    uint256 internal constant GAS_GUARD = 150_000; // ≤ 150,000 until measured (spec §6)
+    /// @dev ≥ the largest item admitted inside an optional B6 step (186,148 [M s5]) + TAIL + the call overhead, and ≥
+    ///      every RcExt item (≤ 117.5k [M s5]) (spec §5.5 "Deferred work", §6; v1.3, s5 v13).
+    uint256 internal constant GAS_GUARD = 250_000; // [MU-274] from the largest measured item (R-GAS)
+    uint256 internal constant TAIL = 40_000; // gas an optional B6 step leaves to its caller (RcExt `_b6Opt`)
+    /// @dev The guard inside an optional B6 step: `_b6Opt` admits a step at gasleft ≥ GAS_GUARD and forwards all but
+    ///      TAIL, so the step's own items are admitted against GAS_GUARD − TAIL (less the call's overhead); one
+    ///      constant for both frames let a step admitted by `_b6Opt` refuse its first item (v13 r1 V1-04).
+    uint256 internal constant GUARD_IN = GAS_GUARD - TAIL - 5_000;
     uint256 internal constant RESEND_BLOCKS = 1_000;
     uint256 internal constant MOVE_TICKS = 10; // B6 back-off base (spec §6)
     uint256 internal constant MOVE_RESENDS = 3; // a raise parks after 3 re-sends
-    uint256 internal constant STALE_POPS = 4; // stale lowers-list heads popped in Cron floor (2)
+    uint256 internal constant STALE_POPS = 1; // stale lowers-list heads popped in Cron floor (2) (v1.3; v1.2: 4)
     uint8 internal constant F_UN = 1;
     uint8 internal constant F_RAISE = 2;
     uint8 internal constant F_BASE = 4;
@@ -90,6 +97,7 @@ abstract contract RcBase {
         uint32 maxSeq; // max latched breachSeq seen (PB-1)
         bool gone; // EXITED or retired
         uint8 nCov; // Covenants ever appended (append-once, ≤ 16)
+        bool unlisted; // the cursor dropped it while it had no Covenant; its first Covenant re-lists it (V4-01)
     }
 
     struct VaultRec2 {
@@ -205,7 +213,7 @@ abstract contract RcBase {
     uint256 internal _workLen;
     uint256 internal _workPtr;
     // the global vault list walked by the cursor (spec §3.5), and the cursor
-    mapping(uint256 => uint256) internal _vaultList; // position → chain << 160 | vault
+    mapping(uint256 => uint256) internal _vaultList; // the cursor's vaults: listed at registration, dropped empty (V4-01)
     uint256 internal _nVaults;
     uint256 internal _cursorV;
     uint256 internal _cursorC;
@@ -256,6 +264,10 @@ abstract contract RcBase {
     address internal _lHead;
     address internal _lTail;
     uint256 internal _lowersCount;
+    /// @dev The cursor list's high-water mark: every slot in [`_nVaults`, `_vaultHigh`) holds a stale non-zero entry,
+    ///      and there are at least as many as dropped vaults, so a re-list (in a STATE) always reuses one (rc-fix r4
+    ///      C4-01). Appended last: the layout of every earlier slot is unchanged.
+    uint256 internal _vaultHigh;
 
     // ------------------------------------------------------------------ events and errors
 
@@ -344,12 +356,12 @@ abstract contract RcBase {
 
     /// @dev A fresh-seq snapshot to a lagging chain, at most once per (chain, id) per 1,000 Lasna blocks (s3 rc r1
     ///      D1-07, r4 D4-01, r5 D5-06); a rate-limited resend keeps nothing listed. Returns whether it sent.
-    function _resendOnce(uint256 c, uint32 id) internal returns (bool) {
+    function _resendOnce(uint256 c, uint32 id, uint256 guard) internal returns (bool) {
         SeqRec storage q = _seq[c][id];
         uint32 bn = uint32(block.number);
         // [MU-241] the PB-7 rate (R-RESEND)
         if (q.lastResendBlock != 0 && bn < q.lastResendBlock + RESEND_BLOCKS) return false;
-        if (gasleft() < GAS_GUARD) return false;
+        if (gasleft() < guard) return false;
         q.lastResendBlock = bn;
         Conduct storage t = _conductOf[id];
         uint32 s = t.seq + 1;
