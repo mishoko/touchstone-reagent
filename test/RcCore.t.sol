@@ -36,7 +36,7 @@ contract RcCoreTest is RcFixture {
 
     /// @dev NEED per chain and kind (spec §5.6 table, s3 LF-S3-1) and the formula, recomputed here (r1 D1-12).
     function _need(uint256 c, uint8 k) internal pure returns (uint256) {
-        uint256[5] memory a = [uint256(35_000), 91_000, 345_000, 832_000, 1_198_000];
+        uint256[5] memory a = [uint256(35_000), 91_000, 360_000, 880_000, 1_290_000];
         uint256[5] memory b = [uint256(150_000), 437_000, 500_000, 2_220_000, 2_310_000];
         return c == CA ? a[k] : b[k];
     }
@@ -151,7 +151,7 @@ contract RcCoreTest is RcFixture {
 
     function test_R_REG__onlyTheTwoChainsAndBundlersNeedTheFactory() public {
         uint256 p = _lasna();
-        address e2 = deployCode("RcExt.sol:RcExt");
+        address e2 = deployCode("RcExt.sol:RcExt", abi.encode(_newB6()));
         IReagentRC r2 = IReagentRC(payable(deployCode("ReagentRC.sol:ReagentRC", abi.encode(rcOwner, e2))));
         vm.startPrank(rcOwner);
         vm.expectRevert();
@@ -521,5 +521,22 @@ contract RcCoreTest is RcFixture {
         for (uint256 i = deliveries.length; i > 0; --i) {
             if (deliveries[i - 1].chainId == c && deliveries[i - 1].selector == s) return deliveries[i - 1].gasLimit;
         }
+    }
+
+    /// @notice R-EXT for the B6 module (s4): a direct call to `RcB6` reverts (from an outsider and from SYSTEM), and
+    ///         `RcExt`'s constructor refuses a B6 module without code.
+    function test_R_EXT__theB6ModuleRefusesDirectCallsAndTheExtensionRefusesACodelessModule() public {
+        address b6 = deployCode("RcB6.sol:RcB6");
+        (bool ok,) = b6.call(abi.encodeWithSignature("b6Floor()"));
+        assertFalse(ok, "an outsider");
+        vm.prank(SYSTEM);
+        (ok,) = b6.call(abi.encodeWithSignature("b6Floor()"));
+        assertFalse(ok, "even SYSTEM: never on the module's own storage");
+        vm.expectRevert();
+        this.deployExtWith(makeAddr("noCode"));
+    }
+
+    function deployExtWith(address b6) external returns (address) {
+        return deployCode("RcExt.sol:RcExt", abi.encode(b6));
     }
 }

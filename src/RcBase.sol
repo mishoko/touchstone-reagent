@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {IRnkSystem, CallbackV1} from "./interfaces/IReactive.sol";
 import {Kind} from "./interfaces/IReagentRC.sol";
+import {IReagentHub} from "./interfaces/IReagent.sol";
 
 /// @notice The storage, parameters, events and errors shared by `ReagentRC` (the reaction dispatch, registry,
 ///         conduct record and callbacks) and `RcExt` (STATE ingestion, the exit scheduler, B6 reconcile, Cron),
@@ -35,6 +36,15 @@ abstract contract RcBase {
     // ------------------------------------------------------------------ parameters (spec §6)
 
     uint256 internal constant ACTION_BUDGET = 8;
+    uint256 internal constant GAS_GUARD = 150_000; // ≤ 150,000 until measured (spec §6)
+    uint256 internal constant RESEND_BLOCKS = 1_000;
+    uint256 internal constant MOVE_TICKS = 10; // B6 back-off base (spec §6)
+    uint256 internal constant MOVE_RESENDS = 3; // a raise parks after 3 re-sends
+    uint256 internal constant STALE_POPS = 4; // stale lowers-list heads popped in Cron floor (2)
+    uint8 internal constant F_UN = 1;
+    uint8 internal constant F_RAISE = 2;
+    uint8 internal constant F_BASE = 4;
+    uint8 internal constant F_OVER = 8;
     uint256 internal constant MAX_PER_CHAIN = 4; // bundlers (so vaults) per id per chain
     uint256 internal constant MAX_COV = 16; // Covenants tracked per vault
     uint256 internal constant TICK_MS = 113_000; // one Cron100 tick [M]
@@ -47,9 +57,9 @@ abstract contract RcBase {
     // exactly (s3 rc r6 D6-03). Named so that `script/deploy/gasneed.py` and `rc.py` read them from source.
     uint256 internal constant NEED_CONDUCT_1301 = 35_000;
     uint256 internal constant NEED_VAULT_1301 = 91_000;
-    uint256 internal constant NEED_BUDGET_1301 = 345_000;
-    uint256 internal constant NEED_EXIT_1301 = 832_000;
-    uint256 internal constant NEED_PLAN_1301 = 1_198_000;
+    uint256 internal constant NEED_BUDGET_1301 = 360_000; // s4: ×1.3 of the cold minimum 270,685 (F-010 H2-01)
+    uint256 internal constant NEED_EXIT_1301 = 880_000; // s4 LF-S4-1: ×1.3 of the cold minimum 675,079
+    uint256 internal constant NEED_PLAN_1301 = 1_290_000; // s4 LF-S4-1: ×1.3 of the cold minimum 986,152
     uint256 internal constant NEED_CONDUCT_11155111 = 150_000;
     uint256 internal constant NEED_VAULT_11155111 = 437_000;
     uint256 internal constant NEED_BUDGET_11155111 = 500_000;
@@ -155,12 +165,15 @@ abstract contract RcBase {
     }
 
     /// @dev B6 per (covenant, id, chain), slot 1: the view from STATE and BudgetApplied, and the Covenant's per-id
-    ///      unpause baseline on that chain. Budgets and exposure saturate at uint96 (≈ 7.9e28 token1 units).
+    ///      unpause baseline on that chain. Budgets and exposure saturate at uint88 (≈ 3.1e26 token1 units, i.e.
+    ///      3.1e8 mWETH; the demo's caps are 1e20-scale).
     struct B6a {
-        uint96 appliedB;
-        uint96 E;
+        uint88 appliedB;
+        uint88 E;
         uint32 baseBreaches;
-        uint32 baseGone;
+        uint16 baseGone;
+        uint8 flags; // F_BASE: the chain's latest STATE carries a Base for the id
+        uint24 appliedNonce; // the latest budgetNonce recorded (answer or STATE); ≥ the Hub's n0 (LF-S4-2)
     }
 
     /// @dev The exit scheduler's pair state (spec §3.5), one slot.
@@ -197,9 +210,52 @@ abstract contract RcBase {
     uint256 internal _cursorV;
     uint256 internal _cursorC;
     // the dirty ids being swept (spec §3.5)
-    mapping(uint32 => uint32) internal _sweepPos; // the next pair index in the id's sweep (1-based; 0 = not dirty)
     mapping(uint256 => uint32) internal _dirty; // position → id
     uint256 internal _nDirty;
+
+    // ------------------------------------------------------------------ B6 (spec §5.5 B6 reconcile, Phase C)
+
+    /// @dev B6 per (covenant, id, chain), slot 2: the budget messages. `unB` is the maximum target over the
+    ///      unanswered sends; `nonce` the RC's last budgetNonce for this (covenant, id, chain) (≥ the Hub's n0);
+    ///      `parkLog` = hubLogCount + 1 while parked (0 = not parked; r18 m-4).
+    struct B6b {
+        uint96 unB;
+        uint32 nonce;
+        uint24 sentTick; // the last send (0 = due now)
+        uint24 runSince; // the first send of the unanswered run (the park clock)
+        uint8 resends;
+        uint8 flags; // F_UN unanswered, F_RAISE the last send was a raise, F_OVER an overflowed (uncounted) park
+        uint32 parkLog;
+    }
+
+    /// @dev A dirty id's sweep (spec §3.5): the next index in its walk (pairs, then its b6Parked lists), the lap in
+    ///      progress and the lap at which it ends (a re-mark extends it, never restarts it; r15 D15-03).
+    struct Sweep {
+        uint32 pos;
+        uint32 lap;
+        uint32 endLap;
+        bool on;
+    }
+
+    /// @dev The lowers list's per-Covenant record (spec §5.5 "Deferred work"; s3 rc r7 D7-01, r8 D8-03).
+    struct LowerLink {
+        address prev;
+        bool listed;
+    }
+
+    mapping(address => mapping(uint32 => mapping(uint256 => B6b))) internal _b6b;
+    mapping(uint256 => mapping(uint32 => address[16])) internal _b6Parked; // (chain, id) → parked Covenants
+    mapping(address => mapping(uint32 => mapping(uint256 => uint8))) internal _b6ParkIdx; // 1-based
+    /// @dev The target of the last LOWER sent in the unanswered run (step 1's "an unanswered lower already has a target
+    ///      ≤ it"); `unB` stays the maximum for `committed` (s4 rc-fix r1 C1-01: one field served two readers).
+    mapping(address => mapping(uint32 => mapping(uint256 => uint96))) internal _lowB;
+    uint256 internal _dirtyPtr; // the dirty ids are served round-robin (s4 rc-fix r1 C1-10)
+    mapping(uint32 => Sweep) internal _sweep;
+    mapping(address => LowerLink) internal _lPrev;
+    mapping(address => address) internal _lNext;
+    address internal _lHead;
+    address internal _lTail;
+    uint256 internal _lowersCount;
 
     // ------------------------------------------------------------------ events and errors
 
@@ -272,5 +328,50 @@ abstract contract RcBase {
 
     function _unsub(uint256 c, address e, uint256 t0, uint256 t1) internal {
         IRnkSystem(SYSTEM).unsubscribe(c, e, t0, t1, IGNORE, IGNORE);
+    }
+
+    function _inIds(uint32[4] storage ids, uint32 id) internal view returns (bool) {
+        return id != 0 && (ids[0] == id || ids[1] == id || ids[2] == id || ids[3] == id);
+    }
+
+    function _epochTicks(uint256 c) internal pure returns (uint32) {
+        return c == CA ? EPOCH_TICKS_1301 : EPOCH_TICKS_11155111;
+    }
+
+    function _sat(uint128 x) internal pure returns (uint88) {
+        return x > type(uint88).max ? type(uint88).max : uint88(x);
+    }
+
+    /// @dev A fresh-seq snapshot to a lagging chain, at most once per (chain, id) per 1,000 Lasna blocks (s3 rc r1
+    ///      D1-07, r4 D4-01, r5 D5-06); a rate-limited resend keeps nothing listed. Returns whether it sent.
+    function _resendOnce(uint256 c, uint32 id) internal returns (bool) {
+        SeqRec storage q = _seq[c][id];
+        uint32 bn = uint32(block.number);
+        // [MU-241] the PB-7 rate (R-RESEND)
+        if (q.lastResendBlock != 0 && bn < q.lastResendBlock + RESEND_BLOCKS) return false;
+        if (gasleft() < GAS_GUARD) return false;
+        q.lastResendBlock = bn;
+        Conduct storage t = _conductOf[id];
+        uint32 s = t.seq + 1;
+        t.seq = s;
+        q.seqOut = s;
+        _send(c, Kind.CONDUCT, abi.encodeCall(IReagentHub.rcConduct, (address(0), id, t.breaches, t.gone, t.actions, uint64(s))));
+        return true;
+    }
+
+    /// @dev Marks `id` dirty: a new sweep of one lap, or an extension of the running one so that every item is
+    ///      evaluated after this mark (ends ≤ 2 laps after the last mark; a re-mark never restarts it, r15 D15-03).
+    function _markDirty(uint32 id) internal {
+        Sweep storage w = _sweep[id];
+        if (w.on) {
+            // [MU-250] extend, never restart (LF-S4-4)
+            uint32 e = w.pos == 0 ? w.lap + 1 : w.lap + 2;
+            if (e > w.endLap) w.endLap = e;
+            return;
+        }
+        (w.on, w.pos, w.lap, w.endLap) = (true, 0, 0, 1);
+        _dirty[_nDirty] = id;
+        _nDirty += 1;
+        _sweeps += 1;
     }
 }

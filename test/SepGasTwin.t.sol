@@ -28,7 +28,7 @@ contract HubForgeNeed is ReagentHub {
     /// @dev Keyed by kind through `needs()` (never by value, which changes; s3 rc r5 D5-05).
     function _shortGas(uint256 need) internal view override returns (bool) {
         (uint256 e, uint256 p) = needs();
-        uint256 forge_ = need == e ? 832_000 : need == p ? 1_198_000 : need;
+        uint256 forge_ = need == e ? 880_000 : need == p ? 1_290_000 : need; // the 1301 NEEDs (RcBase NEED_*_1301; s4 LF-S4-1)
         return gasleft() < forge_ * 64 / 63 + 40_000;
     }
 }

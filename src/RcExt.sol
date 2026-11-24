@@ -5,6 +5,7 @@ import {LogRecord, IRnkSystem} from "./interfaces/IReactive.sol";
 import {IReagentHub, Rulebook, Holding, Base} from "./interfaces/IReagent.sol";
 import {Kind} from "./interfaces/IReagentRC.sol";
 import {RcBase} from "./RcBase.sol";
+import {RcB6} from "./RcB6.sol";
 
 /// @title RcExt
 /// @notice The RC's STATE ingestion, exit scheduler, B6 reconcile and Cron tick (spec §3.5, §5.5). It runs only by
@@ -13,14 +14,14 @@ import {RcBase} from "./RcBase.sol";
 ///         s3 rc r2 D2-05, r3 D3-09).
 contract RcExt is RcBase {
     address internal immutable SELF;
+    address public immutable B6; // the B6 module (immutable, like EXT: no upgrade path)
 
     uint256 internal constant SENDS_PER_REACTION = 4;
-    uint256 internal constant GAS_GUARD = 150_000;
+    uint256 internal constant TAIL = 40_000; // gas kept back from an optional B6 step
     uint256 internal constant SCAN_PER_TICK = 24;
     uint256 internal constant CURSOR_FLOOR = 8;
     uint256 internal constant EXITS_PER_TICK = 8;
     uint256 internal constant RECONCILE_PER_TICK = 8;
-    uint256 internal constant RESEND_BLOCKS = 1_000;
 
     uint8 internal constant EXIT_DONE = 1;
     uint8 internal constant EXIT_EARLY = 2;
@@ -34,10 +35,34 @@ contract RcExt is RcBase {
         uint256 sends;
         uint256 exits;
         uint256 evals;
+        bool probes; // a STATE's reaction: PB-7 resends and probes for the Covenant's ids (spec §3.5)
     }
 
-    constructor() {
+    constructor(address b6_) {
+        // [MU-261] a module without code would make every B6 step a silent no-op (D2-07 class, F-011)
+        if (b6_.code.length == 0) revert NotDelegated();
         SELF = address(this);
+        B6 = b6_;
+    }
+
+    /// @dev An OPTIONAL B6 step (spec §5.5 "Deferred work"): started only at gasleft ≥ GAS_GUARD, given all but
+    ///      `TAIL` gas, and never bubbling: a step cut short reverts alone and stays owed on the listed work entry,
+    ///      so no reaction spends its mandatory part, or reverts, on optional work (s3 rc r1 D1-01 class; s4).
+    function _b6Opt(bytes memory data) internal returns (bool ok, bytes memory r) {
+        if (gasleft() < GAS_GUARD) return (false, r);
+        // [MU-262] the tail kept back for the rest of the reaction (the entry bookkeeping and the Cron subscribe)
+        (ok, r) = B6.delegatecall{gas: gasleft() - TAIL}(data);
+    }
+
+    /// @dev Runs `RcB6` code on the RC's storage (internal only; RcB6 re-checks SYSTEM).
+    function _b6(bytes memory data) internal returns (bytes memory r) {
+        bool ok;
+        (ok, r) = B6.delegatecall(data);
+        if (!ok) {
+            assembly ("memory-safe") {
+                revert(add(r, 32), mload(r))
+            }
+        }
     }
 
     modifier delegated() {
@@ -58,9 +83,17 @@ contract RcExt is RcBase {
             bytes memory d = abi.decode(l.data, (bytes));
             if (kind == 1) _onState(c, cov, d);
             else if (kind == 2) _onExitNote(c, cov, d);
-            else if (kind == 3) _onPlanNote(c, d);
+            else if (kind == 3) _onPlanNote(c, cov, d);
         } else if (l.topic0 == T_BUDGET) {
-            _onBudgetApplied(c, l);
+            address cov = address(uint160(l.topic1));
+            uint32 id = uint32(l.topic2);
+            _resultSeen(c, id);
+            if (l.data.length >= 96) {
+                (uint128 nb, uint64 n, uint64 r) = abi.decode(l.data, (uint128, uint64, uint64));
+                _b6(abi.encodeCall(RcB6.b6Answer, (c, cov, id, nb, n, r)));
+            }
+            _listEntry(c, cov);
+            _serveEntry(c, cov, Budget(SENDS_PER_REACTION, EXITS_PER_TICK, SCAN_PER_TICK, false));
         }
     }
 
@@ -88,15 +121,18 @@ contract RcExt is RcBase {
 
     /// @notice A Cron100 tick: the tick order of spec §5.5 "Deferred work", each item under the guard; then the gate.
     function cron() external delegated {
-        Budget memory bud = Budget(type(uint256).max, EXITS_PER_TICK, SCAN_PER_TICK);
+        Budget memory bud = Budget(type(uint256).max, EXITS_PER_TICK, SCAN_PER_TICK, false);
         // (1) exactly CURSOR_FLOOR cursor evaluations and their due exits
         _cursor(bud, CURSOR_FLOOR);
-        // (2) the lowers floor: in B6 (spec §5.5); (3) one dirty-id item
+        // (2) at most STALE_POPS stale heads, then one lower of the head (round-robin)
+        _b6Opt(abi.encodeCall(RcB6.b6Floor, ()));
+        // (3) one dirty-id item
         _sweepStep(bud, 1);
-        // (4)/(5) work entries, then further dirty items and cursor evaluations
-        for (uint256 i; i < RECONCILE_PER_TICK && _workLen > 0 && gasleft() >= GAS_GUARD; ++i) {
-            _serveNextEntry(bud);
-            _sweepStep(bud, 1);
+        // (4) the lowers-list head's remaining lowers and its entries, or the work list's rotation; (5) further
+        // entries (lowers list first) and dirty items alternately, up to RECONCILE_PER_TICK entries
+        for (uint256 i; i < RECONCILE_PER_TICK && gasleft() >= GAS_GUARD; ++i) {
+            if (!_serveHeadOrRotation(bud)) break;
+            if (i > 0) _sweepStep(bud, 1);
         }
         _sweepStep(bud, SCAN_PER_TICK);
         _cursor(bud, SCAN_PER_TICK);
@@ -104,6 +140,23 @@ contract RcExt is RcBase {
             _cronOn = false;
             IRnkSystem(SYSTEM).unsubscribe(LASNA, CRON, T_CRON100, IGNORE, IGNORE, IGNORE);
         }
+    }
+
+    /// @dev One work-entry item: the lowers list's head (stale heads popped) with its remaining lowers and its
+    ///      entries; else the work list's rotation. Returns false when there was nothing to serve.
+    function _serveHeadOrRotation(Budget memory bud) internal returns (bool) {
+        (bool hok, bytes memory hr) = _b6Opt(abi.encodeCall(RcB6.b6Head, ()));
+        address h = hok ? abi.decode(hr, (address)) : address(0);
+        if (h != address(0)) {
+            (bool ok, bytes memory r) = _b6Opt(abi.encodeCall(RcB6.b6Lowers, (h, bud.sends, type(uint256).max)));
+            if (ok) (bud.sends,) = abi.decode(r, (uint256, bool));
+            if (_cov[CA][h].workListed) _serveEntry(CA, h, bud);
+            if (_cov[CB][h].workListed) _serveEntry(CB, h, bud);
+            return true;
+        }
+        if (_workLen == 0) return false;
+        _serveNextEntry(bud);
+        return true;
     }
 
     // ================================================================== STATE (spec §5.3, §5.5 `Note(STATE)`)
@@ -122,11 +175,8 @@ contract RcExt is RcBase {
             k.cap = uint128(uint256(r.maxShareBps) * r.budget / 10_000);
             if (k.unsettledR != 0 && rn >= k.unsettledR) k.unsettledR = 0;
         }
-        for (uint256 i; i < b.length && i < 8; ++i) {
-            B6a storage x = _b6a[cov][b[i].id][c];
-            (x.baseBreaches, x.baseGone) = (b[i].breaches, b[i].gone);
-            _recordBudget(c, cov, b[i].id, b[i].budget, b[i].budgetNonce, b[i].exposure);
-        }
+        // B6 (mandatory): the Bases under the nonce gate, the own unpark test, the lowers write-ahead
+        _b6(abi.encodeCall(RcB6.b6State, (c, cov, b)));
         // holdings: a dropped holding's pair stops being pending now (mandatory; one writer)
         uint256 oldN = k.nHold;
         for (uint256 i; i < oldN; ++i) {
@@ -152,20 +202,15 @@ contract RcExt is RcBase {
             delete _plan[c][cov][i];
         }
         k.nPlan = uint8(np);
-        // write ahead (spec §5.5 "Deferred work"), then serve this entry within the reaction's optional budget
+        // write ahead (spec §5.5 "Deferred work"; the lowers list in b6State), then serve within the optional budget
         _listEntry(c, cov);
-        Budget memory bud = Budget(SENDS_PER_REACTION, EXITS_PER_TICK, SCAN_PER_TICK);
-        _serveEntry(c, cov, bud);
+        _serveEntry(c, cov, Budget(SENDS_PER_REACTION, EXITS_PER_TICK, SCAN_PER_TICK, true));
     }
 
-    /// @dev Records a chain's (budget, exposure) for a (covenant, id) under the nonce gate (spec §5.5, r4 D4-02).
-    function _recordBudget(uint256 c, address cov, uint32 id, uint128 budget, uint64 nonce, uint128 exposure)
-        internal
-        virtual
-    {
-        B6a storage x = _b6a[cov][id][c];
-        (x.appliedB, x.E) = (_sat(budget), _sat(exposure));
-        nonce;
+    /// @dev The mandatory write-ahead: the work entry, and the lowers list when a lower is owed (D7-01).
+    function _writeAhead(uint256 c, address cov) internal {
+        _listEntry(c, cov);
+        _b6(abi.encodeCall(RcB6.b6WriteAhead, (cov)));
     }
 
     // ================================================================== the exit scheduler (spec §3.5)
@@ -179,7 +224,8 @@ contract RcExt is RcBase {
         VaultRec storage v = _vault[c][vault];
         uint32 id = v.id;
         (bool held, uint32 baseSeq, bool baseGone) = _holding(c, cov, vault);
-        if (!held || id == 0) {
+        // [MU-264] an Untracked (17th) Covenant gets no pair state at all (PB-8; s4 rc-fix r1 C1-04)
+        if (!held || id == 0 || !p.listed) {
             _clearPair(c, cov, vault);
             return false;
         }
@@ -187,7 +233,8 @@ contract RcExt is RcBase {
         Conduct storage t = _conductOf[id];
         CovRec storage k = _cov[c][cov];
         // a new latch on the vault resets tries, defers and drips (lazily)
-        if (v.maxSeq > p.seenSeq) (p.seenSeq, p.tries, p.defers, p.drips) = (uint8(v.maxSeq), 0, 0, 0);
+        uint8 seen = v.maxSeq > 255 ? 255 : uint8(v.maxSeq); // saturated on both sides (s4 rc-fix r1 C1-06)
+        if (seen > p.seenSeq) (p.seenSeq, p.tries, p.defers, p.drips) = (seen, 0, 0, 0);
         // [MU-233] a suspension clears when the id's totals or the rules move past it
         if (p.suspended && (t.breaches > p.suspB || t.gone > p.suspG || k.rulesNonce > p.suspR)) {
             (p.suspended, p.tries, p.defers) = (false, 0, 0);
@@ -213,20 +260,22 @@ contract RcExt is RcBase {
         if (p.waitSeq == 0 && q.seqApplied < q.seqTotals) {
             p.waitSeq = q.seqTotals;
             if (p.waitSince == 0) p.waitSince = now_;
-            _resend(c, id, bud);
         }
+        // [MU-265] while waiting, the snapshot is resent at the PB-7 rate on every evaluation, not once at the
+        // wait's start (§3.5; s4 rc-fix r1 C1-03)
+        if (p.waitSeq != 0) _resend(c, id, bud);
         // [MU-236] at most one send per pair per EPOCH_TICKS (plus the drip re-targets)
         if (p.waitSeq == 0 && now_ >= p.nextTick && bud.sends > 0 && bud.exits > 0 && gasleft() >= GAS_GUARD) {
             _send(c, Kind.EXIT, abi.encodeCall(IReagentHub.rcExit, (address(0), cov, vault, uint64(q.seqTotals), t.breaches)));
             bud.sends -= 1;
             bud.exits -= 1;
-            uint32 nt = now_ + _epochTicks(c);
+            uint32 nt = now_ + _retryTicks(c);
             if (nt > p.nextTick) p.nextTick = nt;
             if (p.waitSince == 0) p.waitSince = now_;
             sent = true;
         }
         // [MU-237] park after 6·EPOCH_TICKS without progress (A-CRON-PIN)
-        if (p.waitSince != 0 && now_ > p.waitSince + 6 * _epochTicks(c)) {
+        if (p.waitSince != 0 && now_ > p.waitSince + _parkTicks(c)) {
             p.parkedLogCount = q.hubLogCount + 1;
             q.parkedCount += 1;
             _setPending(p, false);
@@ -286,7 +335,7 @@ contract RcExt is RcBase {
         Pair storage p = _pair[c][cov][vault];
         SeqRec storage q = _seq[c][id];
         uint32 now_ = _now();
-        uint32 et = _epochTicks(c);
+        uint32 et = _retryTicks(c);
         if (outcome == EXIT_DONE) {
             _dropHolding(c, cov, vault);
             p.waitSince = 0;
@@ -318,14 +367,24 @@ contract RcExt is RcBase {
         } else if (outcome == EXIT_STALE) {
             // caught up: the destination has everything; take its baselines, then suspend if still armable (PB-2)
             B6a storage x = _b6a[cov][id][c];
-            (x.baseBreaches, x.baseGone) = (base.breaches, base.gone);
+            (x.baseBreaches, x.baseGone) = (base.breaches, uint16(base.gone));
             _setHoldBase(c, cov, vault, baseSeq, baseGone);
             if (_armable(c, cov, vault, id, baseSeq, baseGone)) _suspend(c, cov, vault, p, id);
             p.waitSince = 0;
         }
-        _listEntry(c, cov);
-        Budget memory bud = Budget(SENDS_PER_REACTION, EXITS_PER_TICK, SCAN_PER_TICK);
-        _serveEntry(c, cov, bud);
+        _writeAhead(c, cov);
+        _serveEntry(c, cov, Budget(SENDS_PER_REACTION, EXITS_PER_TICK, SCAN_PER_TICK, false));
+    }
+
+    /// @dev The retry window after a FAILED, RELAY_FAILED, PENDING or DEFERRED answer: one EPOCH_TICKS (PB-11).
+    ///      Virtual only for A-EXIT-DENY's positive control.
+    function _retryTicks(uint256 c) internal view virtual returns (uint32) {
+        return _epochTicks(c);
+    }
+
+    /// @dev The park age: 6 · EPOCH_TICKS without progress (A-CRON-PIN). Virtual only for its positive control.
+    function _parkTicks(uint256 c) internal view virtual returns (uint32) {
+        return 6 * _epochTicks(c);
     }
 
     function _addTry(uint256 c, address cov, address vault, Pair storage p) internal {
@@ -341,10 +400,14 @@ contract RcExt is RcBase {
         emit ExitAbandoned(c, cov, vault);
     }
 
-    function _onPlanNote(uint256 c, bytes memory d) internal {
+    /// @dev A PLAN answer: a callback result, then the Covenant's reconcile like an EXIT note (§5.5; rc-fix r1 C1-13).
+    function _onPlanNote(uint256 c, address cov, bytes memory d) internal {
         (address vault,,,) = abi.decode(d, (address, uint32, uint8, uint8));
         uint32 id = _vault[c][vault].id;
-        if (id != 0) _resultSeen(c, id);
+        if (id == 0) return;
+        _resultSeen(c, id);
+        _writeAhead(c, cov);
+        _serveEntry(c, cov, Budget(SENDS_PER_REACTION, EXITS_PER_TICK, SCAN_PER_TICK, false));
     }
 
     /// @dev A callback result (an EXIT or PLAN note, a BudgetApplied): it proves delivery to this chain's Hub.
@@ -354,27 +417,10 @@ contract RcExt is RcBase {
         if (q.parkedCount > 0 || q.b6ParkedCount > 0) _markDirty(id);
     }
 
-    function _onBudgetApplied(uint256 c, LogRecord calldata l) internal virtual {
-        _resultSeen(c, uint32(l.topic2));
-    }
-
     // ================================================================== resends (PB-7)
 
-    /// @dev A fresh-seq snapshot to a lagging chain, at most once per (chain, id) per 1,000 Lasna blocks (s3 rc r1
-    ///      D1-07, r4 D4-01, r5 D5-06); a rate-limited resend keeps nothing listed.
     function _resend(uint256 c, uint32 id, Budget memory bud) internal {
-        SeqRec storage q = _seq[c][id];
-        uint32 bn = uint32(block.number);
-        // [MU-241] the PB-7 rate (R-RESEND)
-        if (q.lastResendBlock != 0 && bn < q.lastResendBlock + RESEND_BLOCKS) return;
-        if (bud.sends == 0 || gasleft() < GAS_GUARD) return;
-        bud.sends -= 1;
-        q.lastResendBlock = bn;
-        Conduct storage t = _conductOf[id];
-        uint32 s = t.seq + 1;
-        t.seq = s;
-        q.seqOut = s;
-        _send(c, Kind.CONDUCT, abi.encodeCall(IReagentHub.rcConduct, (address(0), id, t.breaches, t.gone, t.actions, uint64(s))));
+        if (bud.sends > 0 && _resendOnce(c, id)) bud.sends -= 1;
     }
 
     // ================================================================== work entries (spec §5.5 "Deferred work")
@@ -405,9 +451,15 @@ contract RcExt is RcBase {
         if (_workPtr >= _workLen) _workPtr = 0;
     }
 
-    /// @dev Serves a Covenant's entry: its pair evaluations (and their exits and resends), then B6; the entry is
-    ///      unlisted when nothing remains sendable now.
+    /// @dev Serves a Covenant's entry in the optional order of spec §5.5 "Deferred work": B6 safety lowers; pair
+    ///      evaluations and their exits; PB-7 resends and probes; B6 re-sends and holds; raises and rebalances. The
+    ///      entry is unlisted when nothing remains (the entry-lifecycle predicate).
     function _serveEntry(uint256 c, address cov, Budget memory bud) internal virtual {
+        // (a) B6 safety lowers (both chains)
+        bool owes = true; // a step cut short stays owed
+        (bool ok, bytes memory r) = _b6Opt(abi.encodeCall(RcB6.b6Lowers, (cov, bud.sends, type(uint256).max)));
+        if (ok) (bud.sends, owes) = abi.decode(r, (uint256, bool));
+        // (b) the Covenant's pairs on this chain
         bool left;
         CovRec storage k = _cov[c][cov];
         uint256 n = k.nHold;
@@ -421,13 +473,14 @@ contract RcExt is RcBase {
             Pair storage p = _pair[c][cov][v];
             if (p.pending && p.waitSeq == 0 && _now() >= p.nextTick) left = true; // due but not sent: owed
         }
-        if (!_serveB6(c, cov, bud)) left = true;
+        // (c) PB-7 resends and probes (a STATE's reaction only; rate-limited ones keep nothing listed)
+        // (d), (e) B6 re-sends and holds, then raises and rebalances
+        bool b6left = true;
+        (ok, r) = _b6Opt(abi.encodeCall(RcB6.b6Rest, (c, cov, bud.sends, bud.probes)));
+        if (ok) (bud.sends, b6left) = abi.decode(r, (uint256, bool));
+        if (b6left || owes) left = true;
+        // [MU-249] the entry stays listed while anything remains (the lifecycle predicate, s3 rc r11 D11-02)
         if (!left) _unlistEntry(c, cov);
-    }
-
-    /// @dev B6 reconcile for a Covenant (spec §5.5 steps 0–3). Returns whether nothing remains to send.
-    function _serveB6(uint256, address, Budget memory) internal virtual returns (bool) {
-        return true;
     }
 
     function _serveNextEntry(Budget memory bud) internal {
@@ -464,37 +517,48 @@ contract RcExt is RcBase {
         }
     }
 
-    function _markDirty(uint32 id) internal {
-        if (_sweepPos[id] != 0) {
-            _sweepPos[id] = 1; // a re-mark restarts the walk from the first pair (≤ 2 laps after the last mark)
-            return;
-        }
-        _sweepPos[id] = 1;
-        _dirty[_nDirty] = id;
-        _nDirty += 1;
-        _sweeps += 1;
-    }
-
-    /// @dev Up to `max` evaluations from the dirty ids' sweeps: each id walks its vaults' Covenants on both chains.
+    /// @dev Up to `max` items from the dirty ids' sweeps: each id walks its pairs on both chains, then its b6Parked
+    ///      lists (a lap; s3 rc r19 m-4).
     function _sweepStep(Budget memory bud, uint256 max) internal {
         while (max > 0 && _nDirty > 0 && bud.evals > 0 && gasleft() >= GAS_GUARD) {
-            uint32 id = _dirty[0];
-            uint32 pos = _sweepPos[id]; // 1-based over (chain, vault slot, covenant)
-            (bool found, uint256 c, address v, address cov) = _pairAt(id, pos - 1);
-            if (!found) {
-                _endSweep(id);
+            // [MU-266] round-robin over the dirty ids, one item each (s4 rc-fix r1 C1-10: no head-of-line)
+            if (_dirtyPtr >= _nDirty) _dirtyPtr = 0;
+            uint256 at = _dirtyPtr;
+            uint32 id = _dirty[at];
+            Sweep storage w = _sweep[id];
+            (uint8 kind, uint256 c, address v, address cov) = _itemAt(id, w.pos);
+            if (kind == 0) {
+                w.lap += 1;
+                if (w.lap >= w.endLap) _endSweep(at);
+                else w.pos = 0;
                 continue;
             }
-            _sweepPos[id] = pos + 1;
-            _evalPair(c, cov, v, bud);
+            w.pos += 1;
+            _dirtyPtr = at + 1;
+            if (kind == 1) {
+                _evalPair(c, cov, v, bud);
+            } else {
+                bud.evals -= 1;
+                // optional and non-bubbling like every B6 step in Cron: a cut wake keeps its place (rc-fix r1 C1-05)
+                (bool ok, bytes memory r) = _b6Opt(abi.encodeCall(RcB6.b6Wake, (c, cov, id)));
+                if (!ok) {
+                    w.pos -= 1;
+                    break;
+                }
+                (bool unparked, bool list) = abi.decode(r, (bool, bool));
+                if (list) _listEntry(c, cov);
+                // [MU-267] an unpark shrinks the walked list: step back so the next element is not skipped, whether
+                // the swap-remove moved one here or the last element left (s4 rc-fix r1 C1-02)
+                if (unparked) w.pos -= 1;
+            }
             --max;
         }
     }
 
-    function _endSweep(uint32 id) internal {
-        _sweepPos[id] = 0;
+    function _endSweep(uint256 at) internal {
+        delete _sweep[_dirty[at]];
         uint256 last = _nDirty - 1;
-        for (uint256 i; i < last; ++i) {
+        for (uint256 i = at; i < last; ++i) {
             _dirty[i] = _dirty[i + 1];
         }
         delete _dirty[last];
@@ -502,19 +566,26 @@ contract RcExt is RcBase {
         _sweeps -= 1;
     }
 
-    /// @dev The i-th (chain, vault, covenant) of an id (vaults on 1301 first), skipping empty slots.
-    function _pairAt(uint32 id, uint256 i) internal view returns (bool, uint256, address, address) {
+    /// @dev The i-th item of an id's lap: kind 1 a (chain, vault, covenant) pair (vaults on 1301 first), kind 2 an
+    ///      element of b6Parked[chain][id] (1301 first), kind 0 the end of the lap.
+    function _itemAt(uint32 id, uint256 i) internal view returns (uint8, uint256, address, address) {
         for (uint256 ci; ci < 2; ++ci) {
             uint256 c = ci == 0 ? CA : CB;
             for (uint256 j; j < MAX_PER_CHAIN; ++j) {
                 address v = _idVaults[id][c][j];
                 if (v == address(0)) break;
                 uint256 n = _vault[c][v].nCov;
-                if (i < n) return (true, c, v, _covAt[c][v][i]);
+                if (i < n) return (1, c, v, _covAt[c][v][i]);
                 i -= n;
             }
         }
-        return (false, 0, address(0), address(0));
+        for (uint256 ci; ci < 2; ++ci) {
+            uint256 c = ci == 0 ? CA : CB;
+            uint256 n = _seq[c][id].b6ParkedCount;
+            if (i < n) return (2, c, address(0), _b6Parked[c][id][i]);
+            i -= n;
+        }
+        return (0, 0, address(0), address(0));
     }
 
     // ================================================================== helpers
@@ -582,15 +653,4 @@ contract RcExt is RcBase {
         return 0;
     }
 
-    function _inIds(uint32[4] storage ids, uint32 id) internal view returns (bool) {
-        return id != 0 && (ids[0] == id || ids[1] == id || ids[2] == id || ids[3] == id);
-    }
-
-    function _epochTicks(uint256 c) internal pure returns (uint32) {
-        return c == CA ? EPOCH_TICKS_1301 : EPOCH_TICKS_11155111;
-    }
-
-    function _sat(uint128 x) internal pure returns (uint96) {
-        return x > type(uint96).max ? type(uint96).max : uint96(x);
-    }
 }

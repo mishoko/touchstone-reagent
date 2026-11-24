@@ -210,9 +210,7 @@ abstract contract RcEnv is TsEnv {
     }
 
     GasRow[] internal reactGas; // every reaction's gas, in order (R-GAS)
-    address[] internal coolList; // accounts cooled before every reaction (each live reaction is its own tx)
     uint256 internal forwardOverride; // a cell may set the forward (0 = the live HEAD-semantics forward)
-    bool internal coolNext; // cool the RC, the system and `coolList` before the next reaction only (R-GAS)
     mapping(uint256 => bool) internal hubInDebt;
     bool internal rcInDebt;
 
@@ -517,8 +515,11 @@ abstract contract RcEnv is TsEnv {
             }
             if (_deliverDue()) any = true;
             _flush();
-            if (!any && reqQ.length == 0) break;
+            if (!any && reqQ.length == 0) return;
         }
+        // F-010 H1-02: the bound never truncates work silently (a test asserting "nothing happened" must not pass
+        // on a cut pump)
+        revert("RcEnv: the pump did not settle within 64 rounds");
     }
 
     function _earliest() internal view returns (bool has, uint256 idx, uint256 at) {
@@ -544,17 +545,11 @@ abstract contract RcEnv is TsEnv {
         bytes memory cd = abi.encodeCall(IReactive.react, (l));
         uint256 g = forwardOverride != 0 ? forwardOverride : reactGasFor(cd);
         ++reactCalls;
-        // every live reaction is its own transaction: accounts and slots start cold (TRAPS s2)
-        // cooling is applied only to a reaction an R-GAS cell measures (`coolNext`): cooling between every
-        // reaction of a long test changed the RC's behaviour (a holding STATE ignored; root cause open, F-011)
-        if (coolNext) {
-            coolNext = false;
-            vm.cool(rcAddr);
-            vm.cool(SYSTEM);
-            for (uint256 i; i < coolList.length; ++i) {
-                vm.cool(coolList[i]);
-            }
-        }
+        // Every live reaction is its own transaction (accounts and slots cold). The harness never cools: under forge
+        // 1.5.0 `vm.cool` cools an account but not its slots, and it un-touches the account, so a code account cooled
+        // in setUp and reached only by `delegatecall` (RcExt) is dropped at setUp's commit (F-011, root-caused s4,
+        // `test/F011Cool.t.sol`). An R-GAS cell builds its state in setUp and measures its reaction FIRST in the test
+        // body, a new transaction (`_firstReactionSince`).
         vm.prank(SYSTEM);
         uint256 g0 = gasleft();
         (bool ok,) = rcAddr.call{gas: g}(cd);
@@ -667,7 +662,13 @@ abstract contract RcEnv is TsEnv {
         }
         uint256 saveCur = cur;
         _on(r.chainId);
-        address to = r.chainId == CB && toB[r.recipient] != address(0) ? toB[r.recipient] : r.recipient;
+        address to = r.recipient;
+        if (r.chainId == CB) {
+            // F-010 H1-01 (spec §9 layers: a missing mapping fails loudly): the RC addresses chain B by chain A's
+            // address for the Hub and each Covenant; any other recipient is refused
+            require(toB[r.recipient] != address(0), "RcEnv: no chain-B alias for this recipient");
+            to = toB[r.recipient];
+        }
         bytes memory p = _inject(r.payload, r.rc, r.chainId);
         uint256 g = r.gasLimit > ch[r.chainId].F ? (r.gasLimit - ch[r.chainId].F) * 63 / 64 : 0;
         vm.prank(ch[r.chainId].proxy);
@@ -716,6 +717,15 @@ abstract contract RcEnv is TsEnv {
             Delivery memory d = deliveries[i];
             if ((c == 0 || d.chainId == c) && (s == bytes4(0) || d.selector == s) && (outcome == 0 || d.outcome == outcome)) ++n;
         }
+    }
+
+    /// @notice R-GAS's cold measurement (F-011): the row of the first reaction after `mark` (= `reactGas.length` read at
+    ///         the start of the test body), which must have topic0 `t0` and topic3 `t3`: only the body's first reaction
+    ///         runs with every account and slot cold, as a live reaction does.
+    function _firstReactionSince(uint256 mark, uint256 t0, uint256 t3) internal view returns (GasRow memory r) {
+        require(reactGas.length > mark, "R-GAS: no reaction in the body");
+        r = reactGas[mark];
+        require(r.topic0 == t0 && r.topic3 == t3, "R-GAS: the measured reaction is not the body's first (not cold)");
     }
 
     function _lasnaEventCount(bytes32 topic0) internal view returns (uint256 n) {

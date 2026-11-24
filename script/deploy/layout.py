@@ -11,7 +11,7 @@ import json, os, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FAMILIES = [('CovenantBase', ['Covenant', 'CovenantExt'], 'src/CovenantBase.sol'),
-            ('RcBase', ['ReagentRC', 'RcExt'], 'src/RcBase.sol')]
+            ('RcBase', ['ReagentRC', 'RcExt', 'RcB6'], 'src/RcBase.sol')]  # RcB6: s4 (LF-S4-5)
 
 
 def parse(text):

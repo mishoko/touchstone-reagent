@@ -20,7 +20,6 @@ abstract contract RcFixture is RcEnv {
         uint256 p = _lasna();
         rcExt = _newExt();
         rc = IReagentRC(payable(deployCode("ReagentRC.sol:ReagentRC", abi.encode(rcOwner, rcExt))));
-        coolList.push(rcExt);
         _leave(p);
         _deployReagent(address(rc), admin);
         p = _lasna();
@@ -35,7 +34,12 @@ abstract contract RcFixture is RcEnv {
 
     /// @dev The extension the RC is built with; a gas probe subclass may replace it (R-GAS).
     function _newExt() internal virtual returns (address) {
-        return deployCode("RcExt.sol:RcExt");
+        return deployCode("RcExt.sol:RcExt", abi.encode(_newB6()));
+    }
+
+    /// @dev The B6 module the extension is built with (s4: the third delegated module).
+    function _newB6() internal virtual returns (address) {
+        return deployCode("RcB6.sol:RcB6");
     }
 
     /// @notice Registers curator `id` (if new) and a fresh bundler on `c`, then deploys its vault through it.

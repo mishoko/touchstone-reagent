@@ -17,7 +17,7 @@ CREATE = {'1301': 53_799, '11155111': 210_421}
 # the RC-side NEEDs (conduct, vault, budget) are spec §5.6 inputs to the RC's gasLimit table; they are read from
 # src/ReagentRC.sol once it exists (NEED_<KIND>_<CHAIN> constants), else from this spec copy (printed as such)
 SPEC_RC = {'rcConduct': {'1301': 35_000, '11155111': 150_000}, 'rcVault': {'1301': 91_000, '11155111': 437_000},
-           'rcBudget': {'1301': 345_000, '11155111': 500_000}}  # s3 LF-S3-1 (method (a))
+           'rcBudget': {'1301': 360_000, '11155111': 500_000}}  # s4 (cold); 11155111 s3 LF-S3-1 (method (a))
 
 
 def _num(x):
@@ -59,7 +59,8 @@ def main():
     out = {'generated_by': 'script/deploy/gasneed.py', 'from': 'test/GasNeed.t.sol (T-GAS-*)',
            'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
            **stamp(),
-           'method': 'entry gas = minimum succeeding entry gas at a constructed worst-case state, every account cold (vm.cool); '
+           'method': 'entry gas = minimum succeeding entry gas at a constructed worst-case state built in setUp, the search the '
+                     'first state-touching step of its test body (every account and slot cold, F-011; vm.cool cools accounts only); '
                      '11155111 = that + fresh slots x (110,980 - 22,274) + creations x (210,421 - 53,799) (spec 5.6 method (b)); '
                      'NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F',
            'F': F, 'RESERVE': RESERVE, 'kinds': {}}
@@ -69,6 +70,13 @@ def main():
         p = os.path.join(ROOT, 'output', f'gas-need-{kind}.json')
         d = json.load(open(p))
         m = {k: v for k, v in d.items() if not isinstance(v, dict)}
+        # F-010 H2-02: only a cold measurement certifies a NEED; H4-03: never older than the source it measures
+        if m.get('cold') is not True:
+            raise SystemExit(f'gasneed: {p} is not a cold measurement (F-011); re-run test/GasNeedCold.t.sol')
+        newest = max(os.path.getmtime(os.path.join(dp, f)) for dp, _, fs in os.walk(os.path.join(ROOT, 'src'))
+                     for f in fs if f.endswith('.sol'))
+        if os.path.getmtime(p) < newest:
+            raise SystemExit(f'gasneed: {p} predates the newest src/ file; re-run the T-GAS tests')
         row = {'entry_1301': m['entry_1301'], 'fresh_slots': m['fresh_slots'], 'creates': m['creates'], 'chains': {}}
         for ch in F:
             entry = m['entry_1301'] + m['fresh_slots'] * (SLOT[ch] - SLOT['1301']) + m['creates'] * (CREATE[ch] - CREATE['1301'])

@@ -43,6 +43,22 @@ interface IReagentRC is IReactive {
         view
         returns (uint32 seqOut, uint32 seqApplied, uint32 seqTotals, uint32 hubLogCount);
     function counters() external view returns (uint256 pendingPairs, uint256 b6Active, uint256 sweeps, bool cronOn);
+    function b6Of(address cov, uint32 id, uint256 chain)
+        external
+        view
+        returns (uint96 appliedB, uint96 e, uint96 unB, uint32 nonce, uint32 appliedNonce, uint8 flags, uint32 parkLog);
+    function lowersOf() external view returns (address head, address tail, uint256 count);
+    function lowersNext(address cov) external view returns (address next, address prev, bool listed);
+    function parkedOf(uint256 chain, uint32 id) external view returns (uint16 parkedCount, uint16 b6ParkedCount);
+    function workAt(uint256 i) external view returns (uint256 chain, address cov);
+    function covOf(uint256 chain, address cov)
+        external
+        view
+        returns (uint128 cap, uint32 rulesNonce, uint32 noteNonce, uint32 unsettledR, bool workListed, uint8 nHold);
+    function pairOf(uint256 chain, address cov, address vault)
+        external
+        view
+        returns (uint32 nextTick, uint32 waitSeq, uint32 parkedLogCount, bool pending, bool suspended, uint8 tries);
 
     // ------------------------------------------------------------------ events
     event CuratorAdded(uint32 indexed id);

@@ -247,7 +247,7 @@ contract ReagentHub is IReagentHub {
     function needs() public view returns (uint256 exit, uint256 plan) {
         // [MU-019] the per-chain table (selected by chain id, like PROXY, so T-ADDR holds)
         if (block.chainid == 11155111) return (2_220_000, 2_310_000);
-        return (832_000, 1_198_000);
+        return (880_000, 1_290_000); // s4 LF-S4-1: ×1.3 of the cold minimum entry (F-011)
     }
 
     function _need(bool exit) internal view returns (uint256) {

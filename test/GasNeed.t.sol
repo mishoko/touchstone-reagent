@@ -39,7 +39,7 @@ import {IVaultEntries} from "touchstone/interfaces/ITouchstoneVaultExtension.sol
 ///         an owner receiving each token for the first time. 1301 needs are the minimum entry gas (binary search);
 ///         the 11155111 estimate is method (b): that + Δslot · fresh slots + Δcreate · creations, counted from the
 ///         state diff of the same call. Results go to `output/gas-need-measured.json`.
-contract GasNeedTest is ReagentEnv {
+abstract contract GasNeedBase is ReagentEnv {
     // measured s2 on 11155111 vs 1301 (`eth_estimateGas`; spec §6)
     uint256 internal constant SLOT_SEP = 110_980;
     uint256 internal constant SLOT_1301 = 22_274;
@@ -138,6 +138,21 @@ contract GasNeedTest is ReagentEnv {
 
     /// @dev Records one kind's measurement to `output/gas-need-<kind>.json` (merged into `audits/gas-need.json` by
     ///      `script/deploy/gasneed.py`).
+    function _put(string memory obj, string memory k, Need memory n) internal returns (string memory) {
+        uint256 sep = n.entry + n.fresh * (SLOT_SEP - SLOT_1301) + n.creates * (CREATE_SEP - CREATE_1301);
+        string memory o = k;
+        vm.serializeUint(o, "entry_1301", n.entry);
+        vm.serializeUint(o, "fresh_slots", n.fresh);
+        vm.serializeUint(o, "creates", n.creates);
+        vm.serializeUint(o, "need_1301_x1_3", n.entry * 13 / 10 + 1);
+        // F-011 (s4): only a search that is the first state-touching step of its test body is cold; gasneed.py
+        // refuses a record without this flag
+        vm.serializeBool(o, "cold", true);
+        vm.serializeUint(o, "entry_11155111_est", sep);
+        string memory row = vm.serializeUint(o, "need_11155111_x1_3", sep * 13 / 10 + 1);
+        return vm.serializeString(obj, k, row);
+    }
+
     function _record(string memory kind, Need memory n) internal {
         // a mutated run never overwrites the measurements (tools review m-6)
         if (bytes(vm.envOr("TS_MUTATION_RUN", string(""))).length != 0) return;
@@ -149,7 +164,9 @@ contract GasNeedTest is ReagentEnv {
         internal
         returns (bool)
     {
-        _coolAll(); // a callback arrives in its own transaction: every account and slot cold (EIP-2929)
+        // `vm.cool` cools ACCOUNTS only (forge 1.5.0, F-011): slots are cold only because each probe reverts to a
+        // snapshot taken before the measured path touched them (the search is the body's first state-touching step)
+        _coolAll();
         vm.recordLogs();
         vm.prank(from);
         (bool s,) = target.call{gas: gas_}(data);
@@ -223,7 +240,7 @@ contract GasNeedTest is ReagentEnv {
     uint256 internal constant RESERVE = 40_000;
     // the RC-side NEEDs (the RC holds them in s3; spec §5.6 table): ×1.3 of the measured worst case, rounded up
     uint256 internal constant NEED_CONDUCT = 35_000;
-    uint256 internal constant NEED_BUDGET = 345_000;
+    uint256 internal constant NEED_BUDGET = 360_000;
     uint256 internal constant NEED_VAULT = 91_000;
 
     /// @dev gasLimit(chain, NEED) = ceil(1.1 · (NEED·64/63 + RESERVE) · 64/63) + F (spec §5.6, PB-4).
@@ -257,6 +274,11 @@ contract GasNeedTest is ReagentEnv {
         _toEpochBoundary(X);
     }
 
+}
+
+/// @notice The T-GAS rows (the helpers and worst states are `GasNeedBase`'s; `GasNeedCold.t.sol` re-measures the
+///         body-built worst states cold, F-011).
+contract GasNeedTest is GasNeedBase {
     /// @notice T-GAS-CONDUCT: NEED ≥ 1.3 × the measured need at a fresh id; at the formula gasLimit it applies; at
     ///         1,000 gas under the measured need it does not.
     function test_T_GAS_CONDUCT__appliesAtTheFormulaLimit() public {
@@ -286,14 +308,9 @@ contract GasNeedTest is ReagentEnv {
     /// @notice T-GAS-BUDGET: the same for `rcBudget` at a fresh (Covenant, id) with `emitState` at 4 holdings and
     ///         4 Bases; below the need the STATE is lost (the answer alone is not success).
     function test_T_GAS_BUDGET__answersWithStateAtTheFormulaLimit() public {
+        // the need is measured cold in GasNeedColdBudgetTest (F-010 H2-01: `c.rulesNonce()` here warms the slot)
         bytes memory d = abi.encodeCall(IReagentHub.rcBudget, (RC, address(c), 4, 2e18, 1, c.rulesNonce()));
-        Need memory n = _search(PROXY, address(hub), d, _budgetAnswered);
-        assertGe(NEED_BUDGET, n.entry * 13 / 10);
-        uint256 snap = vm.snapshotState();
         assertTrue(_budgetAnswered(_deliver(d, _entry(_gasLimit(NEED_BUDGET)))));
-        vm.revertToState(snap); // count fresh slots on the pre-delivery state
-        _freshCount(PROXY, address(hub), d, n);
-        _record("rcBudget", n);
     }
 
     /// @notice T-GAS-BUDGET (s2 F1-06, r2 m-4): a real out-of-gas inside `emitState` (4 holdings, 4 Bases) is
@@ -319,9 +336,7 @@ contract GasNeedTest is ReagentEnv {
     function test_T_GAS_EXIT__doneAtTheFormulaLimitDeferredBelowBurnAllRelayFailed() public {
         (uint256 needExit,) = hub.needs();
         _exitWorstState();
-        bytes memory cd = abi.encodeCall(ICovenant.rcExit, (X.vault, seq, 1));
-        Need memory n = _search(address(hub), address(c), cd, _exitDone);
-        assertGe(needExit, n.entry * 13 / 10, "NEED >= 1.3 x measured (withdraw branch)");
+        // the need is measured cold in GasNeedColdExitTest (F-011, F-010 H2-02); these are the behaviour legs
         bytes memory d = abi.encodeCall(IReagentHub.rcExit, (RC, address(c), X.vault, seq, 1));
         uint256 snap = vm.snapshotState();
         assertTrue(_exitDone(_deliver(d, _entry(_gasLimit(needExit)))), "DONE at the formula gasLimit");
@@ -344,8 +359,6 @@ contract GasNeedTest is ReagentEnv {
         (o,,) = _exitOutcome(note);
         assertEq(o, Outcome.RELAY_FAILED);
         vm.revertToState(snap);
-        _freshCount(address(hub), address(c), cd, n); // last: a state diff makes later calls cheaper
-        _record("rcExit", n);
     }
 
     /// @notice T-GAS-PLAN: at the worst case (a fresh holding) the Hub's NEED covers 1.3 × the measured need and the
@@ -362,9 +375,7 @@ contract GasNeedTest is ReagentEnv {
         _toEpochBoundary(X3);
         IVaultEntries(X3.vault).poke();
         uint32 cur = uint32(_ld(X3.vault, 8) >> 40);
-        bytes memory pd = abi.encodeCall(ICovenant.rcAllocate, (X3.vault, cur - 1));
-        Need memory n = _search(address(hub), address(c), pd, _planDone);
-        assertGe(needPlan, n.entry * 13 / 10, "NEED >= 1.3 x measured (fresh holding)");
+        // the need is measured cold in GasNeedColdPlanTest (F-011, F-010 H2-02); these are the behaviour legs
         bytes memory d = abi.encodeCall(IReagentHub.rcAllocate, (RC, address(c), X3.vault, cur - 1));
         uint256 snap = vm.snapshotState();
         assertTrue(_planDone(_deliver(d, _entry(_gasLimit(needPlan)))), "DONE at the formula gasLimit");
@@ -395,8 +406,6 @@ contract GasNeedTest is ReagentEnv {
         assertEq(o, Outcome.RELAY_FAILED, "starved: the relay fails");
         assertEq(c.lastPlanEpoch(X3.vault), 0, "the epoch is not consumed");
         vm.revertToState(snap);
-        _freshCount(address(hub), address(c), pd, n); // last
-        _record("rcAllocate", n);
     }
 
     /// @notice A-GAS63: a delivery just under the pre-check threshold is DEFERRED; no try is burnt.
@@ -422,18 +431,6 @@ contract GasNeedTest is ReagentEnv {
         (uint8 o,,) = _exitOutcome(note);
         assertEq(o, Outcome.RELAY_FAILED, "a try burnt");
         needExit;
-    }
-
-    function _put(string memory obj, string memory k, Need memory n) internal returns (string memory) {
-        uint256 sep = n.entry + n.fresh * (SLOT_SEP - SLOT_1301) + n.creates * (CREATE_SEP - CREATE_1301);
-        string memory o = k;
-        vm.serializeUint(o, "entry_1301", n.entry);
-        vm.serializeUint(o, "fresh_slots", n.fresh);
-        vm.serializeUint(o, "creates", n.creates);
-        vm.serializeUint(o, "need_1301_x1_3", n.entry * 13 / 10 + 1);
-        vm.serializeUint(o, "entry_11155111_est", sep);
-        string memory row = vm.serializeUint(o, "need_11155111_x1_3", sep * 13 / 10 + 1);
-        return vm.serializeString(obj, k, row);
     }
 }
 

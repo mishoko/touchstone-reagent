@@ -343,6 +343,55 @@ contract ReagentRC is RcBase {
         return (_pendingPairs, _workLen, _sweeps, _cronOn);
     }
 
+    /// @notice B6 per (covenant, id, chain) (spec §5.5): applied B, E, the highest unanswered B, the RC's last nonce,
+    ///         the applied nonce, flags (1 unanswered, 2 raise, 4 Base reported, 8 overflowed park), the park mark.
+    function b6Of(address cov, uint32 id, uint256 c)
+        external
+        view
+        returns (uint96 appliedB, uint96 e, uint96 unB, uint32 nonce, uint32 appliedNonce, uint8 flags, uint32 parkLog)
+    {
+        B6a storage x = _b6a[cov][id][c];
+        B6b storage b = _b6b[cov][id][c];
+        return (x.appliedB, x.E, b.unB, b.nonce, x.appliedNonce, b.flags | x.flags, b.parkLog);
+    }
+
+    /// @notice The lowers list (head, tail, length), the work list's length and the b6Parked count of (chain, id).
+    function lowersOf() external view returns (address head, address tail, uint256 count) {
+        return (_lHead, _lTail, _lowersCount);
+    }
+
+    function lowersNext(address cov) external view returns (address next, address prev, bool listed) {
+        return (_lNext[cov], _lPrev[cov].prev, _lPrev[cov].listed);
+    }
+
+    function parkedOf(uint256 c, uint32 id) external view returns (uint16 parkedCount, uint16 b6ParkedCount) {
+        SeqRec storage q = _seq[c][id];
+        return (q.parkedCount, q.b6ParkedCount);
+    }
+
+    function workAt(uint256 i) external view returns (uint256 chain, address cov) {
+        uint256 e = _workList[i];
+        return (e >> 160, address(uint160(e)));
+    }
+
+    function covOf(uint256 c, address cov)
+        external
+        view
+        returns (uint128 cap, uint32 rulesNonce, uint32 noteNonce, uint32 unsettledR, bool workListed, uint8 nHold)
+    {
+        CovRec storage k = _cov[c][cov];
+        return (k.cap, k.rulesNonce, k.noteNonce, k.unsettledR, k.workListed, k.nHold);
+    }
+
+    function pairOf(uint256 c, address cov, address vault)
+        external
+        view
+        returns (uint32 nextTick, uint32 waitSeq, uint32 parkedLogCount, bool pending, bool suspended, uint8 tries)
+    {
+        Pair storage p = _pair[c][cov][vault];
+        return (p.nextTick, p.waitSeq, p.parkedLogCount, p.pending, p.suspended, p.tries);
+    }
+
     event CuratorAdded(uint32 indexed id);
     event BundlerAdded(uint32 indexed id, uint256 indexed chain, address bundler);
     event FactoryAdded(uint256 indexed chain, address factory);
