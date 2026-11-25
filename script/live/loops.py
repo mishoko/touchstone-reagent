@@ -23,7 +23,7 @@ from chain receipts and logs at collection time, never typed by hand.
 Needs UNICHAIN_SEPOLIA_RPC_URL and ETH_SEPOLIA_RPC_URL (never printed); logs are read from the public endpoints
 (the keyed ones cap eth_getLogs ranges).
 """
-import json, os, subprocess, sys, datetime as dt
+import json, os, subprocess, sys, time, datetime as dt
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'deploy'))
 from prov import stamp  # noqa: E402
@@ -494,17 +494,22 @@ def hub_entry(ch, tx):
     """The gas the callback proxy forwarded into the Hub (the first call frame whose callee is the Hub with a
     callback selector), from a parity `trace_transaction`; the kind is that frame's selector."""
     h = hub(ch).lower()
-    tr = None
-    for _ in range(5):  # publicnode load-balances across nodes, some without trace_ (seen s7): a bounded retry
+    tr, last, src = None, '', 'parity trace_transaction (publicnode)'
+    for i in range(5):  # publicnode load-balances across nodes, some without trace_ (seen s7): a bounded retry
         try:
             tr = json.loads(cast('rpc', 'trace_transaction', tx, rpc=TRACE[ch]))
             break
         except SystemExit as e:
-            if 'insufficient changesets' in str(e) or 'pruned' in str(e).lower():
+            last = str(e)
+            if 'insufficient changesets' in last or 'pruned' in last.lower():
                 break
+            if 'not available' not in last and 'does not exist' not in last:
+                raise  # a real error (a wrong tx, a bad answer) is never retried away (lcron r1 m-03)
+            time.sleep(2 * (i + 1))
     if tr is None:
         if ch != '1301':
-            raise SystemExit(f'loops: {ch} {tx}: no trace_transaction after 5 tries')
+            raise SystemExit(f'loops: {ch} {tx}: no trace_transaction after retries; last: {last[-200:]}')
+        src = 'callTracer (drpc)'
         # the 1301 publicnode keeps ~10k blocks of state; drpc's callTracer serves older 1301 deliveries (same frame)
         ct = json.loads(cast('rpc', 'debug_traceTransaction', tx, '{"tracer":"callTracer"}', rpc=DEBUG_1301))
         tr = []
@@ -520,7 +525,7 @@ def hub_entry(ch, tx):
     if not fr:
         raise SystemExit(f'loops: {ch} {tx}: no callback frame into the Hub')
     f = fr[0]
-    return KIND_SEL[f['action']['input'][2:10]], int(f['action']['gas'], 16), f.get('error')
+    return KIND_SEL[f['action']['input'][2:10]], int(f['action']['gas'], 16), f.get('error'), src
 
 
 RELAY_FAILED = 6  # Outcome.RELAY_FAILED
@@ -604,20 +609,24 @@ def lgas_rows(cron_range=None):
             t = json.loads(cast('tx', '--json', tx, rpc=rpc(ch)))
             if t['to'].lower() != CH[ch]['proxy'].lower():
                 continue
-            kind, entry, err = hub_entry(ch, tx)
+            kind, entry, err, src = hub_entry(ch, tx)
             if (ch, kind) in seen:  # the first PASSING delivery per cell (r2 m-03); failing ones stay as rows
                 continue
             want = table[(ch, kind)]
             gas, thr = int(t['gas'], 16), want['need'] * 64 / 63 + 40_000
             good, outcome = callback_outcome(ch, tx, kind)
             ok = gas == want['gasLimit'] and not err and entry >= thr and good
-            if ok:
+            # an exit/plan cell is filled only by a DONE delivery: the Covenant's work ran inside the limit (lcron r1
+            # m-02); an EARLY delivery is a valid entry-gas reading and stays as a row
+            fills = ok and (kind not in ('exit', 'plan') or outcome == 1)
+            if fills:
                 seen.add((ch, kind))
             rows.append({'chain': int(ch), 'kind': kind, 'destTx': tx, 'txGas': gas, 'gasLimit': want['gasLimit'],
                          'atGasLimit': gas == want['gasLimit'], 'need': want['need'], 'entryGas': entry,
                          'F_measured': gas - entry * 64 / 63, 'F_spec': want['F'],
                          'calldataBytes': (len(t['input']) - 2) // 2, 'hubFrameError': err, 'precheck': thr,
-                         'entryCoversPrecheck': entry >= thr, 'outcome': outcome, 'pass': ok})
+                         'entryCoversPrecheck': entry >= thr, 'outcome': outcome, 'fillsCell': fills,
+                         'traceSource': src, 'pass': ok})
     cron = None
     if cron_range:
         txs = cron_reactions(*cron_range)
@@ -637,7 +646,7 @@ def lgas_rows(cron_range=None):
 def lgas_key(rows, cron):
     """`L-GAS` only when every (chain, kind) cell and the Cron forward are recorded and pass; else `L-GAS-partial`,
     which no claim cites (r1 M-02)."""
-    cells = {(str(r['chain']), r['kind']) for r in rows if r.get('pass')}
+    cells = {(str(r['chain']), r['kind']) for r in rows if r.get('pass') and r.get('fillsCell', True)}
     complete = all((c, k) in cells for c in CH for k in KINDS) and bool(cron and cron['pass'])
     missing = [f'{c}/{k}' for c in CH for k in KINDS if (c, k) not in cells] + ([] if cron and cron['pass'] else ['cron'])
     return ('L-GAS' if complete else 'L-GAS-partial'), missing
@@ -787,8 +796,11 @@ def lspoof():
 
 # ------------------------------------------------------------------ L-CRON (spec §9.5, C-10, §5.5 the Cron gate)
 
-CRON_BASELINE = 27  # the RC's subscriptions at the s7 pre-flight, Cron off (MCP list_subscriptions, 2026-11-25)
 T_MODE = '0x73f069d8a008c9e2fe78e308751100d873455f99593c7d60eff545e91a90ab04'  # RcBase.T_MODE
+SEL_SUB, SEL_UNSUB = '5a6aced0', '2f807336'  # IRnkSystem.subscribe / unsubscribe (six arguments)
+CRON_ARGS = [hex(5318007)[2:].rjust(64, '0'), '0' * 58 + 'ffffff', T_CRON100[2:],
+             'a65f96fc951c35ead38878e0f0b7a3c744a6f5ccc1476b313353ce31712313ad'] + \
+            ['a65f96fc951c35ead38878e0f0b7a3c744a6f5ccc1476b313353ce31712313ad'] * 2  # (LASNA, CRON, T_CRON100, IGNORE x3)
 
 
 def rc_subscriptions():
@@ -800,9 +812,56 @@ def rc_subscriptions():
     return d['data']
 
 
-def lasna_input(tx):
+def rc_system_calls(tx):
+    """The RC's calls into the system contract inside one Lasna reaction (its own callTracer), after checking the tx
+    is a landed system call whose LogRecord names this RC (lcron r1 M-01: chain data, the MCP only as an index)."""
     t = json.loads(cast('tx', '--json', tx, rpc=LASNA))
-    return t, words(t['input'][10:])
+    r = json.loads(cast('receipt', '--json', tx, rpc=LASNA))
+    w = words(t['input'][10:])
+    if (t.get('to') or '').lower() != SYSTEM or int(r['status'], 16) != 1 or not w or w[0] != RC[2:].lower().rjust(64, '0'):
+        raise SystemExit(f'loops: {tx} is not a landed reaction of the RC')
+    ct = json.loads(cast('rpc', 'debug_traceTransaction', tx, '{"tracer":"callTracer"}', rpc=LASNA))
+    out = []
+
+    def walk(f, caller):
+        if (f.get('from') or '').lower() == RC.lower() and (f.get('to') or '').lower() == SYSTEM:
+            out.append((f['input'][2:10], words(f['input'][10:])[:6]))
+        for c in f.get('calls', []):
+            walk(c, f.get('to'))
+    walk(ct, None)
+    return t, w, out
+
+
+def active_before(hist, block):
+    """The RC's active filter ids just before `block`, rebuilt from the Subscribe/Unsubscribe history."""
+    on = set()
+    for h_ in sorted(hist, key=lambda x: x['block']):
+        if h_['block'] >= block:
+            break
+        (on.add if h_['kind'] == 'Subscribe' else on.discard)(h_['filterId'])
+    return on
+
+
+def lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, unsub_ts):
+    """`pass`: the retire's reaction subscribed exactly the Cron tuple; one Cron interval (no earlier unsubscribe, no
+    re-subscribe) whose unsubscribe is a Cron reaction's exact six-argument unsubscribe AFTER the ExitDone by time;
+    and the active filter set now equals the set just before the retire's reaction (lcron r1 M-01, M-02, m-01)."""
+    subs_c = [a for s, a in sub_calls if s == SEL_SUB]
+    row['subscribesCron'] = len(subs_c) == 1 and subs_c[0] == CRON_ARGS
+    uns_c = [a for s, a in unsub_calls if s == SEL_UNSUB]
+    row['unsubscribesCron'] = len(uns_c) == 1 and uns_c[0] == CRON_ARGS
+    ev = [h_ for h_ in sorted(hist, key=lambda x: x['block']) if h_['filterId'] == fid
+          and row['subscribeBlock'] <= h_['block'] <= row['unsubscribeBlock']]
+    row['cronIntervals'] = [(h_['kind'], h_['block']) for h_ in ev]
+    row['oneInterval'] = [k for k, _ in row['cronIntervals']] == ['Subscribe', 'Unsubscribe']
+    row['unsubscribeAfterDone'] = unsub_ts >= done_ts
+    row['exitDoneTs'], row['unsubscribeTs'] = done_ts, unsub_ts
+    before = active_before(hist, row['subscribeBlock'])
+    row['activeBefore'], row['activeNow'] = len(before), len(active_now)
+    row['backToBaseline'] = set(active_now) == before
+    row['pass'] = all(row[k] for k in ('subscribesCron', 'unsubscribesCron', 'oneInterval', 'unsubscribeAfterDone',
+                                       'backToBaseline'))
+    return row
 
 
 def exit_notes(c, vault, frm):
@@ -823,7 +882,7 @@ def exit_notes(c, vault, frm):
 
 def lcron():
     """L-CRON: the Cron subscribe and unsubscribe txs around one exit (the owner's Covenant on Y_A, retired by its
-    curator: B3 gone, the owner decision of s7), and the RC's subscription count back to its baseline."""
+    curator: B3 gone, the owner decision of s7), and the RC's filter set back to what it was before."""
     st = [s for k, s in deployments('1301').items() if k.startswith('lcron_')]
     ret = [t for s in st for t in s['txs'] if t['label'] == 'retire_YA' and t.get('status') == 'ok']
     alloc = [t for s in st for t in s['txs'] if t['label'] == 'allocate_YA' and t.get('status') == 'ok']
@@ -835,44 +894,57 @@ def lcron():
     if len(mode) != 1:
         raise SystemExit(f'loops: {rtx}: not one ModeChanged log')
     vault, li = mode[0]['address'], int(mode[0]['logIndex'], 16)
-    covenant = alloc[-1]['to']
+    ya = [e['vault'] for e in load().get('loops', []) if e.get('id') == 'L-DYN' and e.get('step') == 'ldyn_vault_YA']
+    owner = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))['steps']['rc']['owner']
+    fac = deployments('1301')['reagent']['reads']['addresses']['factory']
+    covenant = cast('call', fac, 'predict(address)(address)', owner, rpc=rpc('1301'))
+    if ya != [vault.lower()] or alloc[-1]['to'].lower() != covenant.lower():  # lcron r1 m-05
+        raise SystemExit('loops: the retired vault is not Y_A or the allocation was not the owner\'s Covenant')
     d = rc_subscriptions()
-    hist = sorted(d['history'], key=lambda x: x['block'])
-    # the Cron filter id: the one subscribed in the retire's reaction
-    tr = mcp_trace(('1301'), rtx, li)
+    hist = d['history']
+    tr = mcp_trace('1301', rtx, li)
     rx = (tr['data'].get('reaction') or {}).get('tx')
     if not rx:
         raise SystemExit(f'loops: no reaction to the retire\'s ModeChanged yet ({tr["verdict"]})')
-    t, w = lasna_input(rx)
-    if w[0] != RC[2:].lower().rjust(64, '0') or w[12] != rtx[2:].lower() or int(w[13], 16) != li or w[4] != T_MODE[2:]:
+    t, w, sub_calls = rc_system_calls(rx)
+    if (w[2], w[3], w[4], w[12], int(w[13], 16)) != (hex(1301)[2:].rjust(64, '0'), vault[2:].lower().rjust(64, '0'),
+                                                    T_MODE[2:], rtx[2:].lower(), li):
         raise SystemExit(f'loops: {rx} is not the RC\'s reaction to the retire\'s ModeChanged')
     subs = [h_ for h_ in hist if h_['tx'].lower() == rx.lower() and h_['kind'] == 'Subscribe']
     if len(subs) != 1:
         raise SystemExit(f'loops: the retire\'s reaction {rx} made {len(subs)} subscriptions (want the Cron one)')
     fid = subs[0]['filterId']
-    unsubs = [h_ for h_ in hist if h_['filterId'] == fid and h_['kind'] == 'Unsubscribe' and h_['block'] > subs[0]['block']]
     notes = exit_notes(covenant, vault, ret[0]['block'])
     done = [n for n in notes if n['outcome'] == 1]
-    active = sum(1 for s in d['subscriptions'] if s['active'])
+    if not done:
+        raise SystemExit(f'loops: no ExitDone yet (notes so far: {notes}); re-run later')
+    done_ts = ts('1301', done[0]['block'])
+    unsubs = [h_ for h_ in sorted(hist, key=lambda x: x['block']) if h_['filterId'] == fid
+              and h_['kind'] == 'Unsubscribe' and h_['block'] > subs[0]['block']]
+    later = [u_ for u_ in unsubs if int(cast('block', str(u_['block']), '--field', 'timestamp', rpc=LASNA)) >= done_ts]
+    if not later:
+        raise SystemExit('loops: no Cron unsubscribe after the ExitDone yet; re-run later')
+    u = later[0]
+    ut, uw, unsub_calls = rc_system_calls(u['tx'])
+    unsub_ts = int(ut['blockTimestamp'], 16)
     row = {'originTx': rtx, 'vault': vault.lower(), 'covenant': covenant, 'reactionTx': rx, 'cronFilter': fid,
            'subscribeTx': subs[0]['tx'], 'subscribeBlock': subs[0]['block'], 'exitNotes': notes,
-           'baselineSubscriptions': CRON_BASELINE, 'activeSubscriptionsNow': active}
-    if not done:
-        raise SystemExit(f'loops: no ExitDone yet for {covenant} on {vault} (notes so far: {notes}); re-run later')
-    if not unsubs:
-        raise SystemExit('loops: Cron is still subscribed after the exit; re-run later (the sweep ends within 2 laps)')
-    u = unsubs[0]
-    ut, uw = lasna_input(u['tx'])
-    row.update(unsubscribeTx=u['tx'], unsubscribeBlock=u['block'],
-               unsubscribeInCronReaction=uw[0] == RC[2:].lower().rjust(64, '0') and uw[4] == T_CRON100[2:],
-               exitDoneTx=done[0]['tx'], exitDoneBlock=done[0]['block'], destTx=done[0]['tx'],
-               cronTicks=len(cron_reactions(subs[0]['block'], u['block'])))
-    row['pass'] = (row['unsubscribeInCronReaction'] and active == CRON_BASELINE
-                   and not any(s['filterId'] == fid and s['active'] for s in d['subscriptions']))
+           'exitDoneTx': done[0]['tx'], 'exitDoneBlock': done[0]['block'], 'destTx': done[0]['tx'],
+           'unsubscribeTx': u['tx'], 'unsubscribeBlock': u['block'],
+           'unsubscribeInCronReaction': uw[4] == T_CRON100[2:]}
+    row['cronTicks'] = len(cron_reactions(subs[0]['block'], u['block']))
+    active_now = {s['filterId'] for s in d['subscriptions'] if s['active']}
+    row = lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, unsub_ts)
+    row['pass'] = row['pass'] and row['unsubscribeInCronReaction']
     doc = load()
-    save(doc, 'L-CRON', [row], 'Cron subscribed in the reaction to the retire (B3 gone) and unsubscribed by a Cron '
-         'reaction after the patient exit was DONE; the subscription count back to its baseline (spec §9.5, C-10)')
-    print('loops: L-CRON', {k: row[k] for k in ('subscribeBlock', 'unsubscribeBlock', 'cronTicks', 'activeSubscriptionsNow', 'pass')})
+    doc['loops'] = [e for e in doc.get('loops', []) if e.get('id') not in ('L-CRON', 'L-CRON-failing')]
+    key = 'L-CRON' if row['pass'] else 'L-CRON-failing'
+    save(doc, key, [row], 'Cron subscribed in the reaction to the retire (B3 gone) and unsubscribed by a Cron '
+         'reaction after the patient exit was DONE; the filter set back to what it was (spec §9.5, C-10)'
+         if row['pass'] else 'L-CRON NOT shown: see the row\'s flags')
+    print('loops:', key, {k: row[k] for k in ('subscribeBlock', 'unsubscribeBlock', 'cronTicks', 'oneInterval',
+                                              'unsubscribeAfterDone', 'backToBaseline', 'pass')})
+
 
 # ------------------------------------------------------------------ selftest (offline: the seams replaced; s7 r1 M-03)
 
@@ -1112,7 +1184,7 @@ def selftest():
         g['load'] = lambda: {'loops': [{'destChain': 1301, 'destTx': '0xd1'}, {'destChain': 1301, 'destTx': '0xd2'}]}
         g['deployments'] = lambda ch: {}
         g['hub'] = lambda ch: H
-        g['hub_entry'] = lambda ch, tx: ('exit', 1_200_000, None)
+        g['hub_entry'] = lambda ch, tx: ('exit', 1_200_000, None, 'stub')
         outc = {'0xd1': DEFERRED, '0xd2': 1}
         def lg_cast(*a, rpc):
             if a[0] == 'tx':
@@ -1124,6 +1196,10 @@ def selftest():
            'lgas_rows: a DEFERRED exit fails its row and the next DONE exit fills the cell')
         ok(lgas_key(rows_, {'pass': True})[1] == [f'{c}/{k}' for c in CH for k in KINDS if (c, k) != ('1301', 'exit')],
            'lgas_key: the filled exit cell is not listed missing')
+        outc = {'0xd1': 2, '0xd2': 2}  # EARLY twice: valid readings, but the Covenant's exit work never ran
+        rows_, _ = lgas_rows()
+        ok(all(r_['pass'] and not r_['fillsCell'] for r_ in rows_) and '1301/exit' in lgas_key(rows_, {'pass': True})[1],
+           'an EARLY exit is a passing reading but does not fill the exit cell (lcron r1 m-02)')
         # S. L-SPOOF (lspoof r1 M-01): the delivery search and the verdict
         SP_ = '0x' + '5a' * 20
         wordS = SP_[2:].rjust(64, '0')
@@ -1156,6 +1232,49 @@ def selftest():
         ok(v['charged'] == 10, 'the charge from reserves counts')
         v = spoof_verdict({**base_row(), 'hubBalanceAfter': 100, 'debtAfter': 7}, [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')
         ok(v['charged'] == 7 and v['billed'], 'a charge left as debt counts')
+        # T. L-CRON (lcron r1 M-03): the verdict over its flags
+        hist0 = [{'kind': 'Subscribe', 'block': 10, 'filterId': 'a', 'tx': '0x'}, {'kind': 'Subscribe', 'block': 11, 'filterId': 'b', 'tx': '0x'},
+                 {'kind': 'Subscribe', 'block': 100, 'filterId': 'cron', 'tx': '0xrx'}, {'kind': 'Unsubscribe', 'block': 200, 'filterId': 'cron', 'tx': '0xu'}]
+        base = lambda: {'subscribeBlock': 100, 'unsubscribeBlock': 200}  # noqa: E731
+        good = [(SEL_SUB, CRON_ARGS)], [(SEL_UNSUB, CRON_ARGS)]
+        v = lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b'}, 1000, 1010)
+        ok(v['pass'], 'control: Cron tuple subscribed and unsubscribed, one interval, after DONE, filter set restored')
+        ok(active_before(hist0, 100) == {'a', 'b'}, 'the filter set before the retire\'s reaction, from the history')
+        ok(not lcron_verdict(base(), [(SEL_SUB, CRON_ARGS[:2] + ['00' * 32] + CRON_ARGS[3:])], good[1], hist0, 'cron', {'a', 'b'}, 1000, 1010)['pass'],
+           'L-CRON fails: the reaction subscribed a non-Cron tuple')
+        ok(not lcron_verdict(base(), good[0], [(SEL_UNSUB, CRON_ARGS[:5] + ['00' * 32])], hist0, 'cron', {'a', 'b'}, 1000, 1010)['pass'],
+           'L-CRON fails: an unsubscribe that is not the exact six arguments')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b'}, 1000, 999)['pass'], 'L-CRON fails: unsubscribed before the ExitDone')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a'}, 1000, 1010)['pass'], 'L-CRON fails: the filter set not restored (one less)')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b', 'c'}, 1000, 1010)['pass'], 'L-CRON fails: the filter set not restored (one more)')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'c'}, 1000, 1010)['pass'],
+           'L-CRON fails: the same count but another filter set (one dropped, one added)')
+        hist2 = hist0[:3] + [{'kind': 'Unsubscribe', 'block': 150, 'filterId': 'cron', 'tx': '0x'},
+                             {'kind': 'Subscribe', 'block': 160, 'filterId': 'cron', 'tx': '0x'}] + hist0[3:]
+        ok(not lcron_verdict(base(), *good, hist2, 'cron', {'a', 'b'}, 1000, 1010)['pass'], 'L-CRON fails: two Cron intervals (a park between)')
+        # U. hub_entry: the callTracer fallback reads the same frame as parity; a real error is not retried away
+        par = [{'action': {'to': H, 'callType': 'call', 'input': '0x' + SEL_CONDUCT + '00' * 32, 'gas': hex(84271)}, 'error': None}]
+        ctr = {'to': CH['1301']['proxy'], 'type': 'CALL', 'input': '0x8d1f0fa1', 'gas': hex(261631), 'calls': [
+            {'to': H, 'type': 'CALL', 'input': '0x' + SEL_CONDUCT + '00' * 32, 'gas': hex(84271), 'calls': []}]}
+        g['hub'] = lambda ch: H
+        g['cast'] = lambda *a, rpc: json.dumps(par)
+        p_ = saved['hub_entry']('1301', '0x1')
+        def pruned(*a, rpc):
+            if a[1] == 'trace_transaction':
+                raise SystemExit('loops: cast rpc failed: insufficient changesets to revert')
+            return json.dumps(ctr)
+        g['cast'] = pruned
+        c_ = saved['hub_entry']('1301', '0x1')
+        ok(p_[:3] == c_[:3] == ('conduct', 84271, None) and p_[3] != c_[3], 'the callTracer fallback reads the parity frame\'s gas (source recorded)')
+        def wrong(*a, rpc):
+            raise SystemExit('loops: cast rpc failed: invalid transaction hash')
+        g['cast'] = wrong
+        try:
+            saved['hub_entry']('11155111', '0x1')
+            ok(False, 'a real trace error is raised (not refused)')
+        except SystemExit as e:
+            ok('invalid transaction hash' in str(e) and 'after retries' not in str(e),
+               'a real trace error is raised at once, not retried away')
         # H. lcon_origins: only X_A / X_B paths; pending refuses
         g['deployments'] = lambda ch: {'lcon_YA_20261125': {'txs': [{'tx': otx, 'status': 'ok'}]}} if ch == '1301' else {}
         refuses(lambda: saved['lcon_origins'](), 'has no L-CON path', 'a Y_A step folded into L-CON-AA (r1 m-04)')

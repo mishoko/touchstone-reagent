@@ -34,7 +34,7 @@ MUTANTS = [
     ('stats verdict drops the 3-batch rule', "'pass': len(rs) >= 50 and len(batches) >= 3,", "'pass': len(rs) >= 50,", None),
     ('an L-GAS row passes without its outcome', 'ok = gas == want[\'gasLimit\'] and not err and entry >= thr and good',
      'ok = gas == want[\'gasLimit\'] and not err and entry >= thr', None),
-    ('an L-GAS cell locks to its first delivery', '            if ok:\n                seen.add((ch, kind))',
+    ('an L-GAS cell locks to its first delivery', '            if fills:\n                seen.add((ch, kind))',
      '            seen.add((ch, kind))', None),
     ('outcome: any note count accepted', '    if len(outs) != 1:', '    if not outs:', None),
     ('outcome: the note-kind filter removed', "and int(l['topics'][3], 16) in (2, 3):", ':', None),
@@ -66,6 +66,14 @@ MUTANTS = [
     ('L-SPOOF: the charge always attributed', "row['chargeAttributable'] = not others", "row['chargeAttributable'] = True", None),
     ('L-SPOOF: debt left out of the charge', "        + (row['debtAfter'] - row['debtBefore'])\n    row['charged']", "\n    row['charged']", None),
     ('L-SPOOF: an unread conduct(99) passes', "row['hubLogs'] == 0 and bool(c99) and all(v == 0 for v in c99)", "row['hubLogs'] == 0 and all(v == 0 for v in (c99 or []))", None),
+    # lcron r1 M-03
+    ('L-CRON: the subscribe tuple not checked', "row['subscribesCron'] = len(subs_c) == 1 and subs_c[0] == CRON_ARGS", "row['subscribesCron'] = len(subs_c) == 1", None),
+    ('L-CRON: the unsubscribe tuple not checked', "row['unsubscribesCron'] = len(uns_c) == 1 and uns_c[0] == CRON_ARGS", "row['unsubscribesCron'] = len(uns_c) == 1", None),
+    ('L-CRON: the after-DONE order dropped', "row['unsubscribeAfterDone'] = unsub_ts >= done_ts", "row['unsubscribeAfterDone'] = True", None),
+    ('L-CRON: the filter set compared by count', "row['backToBaseline'] = set(active_now) == before", "row['backToBaseline'] = len(active_now) == len(before)", None),
+    ('L-CRON: one interval not required', "row['oneInterval'] = [k for k, _ in row['cronIntervals']] == ['Subscribe', 'Unsubscribe']", "row['oneInterval'] = True", None),
+    ('hub_entry: every error retried', "            if 'not available' not in last and 'does not exist' not in last:\n                raise", "            if False:\n                raise", None),
+    ('L-GAS: an EARLY exit fills its cell', "fills = ok and (kind not in ('exit', 'plan') or outcome == 1)", "fills = ok", None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 

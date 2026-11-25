@@ -215,7 +215,7 @@ def receipt(ch, tx, tries=30):
     return None
 
 
-def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
+def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None):
     """The eth_call dry run of the exact call (a revert raises: nothing is sent); then (unless dry) an async send
     whose hash is recorded as `pending` BEFORE waiting, so a landed tx is never lost to a receipt timeout (r1 m-01);
     then the receipt: status 1 and exactly one log `expect` = (emitter, topic0)."""
@@ -235,6 +235,9 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
                                           and l['topics'][0] == expect[1]]
     rec = {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if ok else 'FAILED',
            'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 and mine[0] else None}
+    if ok and len(mine) == 1 and post is not None and not post():
+        ok, rec['status'] = False, 'FAILED'  # landed, but the state it should have set is not there (lcron r1 m-04)
+        rec['readback'] = 'failed'
     record_update(ch, step, h, rec)
     rec['tx'] = h
     if not (ok and len(mine) == 1):
@@ -259,8 +262,9 @@ def resolve_pending(step, tx):
         refuse(f'{tx} is not exactly one pending entry of {step}')  # s7 loops r3 m-03
     want = EXPECT.get(mine_e[0]['label'].split('_')[0] if mine_e[0]['label'].split('_')[0] in EXPECT
                       else mine_e[0]['label'])
-    if want is None:
-        refuse(f'no expected log known for label {mine_e[0]["label"]}')
+    if want is None or want == NO_LOG:
+        # a call with no log is decided by reading its state back, which `resolve` cannot know: re-run its command
+        refuse(f'label {mine_e[0]["label"]}: resolve by re-running its command (it reads the state back)')
     r = receipt(ch, tx, tries=3)
     if r is None:
         refuse(f'{tx}: still no receipt')
@@ -408,12 +412,14 @@ def cov_plan(name, amount, dry):
     c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
     if cast('call', c, 'allowed(address)(bool)', v['vault'], rpc=rpc(ch)) != 'true':
         send(ch, c, 'setAllowed(address,bool)', v['vault'], 'true', expect=None, dry=dry, step=step,
-             label=f'setAllowed_{name}')
+             label=f'setAllowed_{name}',
+             post=lambda: cast('call', c, 'allowed(address)(bool)', v['vault'], rpc=rpc(ch)) == 'true')
         if dry:
             print('drive: dry run: setAllowed does not revert (setPlan is dry-run after it lands)')
             return
     send(ch, c, 'setPlan(address,uint128)', v['vault'], str(amount), expect=(hub_, T_NOTE), dry=dry, step=step,
-         label=f'setPlan_{name}')
+         label=f'setPlan_{name}',
+         post=lambda: int(cast('call', c, 'plan(address)(uint128)', v['vault'], rpc=rpc(ch)).split()[0]) == int(amount))
     print(f'drive: plan {amount} into {name} {"(dry: does not revert)" if dry else "landed"}')
 
 
@@ -666,6 +672,30 @@ def selftest():
             finally:
                 g['ROOT'] = saved_root
         g.update(saved3)
+        # a landed send whose state read-back fails is FAILED, never ok (lcron r1 m-04)
+        import tempfile as _tf3
+        with _tf3.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, 'audits'))
+            json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
+            saved4 = {k: g[k] for k in ('_run', 'receipt', 'cast', 'wallet')}
+            g['ROOT'] = td
+            g['cast'] = lambda *a, rpc: 'true'
+            g['wallet'] = lambda: []
+            g['_run'] = lambda args: '0x' + 'cc' * 32
+            g['receipt'] = lambda ch, tx, tries=30: {'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': []}
+            for post, want_st, label in ((lambda: False, 'FAILED', 'a landed setAllowed whose read-back fails is FAILED'),
+                                         (lambda: True, 'ok', 'control: a landed setAllowed that reads back is ok')):
+                json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
+                try:
+                    send('1301', '0x' + '11' * 20, 'setAllowed(address,bool)', '0x' + '22' * 20, 'true', expect=None,
+                         dry=False, step='lcron_t', label='setAllowed_XA', post=post)
+                except Refused:
+                    pass
+                got = json.load(open(os.path.join(td, 'audits', 'deployments-1301.json')))['steps']['lcron_t']['txs'][0]['status']
+                print(('selftest ok: ' if got == want_st else 'selftest FAIL: ') + label)
+                fails += got != want_st
+            g.update(saved4)
+            g['ROOT'] = saved_root
         saved2 = {k: g[k] for k in ('resolve', 'preflight', 'covenant')}
         g['resolve'] = lambda nm: {**v, 'name': nm}
         g['preflight'] = lambda *a, **k: 0
