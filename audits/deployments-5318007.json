@@ -135,6 +135,32 @@
      "to": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9"
     }
    ]
+  },
+  "lspoof": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "d7a8f59",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T10:52:53+00:00",
+   "note": "L-SPOOF: a third-party RC (script/live/SpoofRC.sol) from the owner key",
+   "txs": [
+    {
+     "label": "create",
+     "from": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
+     "tx": "0x73c4660dd889d86a4dc2c6a5a281887beb0c8bf3bdd3d9a7dfa0b7365fbf7263",
+     "status": "ok",
+     "address": "0xdDe7E4F51fA544dd3F23e60E8c258fA6868ebcfE",
+     "token": "0x1AFE15c3dC3d1A023F2EcFa20a417b22F2c49E64",
+     "hub": "0xb41433C9585d230A2607f253E1EA844923e07a91",
+     "gasUsed": 452618
+    },
+    {
+     "label": "depositTo",
+     "tx": "0xd6d20a619aec4b59b5b570d04ce88c5c537d4a980b45534351cd1316afc7da88",
+     "status": "ok",
+     "value": "500000000000000000"
+    }
+   ]
   }
  }
 }

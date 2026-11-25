@@ -659,6 +659,32 @@
      "logIndex": 13
     }
    ]
+  },
+  "lspoof_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "d7a8f59",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T10:53:17+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "spoof_trigger",
+     "tx": "0xf2ec6917530102faa68d76b83a123ca80462225322b1f95b899c8c9cc6054177",
+     "status": "ok",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64",
+     "function": "transfer",
+     "hubSnapshot": {
+      "block": 68751566,
+      "balance": 9997929576700000,
+      "debt": 0,
+      "reserves": 0
+     },
+     "block": 68751570,
+     "gasUsed": 51008,
+     "logIndex": 5
+    }
+   ]
   }
  }
 }
