@@ -87,6 +87,7 @@ DRIVE_MUTANTS = [
     ('drive: the send carries no gas limit', "*wallet(), '--rpc-url', rpc(ch), '--gas-limit', str(lim), to, sig,",
      "*wallet(), '--rpc-url', rpc(ch), to, sig,", None),
     ('drive: no margin over the estimate', 'GAS_MARGIN = (3, 2)', 'GAS_MARGIN = (1, 1)', None),
+    ('drive: the read-back not retried', 'READBACK_TRIES, READBACK_WAIT = 4, 4', 'READBACK_TRIES, READBACK_WAIT = 1, 4', None),
     ('drive: no Sepolia floor', "GAS_FLOOR = {'1301': 2_000_000, '11155111': 4_000_000}", "GAS_FLOOR = {'1301': 2_000_000, '11155111': 0}", None),
     ('drive: the gap-record bound ignored', '    if 1 < len(mine) <= n_max:', '    if 1 < len(mine):', None),
     ('drive: ok without the expected log', '    ok = ok and len(mine) == 1  #', '    ok = ok or len(mine) == 1  #', None),

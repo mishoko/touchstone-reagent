@@ -59,13 +59,22 @@ def _wallet(key, env=os.environ):
     return ['--keystore', ks, '--password-file', pw]
 
 
+def redact(text, env=os.environ):
+    """Keyed RPC URLs (they carry API keys) never reach the console: each is replaced by its variable's name (s8-forge
+    r1 m-03; the same rule as drive.py)."""
+    for k in ('UNICHAIN_SEPOLIA_RPC_URL', 'ETH_SEPOLIA_RPC_URL'):
+        if env.get(k):
+            text = text.replace(env[k], f'${k}')
+    return text
+
+
 def cast(*a, key=None, rpc=LASNA):
     w = _wallet(key) if key else []
     # options before the positionals: `send --create <CODE> [SIG] [ARGS]...` takes anything after CODE as ARGS (s6)
     net = [] if a[0] in OFFLINE else ['--rpc-url', rpc]
     r = subprocess.run(['cast', a[0], *w, *net, *a[1:]], capture_output=True, text=True)
     if r.returncode != 0:
-        raise SystemExit(f'rc: cast {a[0]} failed: {(r.stderr or r.stdout).strip()[-300:]}')
+        raise SystemExit(redact(f'rc: cast {a[0]} failed: {(r.stderr or r.stdout).strip()[-300:]}'))
     return r.stdout.strip()
 
 
@@ -321,10 +330,17 @@ def record_runtime():
 RPC_ENV = {'1301': 'UNICHAIN_SEPOLIA_RPC_URL', '11155111': 'ETH_SEPOLIA_RPC_URL'}
 
 
-def record_receipts(step, note, specs):
-    """A funding step (faucet request, depositTo) recorded from its receipts: LABEL:CHAIN:TX, CHAIN 5318007 = Lasna."""
+DEPOSIT_TO = '0xb760faf9'  # depositTo(address)
+REQUEST = '0x27c78c42'     # the faucet's request(address)
+
+
+def record_receipts(step, note, specs, replace=False):
+    """A funding step (faucet request, depositTo) recorded from its receipts: LABEL:CHAIN:TX, CHAIN 5318007 = Lasna.
+    The beneficiary of a depositTo / request call is decoded from the tx's own input (s8-forge r1 m-04); a receipt
+    with status != 1 is refused before anything is written. `replace` re-records an existing step from the current
+    tree and keeps the old record under `superseded`."""
     doc = load()
-    if step in doc['steps']:
+    if step in doc['steps'] and not replace:
         raise SystemExit(f'rc: {step} already recorded')
     txs = []
     for spec in specs:
@@ -332,10 +348,20 @@ def record_receipts(step, note, specs):
         rpc = LASNA if ch == '5318007' else os.environ[RPC_ENV[ch]]
         r = json.loads(cast('receipt', '--json', tx, rpc=rpc))
         t = json.loads(cast('tx', '--json', tx, rpc=rpc))
-        txs.append({'label': label, 'chain': int(ch), 'tx': tx, 'block': int(r['blockNumber'], 16),
-                    'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if r['status'] in ('0x1', 1) else 'FAILED',
-                    'from': t['from'], 'to': r['to'], 'value': str(int(t['value'], 16))})
-    _record(doc, step, {'source': 'receipts', 'note': note, 'txs': txs})
+        if r['status'] not in ('0x1', 1):
+            raise SystemExit(f'rc: {tx} did not land (status {r["status"]}): nothing recorded')
+        row = {'label': label, 'chain': int(ch), 'tx': tx, 'block': int(r['blockNumber'], 16),
+               'gasUsed': int(r['gasUsed'], 16), 'status': 'ok', 'from': t['from'], 'to': r['to'],
+               'value': str(int(t['value'], 16))}
+        inp = t.get('input') or ''
+        if inp[:10] in (DEPOSIT_TO, REQUEST) and len(inp) >= 74:
+            row['beneficiary'] = '0x' + inp[34:74]
+            row['call'] = 'depositTo(address)' if inp[:10] == DEPOSIT_TO else 'request(address)'
+        txs.append(row)
+    rec = {'source': 'receipts', 'note': note, 'txs': txs}
+    if step in doc['steps']:
+        rec['superseded'] = doc['steps'][step]
+    _record(doc, step, rec)
     print(step, 'recorded', len(txs), 'txs')
 
 
@@ -438,6 +464,47 @@ def selftest():
         ok = (not e) if not must else (len(e) == 1 and must in e[0])
         print('selftest ok:' if ok else 'selftest FAIL:', 'post-deploy', over or 'control passes', e)
         fails += 0 if ok else 1
+    # (4) receipts (offline, a fake cast): the beneficiary decoded; a failed receipt refused before any write; a
+    #     duplicate step refused; --replace keeps the old record; and keyed URLs redacted (s8-forge r1 m-03, m-04)
+    global OUT, cast
+    real_out, real_cast = OUT, cast
+    with tempfile.TemporaryDirectory() as t:
+        OUT = os.path.join(t, 'd.json')
+        rc_hex = RESERVED[2:].lower().rjust(64, '0')
+        fake = {'status': '0x1'}
+
+        def fcast(*a, key=None, rpc=LASNA):
+            if a[0] == 'receipt':
+                return json.dumps({'status': fake['status'], 'blockNumber': '0x10', 'gasUsed': '0x5', 'to': SYSTEM})
+            return json.dumps({'from': '0x' + '07' * 20, 'value': hex(10**18), 'input': DEPOSIT_TO + rc_hex})
+        cast = fcast
+        try:
+            record_receipts('st', 'n', ['depositTo_RC:5318007:0xaa'])
+            row = load()['steps']['st']['txs'][0]
+            ok = row['beneficiary'].lower() == RESERVED.lower() and row['call'] == 'depositTo(address)'
+            print('selftest ok:' if ok else 'selftest FAIL:', 'receipts: the depositTo beneficiary is decoded')
+            fails += not ok
+            refused(lambda: record_receipts('st', 'n', ['x:5318007:0xbb']), 'receipts: a duplicate step is refused',
+                    'already recorded')
+            fake['status'] = '0x0'
+            refused(lambda: record_receipts('st2', 'n', ['x:5318007:0xcc']), 'receipts: a failed receipt is refused',
+                    'did not land')
+            ok = 'st2' not in load()['steps']
+            print('selftest ok:' if ok else 'selftest FAIL:', 'receipts: nothing written for a failed receipt')
+            fails += not ok
+            fake['status'] = '0x1'
+            record_receipts('st', 'n2', ['depositTo_RC:5318007:0xdd'], replace=True)
+            st = load()['steps']['st']
+            ok = st['note'] == 'n2' and st['superseded']['note'] == 'n'
+            print('selftest ok:' if ok else 'selftest FAIL:', 'receipts: --replace keeps the old record as superseded')
+            fails += not ok
+        finally:
+            OUT, cast = real_out, real_cast
+    env = {'ETH_SEPOLIA_RPC_URL': 'https://x.example/v2/SECRETKEY'}
+    red = redact('error sending request for url (https://x.example/v2/SECRETKEY)', env)
+    ok = 'SECRETKEY' not in red and '$ETH_SEPOLIA_RPC_URL' in red and redact('plain', env) == 'plain'
+    print('selftest ok:' if ok else 'selftest FAIL:', 'a keyed RPC URL in a cast error is redacted (control: plain text kept)')
+    fails += not ok
     print('rc selftest', 'OK' if not fails else 'FAIL')
     return not fails
 
@@ -445,7 +512,8 @@ def selftest():
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else 'check'
     if what == 'receipts':
-        record_receipts(sys.argv[2], sys.argv[3], sys.argv[4:])
+        rest = [x for x in sys.argv[4:] if x != '--replace']
+        record_receipts(sys.argv[2], sys.argv[3], rest, replace='--replace' in sys.argv[4:])
         sys.exit(0)
     cmds = {'check': lambda: sys.exit(0 if check('--post' in sys.argv[2:]) else 1), 'runtime': record_runtime, 'pin': pin, '--selftest': lambda: sys.exit(0 if selftest() else 1),
             'b6': lambda: deploy_module('rcb6', 'RcB6'),

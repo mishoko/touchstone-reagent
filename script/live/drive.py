@@ -17,6 +17,12 @@ destination delivery, latency) is collected afterwards by `script/live/loops.py`
   python3 script/live/drive.py cov-alloc VAULT --shares S [--dry]          the owner's guarded allocate
   python3 script/live/drive.py retire YA [--dry | --yes-irreversible]   the curator retires Y_A (B3 gone: L-CRON's
                                                      exit; only once the owner's Covenant holds Y_A)
+  python3 script/live/drive.py breach XA [--dry | --yes-irreversible]   the hero runs' origin (owner decision s8):
+                                                     the reference pushed out of curator 1's range, refreshRef every
+                                                     240 blocks until BreachLatched, then the reference back
+  python3 script/live/drive.py ref-back XA [--dry]   the reference back to the range centre (abort or after a breach)
+  python3 script/live/drive.py process XA [--dry]    the open processBreach (forfeit; the drip starts)
+  python3 script/live/drive.py agent-set CHAIN ADDR [--dry]   the owner's setAgent (read back)
   python3 script/live/drive.py spoof-deploy lasna [--fund WEI] [--dry]   L-SPOOF: SpoofRC from the owner key, funded
   python3 script/live/drive.py spoof-trigger x [--dry]                    L-SPOOF: the 1-unit mUSDC trigger on 1301
   python3 script/live/drive.py resolve STEP TX        a `pending` entry resolved from its receipt
@@ -225,6 +231,20 @@ def expected_logs(r, expect):
             and all(len(l['topics']) > i and int(l['topics'][i], 16) == int(w, 16) for i, w in need.items())]
 
 
+READBACK_TRIES, READBACK_WAIT = 4, 4  # a load-balanced node can serve the pre-tx state just after the receipt (s8)
+
+
+def readback(post):
+    """The post-condition, retried: s8's 1301 setAgent landed (status 1, agent() set) but its first read-back hit a
+    node a block behind and recorded FAILED."""
+    for i in range(READBACK_TRIES):
+        if post():
+            return True
+        if i + 1 < READBACK_TRIES:
+            time.sleep(READBACK_WAIT)
+    return False
+
+
 GAS_MARGIN = (3, 2)  # gas limit = max(1.5 x the node's estimate, the chain's floor) (s8)
 # floors: the estimate is taken before a grid/epoch boundary the tx may cross at inclusion (a Sepolia Action at 1.5 x
 # the estimate, 1,255,617, still ran out of gas inside the vault's own unlock callback; Action 1 used 1,839,517);
@@ -263,7 +283,7 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_
     ok = ok and len(mine) == 1  # `ok` means landed AND carrying its expected log (s7 close r1 M-02)
     rec = {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if ok else 'FAILED',
            'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 and mine[0] else None}
-    if ok and post is not None and not post():
+    if ok and post is not None and not readback(post):
         ok, rec['status'] = False, 'FAILED'  # landed, but the state it should have set is not there (lcron r1 m-04)
         rec['readback'] = 'failed'
     record_update(ch, step, h, rec)
@@ -289,6 +309,16 @@ def rederive(step, tx):
     if len(e) != 1:
         refuse(f'{tx} is not exactly one entry of {step}')
     lab = e[0]['label']
+    if lab == 'setAgent':
+        # no log: the rule is status 1 and the Covenant's agent() equal to the tx's own argument, read now
+        r = receipt(ch, tx, tries=3)
+        arg = _run(['cast', 'calldata-decode', 'setAgent(address)', json.loads(cast('tx', '--json', tx, rpc=rpc(ch)))['input']])
+        now = cast('call', e[0]['to'], 'agent()(address)', rpc=rpc(ch))
+        ok = int(r['status'], 16) == 1 and now.lower() == arg.strip().lower()
+        record_update(ch, step, tx, {'status': 'ok' if ok else 'FAILED', 'rederived': 'drive.py rederive',
+                                     'readback': f'agent() = {now}'})
+        print(f'drive: {step} {tx} rederived: {"ok" if ok else "FAILED"} (agent() = the tx argument: {ok})')
+        return
     want = EXPECT.get(lab.split('_')[0], EXPECT.get(lab))
     if want in (None, NO_LOG):
         refuse(f'label {lab}: no log rule; re-run its command')
@@ -508,6 +538,141 @@ def retire(name, dry, yes):
     send(v['chain'], v['bundler'], 'retire()', expect=(v['vault'], T_RETIRED), dry=dry, step=step,
          label=f'retire_{name}')
     print(f'drive: retire {name} {"(dry: does not revert)" if dry else "landed"}')
+
+
+# ------------------------------------------------------------------ the hero runs' origin: a curator breach (s8)
+
+T_V3SWAP = '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67'   # UniswapV3Pool.Swap
+T_LATCHED = '0x829ba179a839c310d7073c7e340910e1a491fd6eb6c22836dc89137bf4d5a346'  # ITouchstoneHook.BreachLatched
+T_PROCESSED = '0xf37492039a7f836f6b471f6a2c580a9743a545b9d3f3d4b1e3a47108e67ea59c'  # BreachProcessed
+BREACHABLE = ('XA',)  # owner decision s8: the hero runs breach curator 1 on X_A (1301); X_B only by a later decision
+OBS = 'obs()((int24,int24,int24,uint40,bool,uint8,bool,bool,uint64,uint64,uint64,uint32,uint32,uint40,uint64,uint32,uint32))'
+OUT_TICKS = 1500        # the reference is pushed this far beyond the range's upper edge
+REFRESH_EVERY = 240     # blocks between refreshRef calls (DEMO GRID 300; the cache is fresh for 2 GRID)
+BREACH_MAX_S = 75 * 60  # give up (and report) after 75 min: DEMO CURE_BLOCKS 1,800 + the TWAP lag fit well inside
+
+
+def sqrt_at(tick):
+    from decimal import Decimal as D, getcontext
+    getcontext().prec = 80
+    return int((D('1.0001') ** int(tick)).sqrt() * (D(2) ** 96))
+
+
+def ref_driver(ch):
+    s = json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps']['refpool']['txs']
+    d = [t['address'] for t in s if t.get('contract') == 'RefDriver']
+    if len(d) != 1:
+        refuse(f'no single RefDriver recorded for {ch}')
+    return d[0]
+
+
+def obs(v):
+    w = cast('call', v['hook'], OBS, rpc=rpc(v['chain'])).strip('()').replace(' ', '').split(',')
+    num = lambda x: int(x.split('[')[0])  # noqa: E731
+    return {'refTick': num(w[2]), 'refFresh': w[4] == 'true', 'outBlocks': num(w[10]), 'breachSeq': num(w[11]),
+            'pendingBreaches': num(w[12])}
+
+
+def ref_tick(ch, pool):
+    return int(cast('call', pool, 'slot0()(uint160,int24,uint16,uint16,uint16,uint8,bool)', rpc=rpc(ch)).splitlines()[1].split()[0])
+
+
+def drive_ref(v, target, step, label, dry):
+    """Moves the reference pool's spot to `target` through the owner's RefDriver (exact-input swaps stopped at the
+    target price; at most 3)."""
+    ch = v['chain']
+    pool, drv = cast('call', v['hook'], 'REF_POOL()(address)', rpc=rpc(ch)), ref_driver(ch)
+    if cast('call', drv, 'owner()(address)', rpc=rpc(ch)).lower() != signer().lower():
+        refuse('the RefDriver is not the signer\'s')
+    for _ in range(3):
+        cur = ref_tick(ch, pool)
+        if cur == target:
+            return
+        up = target > cur
+        amt = str(50 * 10**18) if up else str(200_000 * 10**6)
+        send(ch, drv, 'swap(bool,uint256,uint160)', 'false' if up else 'true', amt, str(sqrt_at(target)),
+             expect=(pool, T_V3SWAP), dry=dry, step=step, label=label, extra={'from': cur, 'target': target})
+        if dry:
+            return
+    if ref_tick(ch, pool) != target:
+        refuse(f'the reference did not reach {target} in 3 swaps (at {ref_tick(ch, pool)})')
+
+
+def breach(name, dry, yes):
+    """L-PAUSE / L-OFFLINE / L-EXIT origin (owner decision s8): the reference is pushed OUT_TICKS beyond curator
+    1's range on `name`, the hook is refreshed every REFRESH_EVERY blocks until `BreachLatched` (Touchstone counts
+    the out-of-range blocks; CURE_BLOCKS of them latch one breach), then the reference is brought back to the range
+    centre. Irreversible (a latched breach is the curator's record): only a BREACHABLE vault, only while the owner's
+    Covenant holds it, only with --yes-irreversible."""
+    if name not in BREACHABLE:
+        refuse(f'{name} is not breachable (owner decision: {BREACHABLE} only)')
+    v = resolve(name)
+    ch = v['chain']
+    held = int(cast('call', v['vault'], 'balanceOf(address)(uint256)', covenant(ch), rpc=rpc(ch)).split()[0])
+    if held == 0:
+        refuse(f'the owner\'s Covenant holds no {name} shares: nothing would exit')
+    if not dry and not yes:
+        refuse('a breach is irreversible: pass --yes-irreversible')
+    lr, lo, hi = range_now(v)
+    target = (hi + OUT_TICKS) // CH[ch]['spacing'] * CH[ch]['spacing']
+    o0 = obs(v)
+    step = f'lbreach_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    print(f'drive: {name}: range [{lo}, {hi}), reference -> {target}; breachSeq {o0["breachSeq"]}, pending '
+          f'{o0["pendingBreaches"]}{" (dry)" if dry else ""}')
+    drive_ref(v, target, step, 'ref_out', dry)
+    send(ch, v['hook'], 'refreshRef()', expect=None, dry=True, step=step, label='refresh')
+    if dry:
+        print('drive: dry runs pass (the reference swap and refreshRef)')
+        return
+    t0 = time.time()
+    while time.time() - t0 < BREACH_MAX_S:
+        b0 = int(cast('block-number', rpc=rpc(ch)))
+        rec, _ = send(ch, v['hook'], 'refreshRef()', expect=None, dry=False, step=step, label='refresh')
+        o = obs(v)
+        print(f'drive: refresh {rec["tx"]} block {rec["block"]}: refTick {o["refTick"]} outBlocks {o["outBlocks"]} '
+              f'breachSeq {o["breachSeq"]}')
+        if o['breachSeq'] > o0['breachSeq']:
+            r = receipt(ch, rec['tx'])
+            lat = [l for l in r['logs'] if l['topics'] and l['topics'][0] == T_LATCHED
+                   and l['address'].lower() == v['hook'].lower()]
+            record_update(ch, step, rec['tx'], {'breachLatched': len(lat), 'breachSeq': o['breachSeq']})
+            print(f'drive: BreachLatched (seq {o["breachSeq"]}) in {rec["tx"]}')
+            break
+        while int(cast('block-number', rpc=rpc(ch))) < b0 + REFRESH_EVERY:
+            time.sleep(20)
+    else:
+        refuse(f'no breach after {BREACH_MAX_S // 60} min: the reference is still out (run ref-back {name})')
+    ref_back(name, False, step)
+
+
+def ref_back(name, dry, step=None):
+    """The reference back to the range centre (after a breach latched, or to abort one)."""
+    v = resolve(name)
+    lr, lo, hi = range_now(v)
+    step = step or f'lbreach_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    drive_ref(v, (lo + hi) // 2, step, 'ref_back', dry)
+    print(f'drive: reference back to {(lo + hi) // 2}{" (dry)" if dry else ""}')
+
+
+def process(name, dry):
+    """The open `processBreach()`: the latched breach forfeits the curator's unvested pay and starts the drip."""
+    v = resolve(name)
+    step = f'lbreach_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    if obs(v)['pendingBreaches'] == 0:
+        refuse(f'{name} has no pending breach')
+    send(v['chain'], v['vault'], 'processBreach()', expect=(v['vault'], T_PROCESSED), dry=dry, step=step,
+         label='processBreach')
+    print(f'drive: processBreach on {name} {"(dry: does not revert)" if dry else "landed"}')
+
+
+def agent_set(ch, agent, dry):
+    """The owner names the agent key on this chain's Covenant (`setAgent`); checked by read-back."""
+    c, step = covenant(ch), f'agent_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    if agent.lower() == signer().lower():
+        refuse('the agent must not be the owner key')
+    send(ch, c, 'setAgent(address)', agent, expect=None, dry=dry, step=step, label='setAgent',
+         post=lambda: cast('call', c, 'agent()(address)', rpc=rpc(ch)).lower() == agent.lower())
+    print(f'drive: setAgent {agent} on {ch} {"(dry: does not revert)" if dry else "landed"}')
 
 
 # ------------------------------------------------------------------ L-SPOOF (spec §9.5, OQ-18, PB-12)
@@ -779,8 +944,11 @@ def selftest():
             print(('selftest ok: ' if ok_ else 'selftest FAIL: ') + 'a flush note must be its own Covenant\'s STATE (another Covenant or kind does not count)')
             fails += not ok_
             g['receipt'] = lambda ch, tx, tries=30: {'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': []}
+            g['READBACK_WAIT'] = 0
+            lag = iter([False, False, True])  # s8: a node a block behind serves the old state twice, then the new
             for post, want_st, label in ((lambda: False, 'FAILED', 'a landed setAllowed whose read-back fails is FAILED'),
-                                         (lambda: True, 'ok', 'control: a landed setAllowed that reads back is ok')):
+                                         (lambda: True, 'ok', 'control: a landed setAllowed that reads back is ok'),
+                                         (lambda: next(lag), 'ok', 'a read-back that lags two reads is retried to ok')):
                 json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
                 try:
                     send('1301', '0x' + '11' * 20, 'setAllowed(address,bool)', '0x' + '22' * 20, 'true', expect=None,
@@ -809,6 +977,51 @@ def selftest():
         g['cast'] = lambda *a, rpc: '7'
         retire('YA', True, False)  # control: held, a dry run passes every refusal (the send's own dry run is stubbed)
         print('selftest ok: control: retire YA --dry with a holding passes the refusals')
+        # s8 breach: each refusal by its own check, then the dry control passes every refusal
+        for nm, held, flag, must, label in (('XB', '7', True, 'not breachable', 'a breach of a vault the owner did not name'),
+                                            ('XA', '0', True, 'holds no XA shares', 'a breach before the Covenant holds the vault'),
+                                            ('XA', '7', False, 'pass --yes-irreversible', 'a live breach without --yes-irreversible')):
+            g['cast'] = lambda *a, rpc, _h=held: _h
+            try:
+                breach(nm, flag, False)
+                print('selftest FAIL (not refused):', label)
+                fails += 1
+            except Refused as e:
+                print(f'selftest ok: {label} is refused' if must in str(e) else f'selftest FAIL: {label}: {e}')
+                fails += 0 if must in str(e) else 1
+        saved5 = {k: g[k] for k in ('range_now', 'obs', 'drive_ref', 'send')}
+        g['cast'] = lambda *a, rpc: '7'
+        g['range_now'] = lambda v_: (196191, 195190, 197190)
+        g['obs'] = lambda v_: {'refTick': 0, 'refFresh': True, 'outBlocks': 0, 'breachSeq': 0, 'pendingBreaches': 0}
+        tgt = []
+        g['drive_ref'] = lambda v_, t, *a: tgt.append(t)
+        g['send'] = lambda *a, **k: (None, True)
+        breach('XA', True, False)
+        ok5 = tgt == [198690]
+        print(('selftest ok: ' if ok5 else 'selftest FAIL: ') + f'control: breach XA --dry passes, target hi + 1500 = {tgt}')
+        fails += not ok5
+        g.update(saved5)
+        # the obs() tuple parse: field 11 is breachSeq, 12 pendingBreaches, 10 outBlocks
+        g['cast'] = lambda *a, rpc: ('(1, 2, 199000 [1.99e5], 4, true, 0, false, false, 9, 9, 1801 [1.8e3], 3, 1, 5, 6, '
+                                     '7, 8)')
+        o_ = obs({'hook': '0x', 'chain': '1301'})
+        ok6 = o_ == {'refTick': 199000, 'refFresh': True, 'outBlocks': 1801, 'breachSeq': 3, 'pendingBreaches': 1}
+        print(('selftest ok: ' if ok6 else 'selftest FAIL: ') + f'obs() parse {o_}')
+        fails += not ok6
+        # agent-set: the owner key as agent is refused; another address passes (dry)
+        saved6 = {k: g[k] for k in ('signer', 'send')}
+        g['signer'] = lambda: '0x' + 'aa' * 20
+        g['send'] = lambda *a, **k: (None, True)
+        try:
+            agent_set('11155111', '0x' + 'AA' * 20, True)
+            print('selftest FAIL (not refused): the owner as agent')
+            fails += 1
+        except Refused as e:
+            print('selftest ok: the owner as agent is refused' if 'not be the owner' in str(e) else f'selftest FAIL: {e}')
+            fails += 0 if 'not be the owner' in str(e) else 1
+        agent_set('11155111', '0x' + 'bb' * 20, True)
+        print('selftest ok: control: agent-set with another key passes')
+        g.update(saved6)
         g.update(saved2)
         g['cast'] = saved['cast']
         try:
@@ -901,6 +1114,14 @@ def main(argv):
         cov_plan(name, opt('--amount', 10**16), '--dry' in argv)
     elif cmd == 'retire':
         retire(name, '--dry' in argv, '--yes-irreversible' in argv)
+    elif cmd == 'breach':
+        breach(name, '--dry' in argv, '--yes-irreversible' in argv)
+    elif cmd == 'ref-back':
+        ref_back(name, '--dry' in argv)
+    elif cmd == 'process':
+        process(name, '--dry' in argv)
+    elif cmd == 'agent-set':
+        agent_set(name, argv[2] if len(argv) > 2 else refuse('agent-set CHAIN ADDRESS'), '--dry' in argv)
     elif cmd == 'spoof-deploy':
         spoof_deploy(opt('--fund', 5 * 10**17), '--dry' in argv) if name in ('', 'lasna') else refuse('spoof-deploy lasna')
     elif cmd == 'spoof-fund':
