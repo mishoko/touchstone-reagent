@@ -31,7 +31,9 @@ interface IV3Slot0 {
 ///         that bundler, and `deployAndPlace` in one transaction. DEMO tier on 1301, TEST tier on 11155111.
 ///         Env: REF_POOL (from `RefPool.s.sol`, warmed up); optional FACTORY (0 or unset = deploy a new one);
 ///         optional DEPLOY_VAULT=0 to deploy only the factory and a bundler (a bundler the RC registers before it
-///         deploys, spec §12).
+///         deploys, spec §12); optional BUNDLER (an existing bundler of this sender, e.g. one the RC registered: the
+///         vault is deployed through it, no new bundler; s6 L-DYN); optional BROADCAST_PK (the sending key, read from
+///         the environment so it never appears on argv; s6).
 ///         Run: `REF_POOL=<pool> forge script script/deploy/TsDeploy.s.sol --rpc-url <rpc> --private-key $DEPLOYER_PK
 ///         --broadcast --slow --gas-estimate-multiplier 115` (1301's per-transaction cap is 2^24).
 contract TsDeploy is Script {
@@ -71,15 +73,18 @@ contract TsDeploy is Script {
         (,,, uint16 card,,,) = IV3Slot0(refPool).slot0();
         if (card < t.MIN_CARD) revert Cardinality(card, t.MIN_CARD);
 
-        vm.startBroadcast();
-        address me = msg.sender;
+        uint256 pk = vm.envOr("BROADCAST_PK", uint256(0));
+        if (pk != 0) vm.startBroadcast(pk);
+        else vm.startBroadcast();
+        address me = pk != 0 ? vm.addr(pk) : msg.sender;
         bytes memory vaultCode = type(TouchstoneVault).creationCode;
         bytes memory extCode = type(TouchstoneVaultExtension).creationCode;
         bytes memory hookCode = type(TouchstoneHook).creationCode;
         TouchstoneFactory factory = existing != address(0)
             ? TouchstoneFactory(existing)
             : new TouchstoneFactory(c.poolManager, keccak256(vaultCode), keccak256(extCode), keccak256(hookCode));
-        CuratorBundler bundler = new CuratorBundler(me, factory);
+        address existingB = vm.envOr("BUNDLER", address(0));
+        CuratorBundler bundler = existingB != address(0) ? CuratorBundler(existingB) : new CuratorBundler(me, factory);
         console2.log("factory", address(factory));
         console2.log("bundler (curator)", address(bundler));
         if (!deployVault) {
