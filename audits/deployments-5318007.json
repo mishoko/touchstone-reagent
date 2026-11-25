@@ -1,0 +1,17 @@
+{
+ "chainId": 5318007,
+ "generated_by": "script/deploy/rc.py",
+ "steps": {
+  "rcb6": {
+   "commit": "572cdc7",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T06:01:28+00:00",
+   "from": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
+   "tx": "0xc00227f107660ba0cbe3659eb63a689691be4a7dba9851740fe14acfbe3b8ff3",
+   "address": "0xdb671db6df964f18d58d23d8324ae1faae43ef9e",
+   "contract": "RcB6",
+   "runtimeMaskedSha": "5de87297f4d4acc81f5429e1291400c3dacbf069ed91cc812afc6d57f7fd4aa4"
+  }
+ }
+}
