@@ -85,6 +85,8 @@ MUTANTS = [
     ('plan: any SKIPPED reason accepted', "r['outcome'] == PLAN_SKIPPED and r['reason'] == SKIP_PAUSED and", "r['outcome'] == PLAN_SKIPPED and", None),
     ('plan: requests of another RC counted', "and int(l['topics'][2], 16) == int(RC, 16)\n", "\n", None),
     ('plan: the proxy not required', "d = [r for r in rows if r.get('delivered') and r.get('byProxy')]", "d = [r for r in rows if r.get('delivered')]", None),
+    ('exit: the drip end not required', "afterDrip=r.get('doneBlock') is not None and r.get('dripEnd') is not None and r['doneBlock'] >= r['dripEnd'],", 'afterDrip=True,', None),
+    ('exit: other recipients ignored', "noOtherRecipient=r.get('otherRecipients') == [])", 'noOtherRecipient=True)', None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 

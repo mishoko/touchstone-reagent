@@ -1367,6 +1367,14 @@ def selftest():
     g['cast'] = saved_cast
     ok(len(got) == 1 and got[0]['dest'] == '1301' and got[0]['payload'][:8] == SEL_PLAN,
        'plan: callback_requests keeps this RC\'s request only (a foreign RC\'s is ignored)')
+    # ---- s8 L-EXIT verdict
+    ge = dict(doneTx='0x1', doneBlock=200, dripEnd=150, toOwner=[5, 7], noteA=5, noteB=7, otherRecipients=[])
+    ok(lexit_verdict(ge)['pass'], 'exit: control: DONE after the drip, tokens to the owner only = the note')
+    for over, label in (({'doneTx': None}, 'no DONE'), ({'doneBlock': 140}, 'DONE before the drip end'),
+                        ({'toOwner': [5, 6]}, 'the owner got less than the note'),
+                        ({'toOwner': [0, 0], 'noteA': 0, 'noteB': 0}, 'a DONE(0, 0)'),
+                        ({'otherRecipients': ['0xbad']}, 'another recipient')):
+        ok(not lexit_verdict({**ge, **over})['pass'], f'exit: {label} fails')
     print(f'loops selftest: {n_ok[0]} cells passed,', 'OK' if not fails else f'FAIL ({len(fails)})')
     return not fails
 
@@ -1586,11 +1594,87 @@ def lplan():
     print('loops: L-PLAN', v)
 
 
+# ------------------------------------------------------------------ the hero run L-EXIT (spec §3.5, §9.5, C-04; s8)
+
+T_TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+T_PROCESSED = '0xf37492039a7f836f6b471f6a2c580a9743a545b9d3f3d4b1e3a47108e67ea59c'  # BreachProcessed(uint32,uint40,uint256)
+EXIT_DONE, EXIT_EARLY = 1, 2
+SLOT_DRIP = 18  # Touchstone Bank: forfeitTotal u128 @0, forfeitStart u40 @16, dripBlocks u40 @21 (test/base/TsEnv.sol)
+
+
+def drip_window(ch, vault, block):
+    w = int(cast('call', '--block', str(block), vault, 'extsload(bytes32)(bytes32)', hex(SLOT_DRIP), rpc=rpc(ch)), 16)
+    return (w >> 128) & (2**40 - 1), (w >> 168) & (2**40 - 1)
+
+
+def lexit_verdict(r):
+    """Pure (selftest): a DONE answer after the drip, its tokens to the owner only and equal to the note's amounts."""
+    v = dict(done=bool(r.get('doneTx')),
+             afterDrip=r.get('doneBlock') is not None and r.get('dripEnd') is not None and r['doneBlock'] >= r['dripEnd'],
+             toOwnerExactly=r.get('toOwner') is not None and r['toOwner'] == [r.get('noteA'), r.get('noteB')]
+             and r['toOwner'] != [0, 0],
+             noOtherRecipient=r.get('otherRecipients') == [])
+    return {**v, 'earlyBeforeDone': bool(r.get('earlyBeforeDone')), 'pass': all(v.values())}
+
+
+def lexit():
+    ch = '1301'
+    steps = deployments(ch)
+    lat = [t for k, st in sorted(steps.items()) if k.startswith('lbreach_XA_') for t in st['txs']
+           if t.get('label') == 'refresh' and t.get('breachLatched') == 1 and t.get('status') == 'ok']
+    if len(lat) != 1:
+        raise SystemExit(f'loops: {len(lat)} recorded latches on X_A (want 1)')
+    lb = lat[0]['block']
+    vault = [e['vault'] for e in load().get('loops', []) if e.get('id') == 'L-DYN' and e.get('step') == 'ldyn_vault_XA']
+    if len(vault) != 1:
+        raise SystemExit('loops: X_A is not one recorded L-DYN vault')
+    vault = vault[0]
+    owner = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))['steps']['rc']['owner']
+    proc, _ = logs_chunked(ch, vault, lb, 10**12, T_PROCESSED)
+    if not proc:
+        raise SystemExit('loops: no BreachProcessed on X_A after the latch yet; re-run later')
+    p0 = proc[0]
+    pb = int(p0['blockNumber'], 16)
+    start, drip = drip_window(ch, vault, pb)
+    notes = exit_notes(COVENANT, vault, lb)
+    done = [n for n in notes if n['outcome'] == EXIT_DONE]
+    if not done:
+        raise SystemExit(f'loops: no ExitDone yet ({len(notes)} EXIT notes so far); re-run later')
+    d = done[0]
+    r = json.loads(cast('receipt', '--json', d['tx'], rpc=rpc(ch)))
+    hook = cast('call', vault, 'HOOK()(address)', rpc=rpc(ch))
+    pool = cast('call', hook, 'REF_POOL()(address)', rpc=rpc(ch))
+    toks = [cast('call', pool, f'token{i}()(address)', rpc=rpc(ch)).lower() for i in (0, 1)]
+    to_owner, others = [0, 0], []
+    for l in r['logs']:
+        if l['topics'] and l['topics'][0] == T_TRANSFER and l['address'].lower() in toks:
+            dst = '0x' + l['topics'][2][-40:]
+            if dst.lower() == owner.lower():
+                to_owner[toks.index(l['address'].lower())] += int(l['data'], 16)
+            elif dst.lower() not in (COVENANT.lower(), vault.lower()):
+                others.append(dst)
+    t = json.loads(cast('tx', '--json', d['tx'], rpc=rpc(ch)))
+    row = {'originTx': lat[0]['tx'], 'latchBlock': lb, 'vault': vault, 'covenant': COVENANT, 'owner': owner,
+           'processTx': p0['transactionHash'], 'processBlock': pb, 'forfeitedShares': int(words(p0['data'])[2], 16),
+           'forfeitStart': start, 'dripBlocks': drip, 'dripEnd': start + drip, 'exitNotes': notes,
+           'earlyBeforeDone': any(n['outcome'] == EXIT_EARLY and n['block'] < d['block'] for n in notes),
+           'doneTx': d['tx'], 'destTx': d['tx'], 'doneBlock': d['block'], 'noteA': d['a'], 'noteB': d['b'],
+           'toOwner': to_owner, 'otherRecipients': others, 'byProxy': t['to'].lower() == CH[ch]['proxy'].lower(),
+           'latency_s': ts(ch, d['block']) - ts(ch, lb)}
+    row['verdict'] = lexit_verdict(row)
+    row['verdict']['pass'] = row['verdict']['pass'] and row['byProxy']
+    doc = load()
+    save(doc, 'L-EXIT', [row], 'L-EXIT: a 1301 breach of X_A -> processBreach (the forfeit set aside; its shares '
+         'recorded) -> the RC\'s rcExit answers (EARLY while the drip runs) -> ExitDone after the drip: the tokens to '
+         'the owner only, in kind, equal to the note (spec §3.5, §9.5, C-04, C-12)')
+    print('loops: L-EXIT', row['verdict'])
+
+
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else ''
     if what == '--selftest':
         sys.exit(0 if selftest() else 1)
-    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron, 'lhero': lhero, 'lplan': lplan}
+    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron, 'lhero': lhero, 'lplan': lplan, 'lexit': lexit}
     if what not in cmds:
         raise SystemExit(__doc__)
     cmds[what]()
