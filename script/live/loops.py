@@ -268,21 +268,39 @@ def check_reaction(ch, lasna_tx, origin_tx, log_index, emitter):
             'gasUsed': int(r['gasUsed'], 16), 'sends': sends}
 
 
+def lasna_block_at(t):
+    """The first Lasna block with timestamp >= t, by bisection from RC_BLOCK (the RC's creation era): the node is
+    pruned, so `cast find-block` (which starts at block 1) fails there (s7: found by r2 m-01's live control)."""
+    lo, hi = RC_BLOCK, int(cast('block-number', rpc=LASNA))
+    bt = lambda b: int(cast('block', str(b), '--field', 'timestamp', rpc=LASNA))  # noqa: E731
+    if bt(lo) >= t:
+        raise SystemExit(f'loops: {t} precedes Lasna block {lo}: outside the RC era')
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        lo, hi = (mid, hi) if bt(mid) < t else (lo, mid)
+    return hi
+
+
 def lasna_scan(ch, origin_tx, log_index, t0):
     """Positive evidence of absence (r1 B-01): every Lasna block from the one at the origin's time to TIMEOUT_S after
-    it, every system tx whose LogRecord names this RC and origin (tx, logIndex). Returns the reaction tx or None."""
-    b0 = int(cast('find-block', str(t0), rpc=LASNA))
-    n = int(TIMEOUT_S / LASNA_BLOCK_S) + 60
+    it, every system tx whose LogRecord names this RC and origin (tx, logIndex). Returns the reaction tx or None.
+    Cost: one block read per Lasna block (~0.3 s each): a full 4 h miss reads ~12.7k blocks (about an hour); it runs
+    only for a loop older than 4 h that the MCP cannot place."""
+    b = b0 = lasna_block_at(t0)
     tail = origin_tx[2:].lower(), hex(log_index)[2:].rjust(64, '0'), RC[2:].lower().rjust(64, '0')
-    for b in range(b0, b0 + n):
-        blk = json.loads(cast('rpc', 'eth_getBlockByNumber', hex(b), 'true', rpc=LASNA)) or {}
+    while True:  # every block until one is past t0 + TIMEOUT_S (r2 m-01: coverage by timestamp, not by a count)
+        blk = json.loads(cast('rpc', 'eth_getBlockByNumber', hex(b), 'true', rpc=LASNA) or 'null')
+        if not blk:
+            raise SystemExit(f'loops: Lasna block {b} not served: the absence scan cannot conclude')
         for t in blk.get('transactions', []):
             if (t.get('to') or '').lower() != SYSTEM:
                 continue
             w = words(t['input'][10:])
             if len(w) > 13 and (w[12], w[13], w[0]) == tail:
                 return t['hash'], (b0, b)
-    return None, (b0, b0 + n - 1)
+        if int(blk['timestamp'], 16) > t0 + TIMEOUT_S:
+            return None, (b0, b)
+        b += 1
 
 
 def first_applied(dest, hub_, id_, seq, from_block, ceiling_block):
@@ -344,6 +362,9 @@ def lcon_rows(now):
         tr = mcp_trace(ch, otx, li)
         lx = ((tr['data'].get('reaction') or {}).get('tx'))
         scanned = None
+        if not lx and any(w in tr['verdict'].upper() for w in ('SUBSCRI', 'FILTER', 'NOT_CARRIED')):
+            raise SystemExit(f'loops: {otx}: the MCP says the log was not carried ({tr["verdict"]}): no attempted '
+                             'loop (the subscription was not in effect at the origin); investigate')
         if not lx:
             if not old:
                 raise SystemExit(f'loops: {otx}: no reaction found yet ({tr["verdict"]}); re-run later')
@@ -371,6 +392,8 @@ def lcon_rows(now):
             if e is None:
                 if not old:
                     raise SystemExit(f'loops: {key} {otx}: no Applied >= seq {snd["seq"]} yet; re-run later')
+                if ts(dest, upto) < t0 + TIMEOUT_S:
+                    raise SystemExit(f'loops: {key} {otx}: the search reached block {upto}, short of 4 h; re-run later')
                 rows[key].append({**row, 'delivered': False, 'destTx': None, 'searchedTo': upto,
                                   'why': f'no Applied >= its seq within {TIMEOUT_S} s'})
                 continue
@@ -402,6 +425,7 @@ def lcon_stats(key, rs):
     return {'id': key, 'unit': 's', 'attempted': len(rs), 'delivered': len(rs) - und, 'median': median(lat),
             'p95': pct(lat, 95), 'max': max(lat), 'p95IsLowerBound': und * 20 > len(rs), 'meetsN50': len(rs) >= 50,
             'datedBatches': len(batches), 'meets3Batches': len(batches) >= 3, 'batches': bl,
+            'pass': len(rs) >= 50 and len(batches) >= 3,  # PB-17's gate (r2 M-01); claims.py reads it
             'method': 'end-to-end = destination block time - origin block time (both read by RPC); legs unclamped '
                       '(+/-1 s skew); a coalesced loop ends at the first Applied with seq >= its own; undelivered after '
                       '4 h count as 14400 s (p95 a lower bound when > 5% are undelivered); nearest-rank p95; '
@@ -469,19 +493,29 @@ def hub_entry(ch, tx):
     return KIND_SEL[f['action']['input'][2:10]], int(f['action']['gas'], 16), f.get('error')
 
 
-def deferred_note(ch, tx, kind):
-    """For exit and plan: the Hub's EXIT/PLAN note in the delivery says DEFERRED (the pre-check refused: entry gas
-    at the threshold is not gasleft at the check; r1 m-03)."""
-    if kind not in ('exit', 'plan'):
-        return False
+RELAY_FAILED = 6  # Outcome.RELAY_FAILED
+T_STALE = '0xefb60aea3ab96907066bbced4f58785ff7b8c28be82924866fc6839082f32530'  # IReagent.Stale(uint8,uint64)
+T_BUDGET_APPLIED = '0xf8a6aac26004de219a651c93a920566d656f9282511a6369c7298dc84c2d8823'  # IReagent.BudgetApplied
+
+
+def callback_outcome(ch, tx, kind):
+    """The delivery's own verdict from its receipt: for exit and plan, the Covenant's EXIT/PLAN note outcome
+    (r1 m-03: DEFERRED means the pre-check refused; r2 m-03: RELAY_FAILED means the Covenant never ran); for every
+    kind, a Hub `Stale` means the payload was refused as old. Returns (ok, outcome)."""
     r = json.loads(cast('receipt', '--json', tx, rpc=rpc(ch)))
+    h = hub(ch).lower()
+    if any(l['address'].lower() == h and l['topics'][0] == T_STALE for l in r['logs']):
+        return False, 'Stale'
+    if kind not in ('exit', 'plan'):
+        return True, None
+    outs = []
     for l in r['logs']:
-        if l['address'].lower() == hub(ch).lower() and l['topics'][0] == T_NOTE:
+        if l['address'].lower() == h and l['topics'][0] == T_NOTE and int(l['topics'][3], 16) in (2, 3):
             w = words(l['data'])[2:]  # abi.encode(bytes): offset, length, then the note's own words
-            outcome = int(w[1], 16) if kind == 'exit' else int(w[2], 16)
-            if outcome == DEFERRED:
-                return True
-    return False
+            outs.append(int(w[1], 16) if kind == 'exit' else int(w[2], 16))
+    if len(outs) != 1:
+        return False, f'{len(outs)} outcome notes'
+    return outs[0] not in (DEFERRED, RELAY_FAILED), outs[0]
 
 
 def cron_reactions(frm, to):
@@ -528,9 +562,12 @@ def lgas_rows(cron_range=None):
         if e.get('destTx') and dc in CH:
             cand[dc].append(e['destTx'])
     for ch in CH:
-        for step, s in deployments(ch).items():
-            if step.startswith('lgas_'):
-                cand[ch] += [t['tx'] for t in s['txs'] if t.get('status') == 'ok']
+        starts = [t['block'] for step, s in deployments(ch).items() if step.startswith('lcron_')
+                  for t in s['txs'] if t.get('block')]
+        if starts:  # the Hub's callback results since the Covenant path began (budget, exit, plan; r2 m-05)
+            for topic in (T_BUDGET_APPLIED, T_NOTE):
+                es, _ = logs_chunked(ch, hub(ch), min(starts), 10**12, topic)
+                cand[ch] += [e['transactionHash'] for e in es]
     rows, seen = [], set()
     for ch in CH:
         for tx in dict.fromkeys(cand[ch]):
@@ -538,18 +575,19 @@ def lgas_rows(cron_range=None):
             if t['to'].lower() != CH[ch]['proxy'].lower():
                 continue
             kind, entry, err = hub_entry(ch, tx)
-            if (ch, kind) in seen:
+            if (ch, kind) in seen:  # the first PASSING delivery per cell (r2 m-03); failing ones stay as rows
                 continue
-            seen.add((ch, kind))
             want = table[(ch, kind)]
             gas, thr = int(t['gas'], 16), want['need'] * 64 / 63 + 40_000
-            dfr = deferred_note(ch, tx, kind)
+            good, outcome = callback_outcome(ch, tx, kind)
+            ok = gas == want['gasLimit'] and not err and entry >= thr and good
+            if ok:
+                seen.add((ch, kind))
             rows.append({'chain': int(ch), 'kind': kind, 'destTx': tx, 'txGas': gas, 'gasLimit': want['gasLimit'],
                          'atGasLimit': gas == want['gasLimit'], 'need': want['need'], 'entryGas': entry,
                          'F_measured': gas - entry * 64 / 63, 'F_spec': want['F'],
                          'calldataBytes': (len(t['input']) - 2) // 2, 'hubFrameError': err, 'precheck': thr,
-                         'entryCoversPrecheck': entry >= thr, 'deferred': dfr,
-                         'pass': gas == want['gasLimit'] and not err and entry >= thr and not dfr})
+                         'entryCoversPrecheck': entry >= thr, 'outcome': outcome, 'pass': ok})
     cron = None
     if cron_range:
         txs = cron_reactions(*cron_range)
@@ -603,11 +641,15 @@ def selftest():
     g = globals()
     fails = []
     names = ('cast', 'lcon_origins', 'mcp_trace', 'lasna_scan', 'check_reaction', 'first_applied', 'ts', 'hub',
-             'logs_chunked', 'load', 'deployments', 'rpc')
+             'logs_chunked', 'load', 'deployments', 'rpc', 'callback_outcome', 'lasna_scan', 'cron_reactions',
+             'lasna_block_at')
     saved = {k: g[k] for k in names}
     g['rpc'] = lambda ch: 'http://selftest.invalid'  # no network: every chain read goes through a replaced seam
 
+    n_ok = [0]
+
     def ok(cond, label):
+        n_ok[0] += bool(cond)
         print(('selftest ok: ' if cond else 'selftest FAIL: ') + label)
         if not cond:
             fails.append(label)
@@ -704,6 +746,72 @@ def selftest():
         g['mcp_trace'] = lambda *a: {'verdict': 'REACTED', 'data': {'reaction': {'tx': '0xL'}}}
         react['sends'] = {'11155111': react['sends']['11155111']}
         refuses(lambda: lcon_rows(NOW_NEW), 'sent no rcConduct', 'a reaction with no snapshot to a destination (r1 m-05)')
+        # I. (r2 M-02) the decoders on bytes
+        W = lambda x: hex(x)[2:].rjust(64, '0') if isinstance(x, int) else x[2:].lower().rjust(64, '0')  # noqa: E731
+        payload = SEL_CONDUCT + ''.join(W(x) for x in (0, 1, 0, 0, 3, 9))  # rc, id 1, breaches, gone, actions 3, seq 9
+        payload += '0' * (-len(payload) % 64)
+        cb = lambda chn, hub_: {'address': SYSTEM, 'topics': [T_CALLBACK, '0x' + W(chn), '0x' + W(RC), '0x' + W(hub_)],  # noqa: E731
+                                'data': '0x' + ''.join(W(x) for x in (0, 0x40, 0x1a0, 0x20, chn, hub_, 261631, 0x80, 0xc4)) + payload}
+        good_in = inp(7)
+        rc_b = {'tx': json.dumps({'to': SYSTEM, 'input': good_in, 'blockNumber': '0x5', 'blockTimestamp': '0x64'}),
+                'receipt': json.dumps({'status': '0x1', 'gasUsed': '0x1', 'logs': [cb(1301, H), cb(11155111, H)]})}
+        g['cast'] = lambda *a, rpc: rc_b[a[0]]
+        rx = saved['check_reaction']('1301', '0xL', otx, 7, H)
+        ok(rx['sends']['1301']['seq'] == 9 and rx['sends']['1301']['actions'] == 3 and rx['sends']['1301']['gasLimit'] == 261631
+           and rx['sends']['11155111']['hub'].lower() == H, 'the callback request decodes seq 9 / actions 3 / gasLimit / hub per chain')
+        rc_b['tx'] = json.dumps({'to': H, 'input': good_in, 'blockNumber': '0x5', 'blockTimestamp': '0x64'})
+        refuses(lambda: saved['check_reaction']('1301', '0xL', otx, 7, H), 'is not the RC\'s reaction', 'a Lasna tx not sent to the system contract')
+        rc_b['tx'] = json.dumps({'to': SYSTEM, 'input': good_in, 'blockNumber': '0x5', 'blockTimestamp': '0x64'})
+        refuses(lambda: saved['check_reaction']('11155111', '0xL', otx, 7, H), 'is not the RC\'s reaction', 'a reaction to the same tx hash on another chain')
+        # J. lcon_rows: the wrong Hub, the Applied-side timeout branches (r2 M-02 1, 3), a not-carried verdict (r2 m-02)
+        g['lcon_origins'] = lambda: [('XA', '1301', otx)]
+        g['ts'] = lambda ch, b: T0 if b == 10 else (T0 + TIMEOUT_S + 5 if b == 999 else T0 + 30)
+        g['cast'] = lambda *a, rpc: rec if a[0] == 'receipt' else '20'
+        g['mcp_trace'] = lambda *a: {'verdict': 'REACTED', 'data': {'reaction': {'tx': '0xL'}}}
+        react['sends'] = {c: {'hub': H, 'gasLimit': 1, 'id': 1, 'actions': 1, 'seq': 4} for c in CH}
+        g['hub'] = lambda ch: '0x' + 'ef' * 20
+        refuses(lambda: lcon_rows(NOW_NEW), 'not the recorded Hub', 'a snapshot sent to another Hub address')
+        g['hub'] = lambda ch: H
+        g['first_applied'] = lambda *a: (None, 50)
+        refuses(lambda: lcon_rows(NOW_NEW), 're-run later', 'no Applied yet inside 4 h: refused, not undelivered')
+        refuses(lambda: lcon_rows(NOW_OLD), 'short of 4 h', 'an old loop whose search stopped short of 4 h: refused')
+        g['first_applied'] = lambda *a: (None, 999)
+        r = lcon_rows(NOW_OLD)['L-CON-AA'][0]
+        ok(not r['delivered'] and 'no Applied' in r['why'], 'control: no Applied in a search covering 4 h: undelivered')
+        g['mcp_trace'] = lambda *a: {'verdict': 'NOT_SUBSCRIBED', 'data': {}}
+        refuses(lambda: lcon_rows(NOW_OLD), 'not carried', 'a log the subscription did not carry is no attempted loop')
+        # K. callback_outcome (r1 m-03, r2 m-03)
+        note = lambda kind, outcome: {'address': H, 'topics': [T_NOTE, '0x0', '0x0', '0x' + W(kind)],  # noqa: E731
+                                      'data': '0x' + W(0x20) + W(0x120) + W(H) + (W(outcome) if kind == 2 else W(7) + W(outcome)) + W(0) * 6}
+        for kind, kname in ((2, 'exit'), (3, 'plan')):
+            for oc, want in ((1, True), (DEFERRED, False), (RELAY_FAILED, False)):
+                g['cast'] = lambda *a, rpc, _n=note(kind, oc): json.dumps({'logs': [_n]})
+                ok(saved['callback_outcome']('1301', '0x1', kname)[0] is want, f'{kname} outcome {oc} -> pass {want}')
+        g['cast'] = lambda *a, rpc: json.dumps({'logs': [{'address': H, 'topics': [T_STALE], 'data': '0x'}]})
+        ok(saved['callback_outcome']('1301', '0x1', 'conduct')[0] is False, 'a Stale answer fails the cell')
+        g['cast'] = lambda *a, rpc: json.dumps({'logs': []})
+        ok(saved['callback_outcome']('1301', '0x1', 'conduct')[0] is True, 'control: a conduct delivery without Stale passes')
+        # L. the Lasna scanners on fake blocks
+        sys_tx = lambda h, rc_, li, t0w=T_ACTION: {'hash': h, 'to': SYSTEM, 'input': '0x0d0d0d0d' + ''.join(  # noqa: E731
+            [W(rc_), W(0x40), W(1301), W(H), t0w[2:]] + ['0' * 64] * 7 + [otx[2:], W(li)])}
+        blocks = {0x100: {'timestamp': hex(T0), 'transactions': [sys_tx('0xother', '0x' + '99' * 20, 7)]},
+                  0x101: {'timestamp': hex(T0 + 1), 'transactions': [sys_tx('0xhit', RC, 7)]}}
+        def fake_rpc(*a, rpc):
+            if a[0] == 'find-block':
+                return str(0x100)
+            b = int(a[2], 16)
+            return json.dumps(blocks.get(b, {'timestamp': hex(T0 + TIMEOUT_S + 1), 'transactions': []}) if b < 0x110 else None)
+        g['cast'] = fake_rpc
+        g['lasna_block_at'] = lambda t: 0x100
+        ok(saved['lasna_scan']('1301', otx, 7, T0)[0] == '0xhit', 'the scan finds the RC\'s reaction, not another RC\'s')
+        ok(saved['lasna_scan']('1301', otx, 8, T0)[0] is None, 'the scan reports none after the timestamp passes 4 h')
+        blocks[0x102] = None
+        g['cast'] = lambda *a, rpc: str(0x100) if a[0] == 'find-block' else json.dumps(blocks.get(int(a[2], 16), {'timestamp': hex(T0), 'transactions': []}))
+        refuses(lambda: saved['lasna_scan']('1301', otx, 8, T0), 'not served', 'a null Lasna block stops the absence scan')
+        cblocks = {201: {'transactions': [sys_tx('0xcron', RC, 0, T_CRON100), sys_tx('0xact', RC, 0),
+                                          sys_tx('0xothercron', '0x' + '99' * 20, 0, T_CRON100)]}}
+        g['cast'] = lambda *a, rpc: json.dumps(cblocks.get(int(a[2], 16), {'transactions': []}))
+        ok(saved['cron_reactions'](200, 200) == ['0xcron'], 'cron_reactions: this RC\'s Cron100 only')
         # H. lcon_origins: only X_A / X_B paths; pending refuses
         g['deployments'] = lambda ch: {'lcon_YA_20261125': {'txs': [{'tx': otx, 'status': 'ok'}]}} if ch == '1301' else {}
         refuses(lambda: saved['lcon_origins'](), 'has no L-CON path', 'a Y_A step folded into L-CON-AA (r1 m-04)')
@@ -713,7 +821,7 @@ def selftest():
         ok(saved['lcon_origins']() == [('XA', '1301', otx)], 'control: X_A origins collected, failed sends skipped')
     finally:
         g.update(saved)
-    print('loops selftest', 'OK' if not fails else f'FAIL ({len(fails)})')
+    print(f'loops selftest: {n_ok[0]} cells passed,', 'OK' if not fails else f'FAIL ({len(fails)})')
     return not fails
 
 

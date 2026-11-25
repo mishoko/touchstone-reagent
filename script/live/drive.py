@@ -15,7 +15,9 @@ destination delivery, latency) is collected afterwards by `script/live/loops.py`
   python3 script/live/drive.py cov-rules CHAIN [--k 1 --b3 1 --share 6000 --budget WEI --agentcap WEI --ids 2,1] [--dry]
   python3 script/live/drive.py cov-fund CHAIN --t0 AMT --t1 AMT [--dry]   owner tokens into the Covenant
   python3 script/live/drive.py cov-alloc VAULT --shares S [--dry]          the owner's guarded allocate
-  python3 script/live/drive.py retire VAULT [--dry]  the curator retires the vault (B3 gone: L-CRON's exit)
+  python3 script/live/drive.py retire YA [--dry | --yes-irreversible]   the curator retires Y_A (B3 gone: L-CRON's
+                                                     exit; only once the owner's Covenant holds Y_A)
+  python3 script/live/drive.py resolve STEP TX        a `pending` entry resolved from its receipt
   python3 script/live/drive.py --selftest            the refusals, offline
 
 VAULT is XA, YA (1301) or XB (11155111), resolved from the recorded L-DYN deploys (the factory's `Deployed` log in the
@@ -237,6 +239,22 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
     return rec, True
 
 
+def resolve_pending(step, tx):
+    """A `pending` entry (its receipt timed out at send time) resolved from its receipt by script (r2 m-05)."""
+    ch = next((c for c in CH if step in json.load(open(os.path.join(ROOT, 'audits', f'deployments-{c}.json')))['steps']), None)
+    if ch is None:
+        refuse(f'no step {step}')
+    r = receipt(ch, tx, tries=3)
+    if r is None:
+        refuse(f'{tx}: still no receipt')
+    want = {'lcon': T_ACTION, 'poke': T_EPOCH}.get(step.split('_')[0])
+    mine = [l for l in r['logs'] if l['topics'] and want and l['topics'][0] == want]
+    record_update(ch, step, tx, {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16),
+                                 'status': 'ok' if int(r['status'], 16) == 1 else 'FAILED',
+                                 'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 else None})
+    print(f'drive: {step} {tx} resolved')
+
+
 def preflight(v, n=1, filters=None):
     me = signer()
     owner = cast('call', v['bundler'], 'OWNER()(address)', rpc=rpc(v['chain']))
@@ -363,11 +381,22 @@ def cov_alloc(name, shares, dry):
     print(f'drive: allocate {shares} shares of {name} {"(dry: does not revert)" if dry else "landed"}')
 
 
-def retire(name, dry):
+RETIRABLE = ('YA',)  # owner decision s7: only Y_A (curator 2) is retired; X_A / X_B carry the L-CON paths
+
+
+def retire(name, dry, yes):
     """The curator retires its vault (Touchstone: EXITED, the unvested pay forfeited over the drip): the B3 'gone'
-    trigger of L-CRON's exit (owner decision s7)."""
+    trigger of L-CRON's exit (owner decision s7). Irreversible: only a RETIRABLE vault, only once the owner's
+    Covenant holds it (else the trigger is spent with no exit to watch), and only with --yes-irreversible (r2 m-04)."""
+    if name not in RETIRABLE:
+        refuse(f'{name} is not retirable (owner decision: {RETIRABLE} only)')
     v = resolve(name)
     preflight(v, 0)
+    held = int(cast('call', v['vault'], 'balanceOf(address)(uint256)', covenant(v['chain']), rpc=rpc(v['chain'])).split()[0])
+    if held == 0:
+        refuse(f'the owner\'s Covenant holds no {name} shares: allocate first (L-CRON needs a holding to exit)')
+    if not dry and not yes:
+        refuse('retire is irreversible: pass --yes-irreversible')
     step = f'lcron_{v["chain"]}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
     send(v['chain'], v['bundler'], 'retire()', expect=(v['vault'], T_RETIRED), dry=dry, step=step,
          label=f'retire_{name}')
@@ -415,6 +444,33 @@ def selftest():
              filters=[{**on[0], 'chain': CH['11155111']['mcp']}])
         case('a 9th Action (8 used) is refused', 'exceed ACTION_BUDGET', used=8)
         case('a batch that would cross the budget (6 used, 3 more) is refused', 'exceed ACTION_BUDGET', used=6, n=3)
+        g['cast'] = saved['cast']
+        for nm, must in (('XA', 'not retirable'), ('XB', 'not retirable')):
+            try:
+                retire(nm, True, False)
+                print(f'selftest FAIL (not refused): retire {nm}')
+                fails += 1
+            except Refused as e:
+                print(f'selftest ok: retire {nm} is refused' if must in str(e) else f'selftest FAIL: {e}')
+                fails += 0 if must in str(e) else 1
+        saved2 = {k: g[k] for k in ('resolve', 'preflight', 'covenant')}
+        g['resolve'] = lambda nm: {**v, 'name': nm}
+        g['preflight'] = lambda *a, **k: 0
+        g['covenant'] = lambda ch: '0x' + '55' * 20
+        for held, flag, must, label in (('0', True, 'holds no YA shares', 'retire YA before the Covenant holds it'),
+                                        ('7', False, 'pass --yes-irreversible', 'a live retire without --yes-irreversible')):
+            g['cast'] = lambda *a, rpc, _h=held: _h
+            try:
+                retire('YA', flag, False)
+                print('selftest FAIL (not refused):', label)
+                fails += 1
+            except Refused as e:
+                print(f'selftest ok: {label} is refused' if must in str(e) else f'selftest FAIL: {label}: {e}')
+                fails += 0 if must in str(e) else 1
+        g['cast'] = lambda *a, rpc: '7'
+        retire('YA', True, False)  # control: held, a dry run passes every refusal (the send's own dry run is stubbed)
+        print('selftest ok: control: retire YA --dry with a holding passes the refusals')
+        g.update(saved2)
         g['cast'] = saved['cast']
         try:
             resolve('ZZ')
@@ -466,7 +522,9 @@ def main(argv):
     elif cmd == 'cov-alloc':
         cov_alloc(name, opt('--shares', 0), '--dry' in argv)
     elif cmd == 'retire':
-        retire(name, '--dry' in argv)
+        retire(name, '--dry' in argv, '--yes-irreversible' in argv)
+    elif cmd == 'resolve':
+        resolve_pending(name, argv[2] if len(argv) > 2 else '')
     else:
         print(__doc__)
         return 2
