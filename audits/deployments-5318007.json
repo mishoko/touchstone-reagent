@@ -23,6 +23,23 @@
    "address": "0xa9b408a944337a1bbce77c6823fad226de4c228d",
    "contract": "RcExt",
    "runtimeMaskedSha": "e0f819b2ed8cac51ecf1061ac7c1c898f16fffb08879428f23974b7c9f219287"
+  },
+  "rc": {
+   "commit": "7c57218",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:20:03+00:00",
+   "from": "0x67941b1eA81913B45a6eE1d9B2e1aFfa98b2aea1",
+   "tx": "0x82936be31ffa48445be2f40de9f12d4e931f521931d4983b5650cef80ccba58b",
+   "status": "ok",
+   "estimate": 2992841,
+   "gasUsed": 2968117,
+   "address": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9",
+   "runtimeSha": "ae2816d6ffc930f95f8347139b75d4937168aaf97c8b48b827dec46dbd83ec94",
+   "owner": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
+   "ext": "0xa9b408a944337a1bbce77c6823fad226de4c228d",
+   "b6": "0xdb671db6df964f18d58d23d8324ae1faae43ef9e",
+   "asserted": true
   }
  }
 }
