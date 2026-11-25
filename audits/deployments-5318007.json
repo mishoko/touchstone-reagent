@@ -211,6 +211,18 @@
      "value": "12000000000000000000"
     }
    ]
+  },
+  "rc_runtime": {
+   "commit": "97697c5",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T14:10:53+00:00",
+   "source": "eth_getCode",
+   "address": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
+   "runtimeSha": "ae2816d6ffc930f95f8347139b75d4937168aaf97c8b48b827dec46dbd83ec94",
+   "runtimeMaskedSha": "fc510b4d2614f72bf22b8e7f06b8885b54ab19dac81c2fee118aaae42a7cf707",
+   "owner": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
+   "ext": "0xA9B408A944337A1BbcE77c6823FaD226DE4c228d"
   }
  }
 }
