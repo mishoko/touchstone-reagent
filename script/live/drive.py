@@ -11,6 +11,11 @@ destination delivery, latency) is collected afterwards by `script/live/loops.py`
                                                      each) spaced >= COOLDOWN blocks + S seconds; the L-CON-* origins
   python3 script/live/drive.py poke VAULT [--dry]    an open `poke()` (the epoch roll's `EpochRecorded` re-opens the
                                                      RC's Action budget for that vault)
+  python3 script/live/drive.py cov-create CHAIN [--dry]   the owner's Covenant (allow on the demo allowlist, create)
+  python3 script/live/drive.py cov-rules CHAIN [--k 1 --b3 1 --share 6000 --budget WEI --agentcap WEI --ids 2,1] [--dry]
+  python3 script/live/drive.py cov-fund CHAIN --t0 AMT --t1 AMT [--dry]   owner tokens into the Covenant
+  python3 script/live/drive.py cov-alloc VAULT --shares S [--dry]          the owner's guarded allocate
+  python3 script/live/drive.py retire VAULT [--dry]  the curator retires the vault (B3 gone: L-CRON's exit)
   python3 script/live/drive.py --selftest            the refusals, offline
 
 VAULT is XA, YA (1301) or XB (11155111), resolved from the recorded L-DYN deploys (the factory's `Deployed` log in the
@@ -38,6 +43,12 @@ from prov import stamp  # noqa: E402
 RC = '0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9'
 T_ACTION = '0x937e001463e9195c691b580d8f14c71c42291e5c57b3311a69422e91310293ba'   # RcBase.T_ACTION
 T_EPOCH = '0x52ac8c0ec192dc514cc63f10118a6ba589667d3548a5ffcb0886465085529050'    # RcBase.T_EPOCH
+T_RETIRED = '0xfe4758e6ccdb65cb7d78b678b554dc5319e940c6ee582e94811b7d48fbb506c5'  # RcBase.T_RETIRED
+T_NOTE = '0x9f0625eae4d628e3bcc8083dac0036f15eb2c98996c115367665517f717810a7'     # RcBase.T_NOTE (Hub `Note`)
+T_ALLOWED = '0x64966f3fe2ac8cae5e6f7e4196d1315efafdb78a4377de3887c56fa3b9ac47cb'  # CovenantFactory.Allowed
+T_CREATED = '0x587ece4cd19692c5be1a4184503d607d45542d2aca0698c0068f52e09ccb541c'  # CovenantFactory.Created
+T_TRANSFER = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+RULES = 'setRules((uint8,bool,uint16,uint16,uint128,bool,uint16,uint128,uint32[4]))'
 T_TS_DEPLOYED = '0xd3718c34c2f5d26df60faa54c8035a99d8fc11a4d3437ec8c46bfcf64aaa2ee2'
 ACTION_BUDGET = 8  # RcBase.ACTION_BUDGET (spec §6)
 SET_POS = 'setPositions(int24,int24,(bool,bool,uint128),uint160,uint256)'
@@ -61,10 +72,18 @@ def refuse(why):
 
 # ------------------------------------------------------------------ chain access (the seams the selftest replaces)
 
+def redact(text):
+    """Keyed RPC URLs (they carry API keys) never reach the console: each is replaced by its variable's name."""
+    for k in ('UNICHAIN_SEPOLIA_RPC_URL', 'ETH_SEPOLIA_RPC_URL'):
+        if os.environ.get(k):
+            text = text.replace(os.environ[k], f'${k}')
+    return text
+
+
 def _run(args):
     r = subprocess.run(args, capture_output=True, text=True)
     if r.returncode != 0:
-        raise SystemExit(f'drive: cast {args[1]} failed: {(r.stderr or r.stdout).strip()[-300:]}')
+        raise SystemExit(redact(f'drive: cast {args[1]} failed: {(r.stderr or r.stdout).strip()[-300:]}'))
     return r.stdout.strip()
 
 
@@ -174,19 +193,48 @@ def record(ch, step, label, rec):
     open(out, 'w').write(json.dumps(doc, indent=1) + '\n')
 
 
-def send(v, to, sig, *args, expect_topic, dry):
-    """The eth_call dry run of the exact call, then (unless dry) the send and its receipt check."""
-    ch, me = v['chain'], signer()
-    cast('call', '--from', me, to, sig, *args, rpc=rpc(ch))  # a revert raises: nothing is sent
+def record_update(ch, step, tx, fields):
+    out = os.path.join(ROOT, 'audits', f'deployments-{ch}.json')
+    doc = json.load(open(out))
+    for t in doc['steps'][step]['txs']:
+        if t['tx'] == tx:
+            t.update(fields)
+    open(out, 'w').write(json.dumps(doc, indent=1) + '\n')
+
+
+def receipt(ch, tx, tries=30):
+    for _ in range(tries):
+        r = subprocess.run(['cast', 'receipt', '--json', '--rpc-url', rpc(ch), tx], capture_output=True, text=True)
+        if r.returncode == 0 and r.stdout.strip():
+            return json.loads(r.stdout)
+        time.sleep(4)
+    return None
+
+
+def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
+    """The eth_call dry run of the exact call (a revert raises: nothing is sent); then (unless dry) an async send
+    whose hash is recorded as `pending` BEFORE waiting, so a landed tx is never lost to a receipt timeout (r1 m-01);
+    then the receipt: status 1 and exactly one log `expect` = (emitter, topic0)."""
+    me = signer()
+    cast('call', '--from', me, to, sig, *args, rpc=rpc(ch))
     if dry:
-        return None
-    r = json.loads(_run(['cast', 'send', '--json', *wallet(), '--rpc-url', rpc(ch), to, sig, *args]))
+        return None, True
+    h = _run(['cast', 'send', '--async', *wallet(), '--rpc-url', rpc(ch), to, sig, *args]).split()[-1]
+    record(ch, step, label, {'tx': h, 'status': 'pending', 'to': to.lower(), 'function': sig.split('(')[0],
+                             **(extra or {})})
+    r = receipt(ch, h)
+    if r is None:
+        refuse(f'{h}: no receipt after 2 min (recorded as pending in {step}): check it before anything else')
     ok = int(r['status'], 16) == 1
-    mine = [l for l in r['logs'] if l['address'].lower() == v['vault'].lower() and l['topics'][0] == expect_topic]
-    rec = {'tx': r['transactionHash'], 'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16),
-           'status': 'ok' if ok else 'FAILED', 'to': to.lower(), 'function': sig.split('(')[0],
+    mine = [l for l in r['logs'] if l['topics'] and l['address'].lower() == expect[0].lower()
+            and l['topics'][0] == expect[1]]
+    rec = {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if ok else 'FAILED',
            'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 else None}
-    return rec, ok and len(mine) == 1
+    record_update(ch, step, h, rec)
+    rec['tx'] = h
+    if not (ok and len(mine) == 1):
+        refuse(f'{h} did not land exactly one expected log (recorded as {rec["status"]} in {step}): stopping')
+    return rec, True
 
 
 def preflight(v, n=1, filters=None):
@@ -228,17 +276,13 @@ def action(name, n, gap, dry):
             time.sleep(gap)
             preflight(v, 1)  # re-checked before every send: the subscription and the budget
         lr, lo, hi = range_now(v)
-        out = send(v, v['bundler'], SET_POS, str(lo), str(hi), '(false,false,0)', '0', MAXU,
-                   expect_topic=T_ACTION, dry=dry)
+        rec, _ = send(v['chain'], v['bundler'], SET_POS, str(lo), str(hi), '(false,false,0)', '0', MAXU,
+                      expect=(v['vault'], T_ACTION), dry=dry, step=step, label=f'action_{v["name"]}',
+                      extra={'range': [lo, hi], 'liveRef': lr})
         if dry:
             print(f'drive: dry run {k + 1}/{n}: setPositions({lo}, {hi}) at liveRef {lr}: does not revert')
             return
-        rec, ok = out
-        rec.update(range=[lo, hi], liveRef=lr)
-        record(v['chain'], step, f'action_{v["name"]}', rec)
         print(f'drive: {k + 1}/{n} {rec["tx"]} block {rec["block"]} {rec["status"]}')
-        if not ok:
-            refuse(f'{rec["tx"]} did not land one Action from the vault (recorded as {rec["status"]}): stopping')
         prev = rec['block']
 
 
@@ -246,14 +290,88 @@ def poke(name, dry):
     v = resolve(name)
     preflight(v, 0)
     step = f'poke_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
-    out = send(v, v['vault'], 'poke()', expect_topic=T_EPOCH, dry=dry)
-    if dry:
-        print(f'drive: dry run: poke() on {name} does not revert')
+    rec, _ = send(v['chain'], v['vault'], 'poke()', expect=(v['vault'], T_EPOCH), dry=dry, step=step,
+                  label=f'poke_{name}')
+    print(f'drive: dry run: poke() on {name} does not revert' if dry else
+          f'drive: poke {rec["tx"]} {rec["status"]}: EpochRecorded emitted')
+
+
+# ------------------------------------------------------------------ the Covenant path (L-CRON, L-GAS budget/exit/plan)
+
+def reagent(ch):
+    a = json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps']['reagent']['reads']['addresses']
+    return a['factory'], a['hub']
+
+
+def covenant(ch):
+    f, _ = reagent(ch)
+    return cast('call', f, 'predict(address)(address)', signer(), rpc=rpc(ch))
+
+
+def tokens(ch):
+    v = resolve('XA' if ch == '1301' else 'XB')
+    ref = cast('call', v['hook'], 'REF_POOL()(address)', rpc=rpc(ch))
+    return cast('call', ref, 'token0()(address)', rpc=rpc(ch)), cast('call', ref, 'token1()(address)', rpc=rpc(ch))
+
+
+def cov_create(ch, dry):
+    """allow(owner) on the demo allowlist (PA-11; the owner is the factory ADMIN) if needed, then create()."""
+    f, _ = reagent(ch)
+    me, step = signer(), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    if cast('call', f, 'ADMIN()(address)', rpc=rpc(ch)).lower() != me.lower():
+        refuse('the owner keystore is not the CovenantFactory ADMIN')
+    c = covenant(ch)
+    if cast('code', c, rpc=rpc(ch)) not in ('0x', ''):
+        print(f'drive: Covenant {c} already exists on {ch}')
         return
-    rec, ok = out
-    rec['epochRecorded'] = ok
-    record(v['chain'], step, f'poke_{name}', rec)
-    print(f'drive: poke {rec["tx"]} {rec["status"]}; EpochRecorded in it: {ok}')
+    if cast('call', f, 'allowed(address)(bool)', me, rpc=rpc(ch)) != 'true':
+        send(ch, f, 'allow(address,bool)', me, 'true', expect=(f, T_ALLOWED),
+             dry=dry, step=step, label='factory_allow')
+        if dry:
+            print('drive: dry run: allow(owner) does not revert (create() is dry-run after it lands)')
+            return
+    send(ch, f, 'create()', expect=(f, T_CREATED), dry=dry, step=step, label='covenant_create')
+    print(f'drive: {"dry run: create() does not revert" if dry else "Covenant created at " + c}')
+
+
+def cov_rules(ch, k, b3, share, budget, agentcap, ids, dry):
+    _, hub_ = reagent(ch)
+    c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    ids4 = (ids + [0, 0, 0, 0])[:4]
+    rb = f'({k},{str(bool(b3)).lower()},0,{share},{budget},false,0,{agentcap},[{",".join(map(str, ids4))}])'
+    send(ch, c, RULES, rb, expect=(hub_, T_NOTE), dry=dry, step=step, label='setRules', extra={'rules': rb})
+    print(f'drive: setRules {rb} {"(dry: does not revert)" if dry else "landed"}')
+
+
+def cov_fund(ch, a0, a1, dry):
+    c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    for t, a in zip(tokens(ch), (a0, a1)):
+        if int(a):
+            send(ch, t, 'transfer(address,uint256)', c, str(a), expect=(t, T_TRANSFER), dry=dry, step=step,
+                 label='fund_covenant')
+    print(f'drive: Covenant funded {a0} / {a1}{" (dry)" if dry else ""}')
+
+
+def cov_alloc(name, shares, dry):
+    v = resolve(name)
+    ch = v['chain']
+    _, hub_ = reagent(ch)
+    c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    m0, m1 = (cast('call', t, 'balanceOf(address)(uint256)', c, rpc=rpc(ch)).split()[0] for t in tokens(ch))
+    send(ch, c, 'allocate(address,uint256,uint256,uint256)', v['vault'], str(shares), m0, m1,
+         expect=(hub_, T_NOTE), dry=dry, step=step, label=f'allocate_{name}')
+    print(f'drive: allocate {shares} shares of {name} {"(dry: does not revert)" if dry else "landed"}')
+
+
+def retire(name, dry):
+    """The curator retires its vault (Touchstone: EXITED, the unvested pay forfeited over the drip): the B3 'gone'
+    trigger of L-CRON's exit (owner decision s7)."""
+    v = resolve(name)
+    preflight(v, 0)
+    step = f'lcron_{v["chain"]}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    send(v['chain'], v['bundler'], 'retire()', expect=(v['vault'], T_RETIRED), dry=dry, step=step,
+         label=f'retire_{name}')
+    print(f'drive: retire {name} {"(dry: does not revert)" if dry else "landed"}')
 
 
 # ------------------------------------------------------------------ selftest (offline: the seams replaced)
@@ -338,6 +456,17 @@ def main(argv):
         action(name, opt('--n', 1), opt('--gap', 15), '--dry' in argv)
     elif cmd == 'poke':
         poke(name, '--dry' in argv)
+    elif cmd == 'cov-create':
+        cov_create(name, '--dry' in argv)
+    elif cmd == 'cov-rules':
+        cov_rules(name, opt('--k', 1), opt('--b3', 1), opt('--share', 6000), opt('--budget', 10**20),
+                  opt('--agentcap', 10**19), [int(x) for x in opt('--ids', '2,1').split(',')], '--dry' in argv)
+    elif cmd == 'cov-fund':
+        cov_fund(name, opt('--t0', 0), opt('--t1', 0), '--dry' in argv)
+    elif cmd == 'cov-alloc':
+        cov_alloc(name, opt('--shares', 0), '--dry' in argv)
+    elif cmd == 'retire':
+        retire(name, '--dry' in argv)
     else:
         print(__doc__)
         return 2
