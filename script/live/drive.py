@@ -215,6 +215,16 @@ def receipt(ch, tx, tries=30):
     return None
 
 
+def expected_logs(r, expect):
+    """The receipt's logs matching `expect` = None (a call that emits nothing: one placeholder), (emitter, topic0), or
+    (emitter, topic0, {topic index: required word}) (s7 close r1 m-05: a flush's note must be its Covenant's STATE)."""
+    if expect is None:
+        return [None]
+    need = expect[2] if len(expect) > 2 else {}
+    return [l for l in r['logs'] if l['topics'] and l['address'].lower() == expect[0].lower() and l['topics'][0] == expect[1]
+            and all(len(l['topics']) > i and int(l['topics'][i], 16) == int(w, 16) for i, w in need.items())]
+
+
 def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_max=1):
     """The eth_call dry run of the exact call (a revert raises: nothing is sent); then (unless dry) an async send
     whose hash is recorded as `pending` BEFORE waiting, so a landed tx is never lost to a receipt timeout (r1 m-01);
@@ -231,14 +241,14 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_
         refuse(f'{h}: no receipt after 2 min (recorded as pending in {step}): check it before anything else')
     ok = int(r['status'], 16) == 1
     # expect = None: a call that emits nothing (setAllowed); its receipt status alone decides
-    mine = [None] if expect is None else [l for l in r['logs'] if l['topics'] and l['address'].lower() == expect[0].lower()
-                                          and l['topics'][0] == expect[1]]
+    mine = expected_logs(r, expect)
+    # n_max: a poke's epoch roll emits one EpochRecorded, or two when epochs were skipped (the gap record; seen live)
+    if 1 < len(mine) <= n_max:
+        mine = mine[:1]
+    ok = ok and len(mine) == 1  # `ok` means landed AND carrying its expected log (s7 close r1 M-02)
     rec = {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if ok else 'FAILED',
            'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 and mine[0] else None}
-    # n_max: a poke's epoch roll emits one EpochRecorded, or two when epochs were skipped (the gap record; seen live)
-    if len(mine) > 1 and len(mine) <= n_max:
-        mine = mine[:1]
-    if ok and len(mine) == 1 and post is not None and not post():
+    if ok and post is not None and not post():
         ok, rec['status'] = False, 'FAILED'  # landed, but the state it should have set is not there (lcron r1 m-04)
         rec['readback'] = 'failed'
     record_update(ch, step, h, rec)
@@ -252,6 +262,30 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_
 NO_LOG = 'none'  # a label whose call emits nothing: its status alone decides
 EXPECT = {'setAllowed': NO_LOG, 'setPlan': NO_LOG, 'flush': T_NOTE, 'action': T_ACTION, 'poke': T_EPOCH, 'factory': T_ALLOWED, 'covenant': T_CREATED, 'setRules': T_NOTE,
           'fund': T_TRANSFER, 'allocate': T_NOTE, 'retire': T_RETIRED, 'spoof': T_TRANSFER}
+
+
+def rederive(step, tx):
+    """Re-reads one recorded entry's receipt and rewrites its status/logIndex by `send`'s rule (s7 close r1 M-02: the
+    poke_XB entry recorded `ok` without a single expected log before the gap-record rule existed)."""
+    ch = next((c for c in CH if step in json.load(open(os.path.join(ROOT, 'audits', f'deployments-{c}.json')))['steps']), None)
+    if ch is None:
+        refuse(f'no step {step}')
+    e = [t for t in json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps'][step]['txs'] if t['tx'] == tx]
+    if len(e) != 1:
+        refuse(f'{tx} is not exactly one entry of {step}')
+    lab = e[0]['label']
+    want = EXPECT.get(lab.split('_')[0], EXPECT.get(lab))
+    if want in (None, NO_LOG):
+        refuse(f'label {lab}: no log rule; re-run its command')
+    r = receipt(ch, tx, tries=3)
+    mine = [l for l in r['logs'] if l['topics'] and l['topics'][0] == want]
+    n_max = 2 if want == T_EPOCH else 1
+    k = len(mine)
+    mine = mine[:1] if 1 < k <= n_max else mine
+    ok = int(r['status'], 16) == 1 and len(mine) == 1
+    record_update(ch, step, tx, {'status': 'ok' if ok else 'FAILED', 'expectedLogs': k, 'rederived': 'drive.py rederive',
+                                 'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 else None})
+    print(f'drive: {step} {tx} rederived: {"ok" if ok else "FAILED"} ({k} expected logs)')
 
 
 def resolve_pending(step, tx):
@@ -435,7 +469,7 @@ def cov_flush(ch, dry):
     a plan or rule whose own note was coalesced."""
     _, hub_ = reagent(ch)
     c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
-    send(ch, c, 'flush()', expect=(hub_, T_NOTE), dry=dry, step=step, label='flush')
+    send(ch, c, 'flush()', expect=(hub_, T_NOTE, {2: c, 3: '0x1'}), dry=dry, step=step, label='flush')
     print(f'drive: flush {"(dry: does not revert)" if dry else "landed"}')
 
 
@@ -699,6 +733,29 @@ def selftest():
             g['wallet'] = lambda: []
             g['_run'] = lambda args: '0x' + 'cc' * 32
             g['receipt'] = lambda ch, tx, tries=30: {'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': []}
+            ep = lambda i: {'address': '0x' + '33' * 20, 'topics': [T_EPOCH, '0x1'], 'logIndex': hex(i)}  # noqa: E731
+            for logs_, nmax, want_st, want_li, label in (([], 2, 'FAILED', None, 'a poke with no EpochRecorded is FAILED'),
+                                                         ([ep(4), ep(5)], 1, 'FAILED', None, 'two logs where one is due is FAILED'),
+                                                         ([ep(4), ep(5)], 2, 'ok', 4, 'control: a roll with its gap record is ok at the first log')):
+                json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
+                g['receipt'] = lambda ch, tx, tries=30, _l=logs_: {'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': _l}
+                try:
+                    send('1301', '0x' + '33' * 20, 'poke()', expect=('0x' + '33' * 20, T_EPOCH), dry=False, step='poke_t',
+                         label='poke_XA', n_max=nmax)
+                except Refused:
+                    pass
+                t_ = json.load(open(os.path.join(td, 'audits', 'deployments-1301.json')))['steps']['poke_t']['txs'][0]
+                good_ = t_['status'] == want_st and t_.get('logIndex') == want_li
+                print(('selftest ok: ' if good_ else 'selftest FAIL: ') + label)
+                fails += not good_
+            cv = '0x' + '44' * 20
+            note_ = lambda cov, kind: {'address': '0x' + '55' * 20, 'topics': [T_NOTE, '0x0', '0x' + cov[2:].rjust(64, '0'), hex(kind)], 'logIndex': '0x0'}  # noqa: E731
+            r_ = {'logs': [note_('0x' + '66' * 20, 1), note_(cv, 2)]}
+            ok_ = expected_logs(r_, ('0x' + '55' * 20, T_NOTE, {2: cv, 3: '0x1'})) == []
+            ok_ = ok_ and len(expected_logs({'logs': [note_(cv, 1)]}, ('0x' + '55' * 20, T_NOTE, {2: cv, 3: '0x1'}))) == 1
+            print(('selftest ok: ' if ok_ else 'selftest FAIL: ') + 'a flush note must be its own Covenant\'s STATE (another Covenant or kind does not count)')
+            fails += not ok_
+            g['receipt'] = lambda ch, tx, tries=30: {'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': []}
             for post, want_st, label in ((lambda: False, 'FAILED', 'a landed setAllowed whose read-back fails is FAILED'),
                                          (lambda: True, 'ok', 'control: a landed setAllowed that reads back is ok')):
                 json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
@@ -827,6 +884,8 @@ def main(argv):
         spoof_fund(opt('--fund', 5 * 10**17), '--dry' in argv)
     elif cmd == 'spoof-trigger':
         spoof_trigger('--dry' in argv)
+    elif cmd == 'rederive':
+        rederive(name, argv[2] if len(argv) > 2 else '')
     elif cmd == 'resolve':
         resolve_pending(name, argv[2] if len(argv) > 2 else '')
     else:

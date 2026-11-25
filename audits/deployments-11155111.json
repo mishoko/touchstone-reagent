@@ -523,7 +523,9 @@
      "block": 12209404,
      "gasUsed": 1391121,
      "logIndex": 70,
-     "epochRecorded": 2
+     "epochRecorded": 2,
+     "expectedLogs": 2,
+     "rederived": "drive.py rederive"
     }
    ]
   }

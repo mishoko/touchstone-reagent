@@ -70,11 +70,14 @@ MUTANTS = [
     ('L-CRON: the subscribe tuple not checked', "row['subscribesCron'] = len(subs_c) == 1 and subs_c[0] == CRON_ARGS", "row['subscribesCron'] = len(subs_c) == 1", None),
     ('L-CRON: the unsubscribe tuple not checked', "row['unsubscribesCron'] = len(uns_c) == 1 and uns_c[0] == CRON_ARGS", "row['unsubscribesCron'] = len(uns_c) == 1", None),
     ('L-CRON: the after-DONE order dropped', "row['unsubscribeAfterDone'] = unsub_ts >= done_ts", "row['unsubscribeAfterDone'] = True", None),
-    ('L-CRON: the filter set compared by count', "row['backToBaseline'] = set(active_now) == expect and fid not in active_now", "row['backToBaseline'] = len(active_now) == len(expect)", None),
-    ('L-CRON: other changes absorbed blindly', "(expect.add if h_['kind'] == 'Subscribe' else expect.discard)(h_['filterId'])", "expect = set(active_now)", None),
+    ('L-CRON: the Cron filter may stay active', "row['backToBaseline'] = fid not in active_now and row['beforeMatchesPreflight']", "row['backToBaseline'] = row['beforeMatchesPreflight']", None),
+    ('L-CRON: history consistency dropped', "and row['beforeMatchesPreflight'] and row['historyConsistent']", "and row['beforeMatchesPreflight']", None),
+    ('L-CRON: the pre-flight count not checked', "row['beforeMatchesPreflight'] = len(before) == PREFLIGHT_ACTIVE", "row['beforeMatchesPreflight'] = True", None),
+    ('L-CRON: the backwards rebuild inverted', "(on.discard if h_['kind'] == 'Subscribe' else on.add)(h_['filterId'])", "(on.add if h_['kind'] == 'Subscribe' else on.discard)(h_['filterId'])", None),
     ('L-CRON: one interval not required', "row['oneInterval'] = [k for k, _ in row['cronIntervals']] == ['Subscribe', 'Unsubscribe']", "row['oneInterval'] = True", None),
     ('hub_entry: every error retried', "            if 'not available' not in last and 'does not exist' not in last:\n                raise", "            if False:\n                raise", None),
     ('L-GAS: an EARLY exit fills its cell', "fills = ok and (kind not in ('exit', 'plan') or outcome == 1)", "fills = ok", None),
+    ('L-CRON: other changes not attributed', "'backToBaseline', 'othersNotCron'))", "'backToBaseline'))", None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 

@@ -832,17 +832,20 @@ def rc_system_calls(tx):
     return t, w, out
 
 
-def active_before(hist, block):
-    """The RC's active filter ids just before `block`, rebuilt from the Subscribe/Unsubscribe history."""
-    on = set()
-    for h_ in sorted(hist, key=lambda x: x['block']):
-        if h_['block'] >= block:
-            break
-        (on.add if h_['kind'] == 'Subscribe' else on.discard)(h_['filterId'])
+PREFLIGHT_ACTIVE = 27  # the RC's active subscriptions at the s7 pre-flight (MCP, 2026-11-25), measured independently
+
+
+def active_before(hist, block, active_now):
+    """The RC's active filter ids just before `block`, rebuilt BACKWARDS from the active set now by undoing the window's
+    events (the MCP history is truncated to its newest entries, so a forward rebuild from the RC's start is wrong;
+    seen at the s7 close)."""
+    on = set(active_now)
+    for h_ in sorted((h for h in hist if h['block'] >= block), key=lambda x: -x['block']):
+        (on.discard if h_['kind'] == 'Subscribe' else on.add)(h_['filterId'])
     return on
 
 
-def lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, unsub_ts):
+def lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, unsub_ts, trigger_of=None):
     """`pass`: the retire's reaction subscribed exactly the Cron tuple; one Cron interval (no earlier unsubscribe, no
     re-subscribe) whose unsubscribe is a Cron reaction's exact six-argument unsubscribe AFTER the ExitDone by time;
     and the active filter set now equals the set just before the retire's reaction (lcron r1 M-01, M-02, m-01)."""
@@ -856,19 +859,28 @@ def lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, u
     row['oneInterval'] = [k for k, _ in row['cronIntervals']] == ['Subscribe', 'Unsubscribe']
     row['unsubscribeAfterDone'] = unsub_ts >= done_ts
     row['exitDoneTs'], row['unsubscribeTs'] = done_ts, unsub_ts
-    before = active_before(hist, row['subscribeBlock'])
+    before = active_before(hist, row['subscribeBlock'], active_now)
     row['activeBefore'], row['activeNow'] = len(before), len(active_now)
+    # the rebuilt set's size against the count measured independently at the pre-flight (before this run's changes)
+    row['beforeMatchesPreflight'] = len(before) == PREFLIGHT_ACTIVE
+    # the window's history agrees with the set now: each filter's last event says whether it is active now
+    last = {}
+    for h_ in sorted((h for h in hist if h['block'] >= row['subscribeBlock']), key=lambda x: x['block']):
+        last[h_['filterId']] = h_['kind']
+    row['historyConsistent'] = all((k_ == 'Subscribe') == (f_ in active_now) for f_, k_ in last.items())
     # changes made in the window by OTHER reactions (e.g. A-ACTION-SPAM's Action unsubscribe at the budget) are listed,
     # never absorbed silently; Cron's own filter is never among them; outside them the set is restored exactly
     others = [h_ for h_ in hist if h_['block'] >= row['subscribeBlock'] and h_['filterId'] != fid]
-    row['otherChanges'] = [{'kind': h_['kind'], 'filterId': h_['filterId'], 'block': h_['block'], 'tx': h_['tx']}
-                           for h_ in sorted(others, key=lambda x: x['block'])]
-    expect = set(before)
-    for h_ in sorted(others, key=lambda x: x['block']):
-        (expect.add if h_['kind'] == 'Subscribe' else expect.discard)(h_['filterId'])
-    row['backToBaseline'] = set(active_now) == expect and fid not in active_now
+    # each other change is attributed to its reaction's trigger (its LogRecord topic0); one made by a Cron reaction or by
+    # the retire's own reaction is Cron's footprint and fails the verdict (s7 close r1 M-01)
+    trig = trigger_of or (lambda tx: None)
+    row['otherChanges'] = [{'kind': h_['kind'], 'filterId': h_['filterId'], 'block': h_['block'], 'tx': h_['tx'],
+                            'trigger': trig(h_['tx'])} for h_ in sorted(others, key=lambda x: x['block'])]
+    row['othersNotCron'] = all(c_['trigger'] not in (None, T_CRON100) and c_['tx'].lower() != row.get('reactionTx', '').lower()
+                               for c_ in row['otherChanges'])
+    row['backToBaseline'] = fid not in active_now and row['beforeMatchesPreflight'] and row['historyConsistent']
     row['pass'] = all(row[k] for k in ('subscribesCron', 'unsubscribesCron', 'oneInterval', 'unsubscribeAfterDone',
-                                       'backToBaseline'))
+                                       'backToBaseline', 'othersNotCron'))
     return row
 
 
@@ -922,6 +934,8 @@ def lcron():
     if len(subs) != 1:
         raise SystemExit(f'loops: the retire\'s reaction {rx} made {len(subs)} subscriptions (want the Cron one)')
     fid = subs[0]['filterId']
+    if min(h_['block'] for h_ in hist) > subs[0]['block']:
+        raise SystemExit('loops: the MCP history does not reach back to the Cron subscribe: cannot rebuild the window')
     notes = exit_notes(covenant, vault, ret[0]['block'])
     done = [n for n in notes if n['outcome'] == 1]
     if not done:
@@ -942,13 +956,17 @@ def lcron():
            'unsubscribeInCronReaction': uw[4] == T_CRON100[2:]}
     row['cronTicks'] = len(cron_reactions(subs[0]['block'], u['block']))
     active_now = {s['filterId'] for s in d['subscriptions'] if s['active']}
-    row = lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, unsub_ts)
+    row = lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, unsub_ts,
+                        trigger_of=lambda tx: '0x' + rc_system_calls(tx)[1][4])
     row['pass'] = row['pass'] and row['unsubscribeInCronReaction']
     doc = load()
     doc['loops'] = [e for e in doc.get('loops', []) if e.get('id') not in ('L-CRON', 'L-CRON-failing')]
+    for k_ in ('L-CRON', 'L-CRON-failing'):
+        doc.get('runs', {}).pop(k_, None)  # no stale run beside the fresh one (s7 close r1 m-04)
     key = 'L-CRON' if row['pass'] else 'L-CRON-failing'
     save(doc, key, [row], 'Cron subscribed in the reaction to the retire (B3 gone) and unsubscribed by a Cron '
-         'reaction after the patient exit was DONE; the filter set back to what it was (spec §9.5, C-10)'
+         'reaction after the patient exit was DONE, one interval; every other subscription change in the window was made '
+         'by a non-Cron reaction (listed with its trigger in otherChanges) (spec §9.5, C-10)'
          if row['pass'] else 'L-CRON NOT shown: see the row\'s flags')
     print('loops:', key, {k: row[k] for k in ('subscribeBlock', 'unsubscribeBlock', 'cronTicks', 'oneInterval',
                                               'unsubscribeAfterDone', 'backToBaseline', 'pass')})
@@ -1245,29 +1263,38 @@ def selftest():
                  {'kind': 'Subscribe', 'block': 100, 'filterId': 'cron', 'tx': '0xrx'}, {'kind': 'Unsubscribe', 'block': 200, 'filterId': 'cron', 'tx': '0xu'}]
         base = lambda: {'subscribeBlock': 100, 'unsubscribeBlock': 200}  # noqa: E731
         good = [(SEL_SUB, CRON_ARGS)], [(SEL_UNSUB, CRON_ARGS)]
+        g['PREFLIGHT_ACTIVE'] = 2
         v = lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b'}, 1000, 1010)
         ok(v['pass'], 'control: Cron tuple subscribed and unsubscribed, one interval, after DONE, filter set restored')
-        ok(active_before(hist0, 100) == {'a', 'b'}, 'the filter set before the retire\'s reaction, from the history')
+        ok(active_before(hist0, 100, {'a', 'b'}) == {'a', 'b'} and active_before(hist0, 100, {'a', 'b', 'cron'}) == {'a', 'b'},
+           'the filter set before the retire\'s reaction, rebuilt backwards from now')
         ok(not lcron_verdict(base(), [(SEL_SUB, CRON_ARGS[:2] + ['00' * 32] + CRON_ARGS[3:])], good[1], hist0, 'cron', {'a', 'b'}, 1000, 1010)['pass'],
            'L-CRON fails: the reaction subscribed a non-Cron tuple')
         ok(not lcron_verdict(base(), good[0], [(SEL_UNSUB, CRON_ARGS[:5] + ['00' * 32])], hist0, 'cron', {'a', 'b'}, 1000, 1010)['pass'],
            'L-CRON fails: an unsubscribe that is not the exact six arguments')
         ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b'}, 1000, 999)['pass'], 'L-CRON fails: unsubscribed before the ExitDone')
-        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a'}, 1000, 1010)['pass'], 'L-CRON fails: the filter set not restored (one less)')
-        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b', 'c'}, 1000, 1010)['pass'], 'L-CRON fails: the filter set not restored (one more)')
-        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'c'}, 1000, 1010)['pass'],
-           'L-CRON fails: the same count but another filter set (one dropped, one added)')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a'}, 1000, 1010)['pass'], 'L-CRON fails: the set before is not the pre-flight count (one less)')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b', 'c'}, 1000, 1010)['pass'], 'L-CRON fails: the set before is not the pre-flight count (one more)')
         hist3 = hist0 + [{'kind': 'Unsubscribe', 'block': 150, 'filterId': 'b', 'tx': '0xact'}]
-        v3 = lcron_verdict(base(), *good, hist3, 'cron', {'a'}, 1000, 1010)
+        v3 = lcron_verdict(base(), *good, hist3, 'cron', {'a'}, 1000, 1010, trigger_of=lambda tx: T_ACTION)
         ok(v3['pass'] and v3['otherChanges'][0]['filterId'] == 'b',
            'another reaction\'s unsubscribe in the window is listed and accounted, not a Cron failure')
-        ok(not lcron_verdict(base(), *good, hist3, 'cron', {'a', 'b'}, 1000, 1010)['pass'],
-           'L-CRON fails: a listed unsubscribe whose filter is still active')
+        ok(not lcron_verdict(base(), *good, hist3, 'cron', {'a'}, 1000, 1010, trigger_of=lambda tx: T_CRON100)['pass'],
+           'L-CRON fails: another filter changed by a Cron reaction (Cron\'s own footprint)')
+        ok(not lcron_verdict({**base(), 'reactionTx': '0xact'}, *good, hist3, 'cron', {'a'}, 1000, 1010, trigger_of=lambda tx: T_ACTION)['pass'],
+           'L-CRON fails: another filter changed by the retire\'s own reaction')
+        ok(not lcron_verdict(base(), *good, hist3, 'cron', {'a'}, 1000, 1010)['pass'], 'L-CRON fails: an unattributed other change')
+        ok(not lcron_verdict(base(), *good, hist3, 'cron', {'a', 'b'}, 1000, 1010, trigger_of=lambda tx: T_ACTION)['pass'],
+           'L-CRON fails: a filter the window unsubscribed is still active (history and set disagree)')
+        hist4 = hist0 + [{'kind': 'Subscribe', 'block': 300, 'filterId': 'cron', 'tx': '0xlater'}]
+        ok(not lcron_verdict(base(), *good, hist4, 'cron', {'a', 'b', 'cron'}, 1000, 1010)['pass'],
+           'L-CRON fails: Cron subscribed again later and still on (the filter must be gone)')
         ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b', 'cron'}, 1000, 1010)['pass'],
            'L-CRON fails: the Cron filter still active')
         hist2 = hist0[:3] + [{'kind': 'Unsubscribe', 'block': 150, 'filterId': 'cron', 'tx': '0x'},
                              {'kind': 'Subscribe', 'block': 160, 'filterId': 'cron', 'tx': '0x'}] + hist0[3:]
         ok(not lcron_verdict(base(), *good, hist2, 'cron', {'a', 'b'}, 1000, 1010)['pass'], 'L-CRON fails: two Cron intervals (a park between)')
+        g['PREFLIGHT_ACTIVE'] = 27
         # U. hub_entry: the callTracer fallback reads the same frame as parity; a real error is not retried away
         par = [{'action': {'to': H, 'callType': 'call', 'input': '0x' + SEL_CONDUCT + '00' * 32, 'gas': hex(84271)}, 'error': None}]
         ctr = {'to': CH['1301']['proxy'], 'type': 'CALL', 'input': '0x8d1f0fa1', 'gas': hex(261631), 'calls': [
