@@ -1,6 +1,6 @@
 # Touchstone Reagent
 
-**Exit on conduct, not on price.**
+**Exit on conduct, not on price.** · [Watch the 2.5-minute walkthrough](https://youtu.be/XrE66pfV_Gw)
 
 Reagent puts standing orders on a vault curator's *conduct* next to your vault shares. If the curator
 breaks your rules on one chain, your new allocations to that curator stop on every chain. Your capital then
@@ -33,7 +33,8 @@ Touchstone (the vault) is a pinned dependency and is not modified. Everything un
 `script/` in this repo is Reagent.
 
 To watch it, open [`frontend/index.html`](frontend/index.html) in a browser: it replays the recorded runs as an
-animation and links every step to its transaction. There is also a short narrated walkthrough video.
+animation and links every step to its transaction. The 2.5-minute narrated walkthrough
+is on YouTube: [youtu.be/XrE66pfV_Gw](https://youtu.be/XrE66pfV_Gw).
 
 ---
 
