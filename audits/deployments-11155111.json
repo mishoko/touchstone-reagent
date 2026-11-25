@@ -505,6 +505,26 @@
      "logIndex": 129
     }
    ]
+  },
+  "poke_XB_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "ca3db98",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T11:59:21+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "poke_XB",
+     "tx": "0x050bdf6739d231df15470ec1fd3d6d415e7f07b8c070bcc12e3f7420d398b018",
+     "status": "ok",
+     "to": "0x67ff755e233c3f550303c658ab8c55953f231a46",
+     "function": "poke",
+     "block": 12209404,
+     "gasUsed": 1391121,
+     "logIndex": null
+    }
+   ]
   }
  }
 }

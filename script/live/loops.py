@@ -858,7 +858,15 @@ def lcron_verdict(row, sub_calls, unsub_calls, hist, fid, active_now, done_ts, u
     row['exitDoneTs'], row['unsubscribeTs'] = done_ts, unsub_ts
     before = active_before(hist, row['subscribeBlock'])
     row['activeBefore'], row['activeNow'] = len(before), len(active_now)
-    row['backToBaseline'] = set(active_now) == before
+    # changes made in the window by OTHER reactions (e.g. A-ACTION-SPAM's Action unsubscribe at the budget) are listed,
+    # never absorbed silently; Cron's own filter is never among them; outside them the set is restored exactly
+    others = [h_ for h_ in hist if h_['block'] >= row['subscribeBlock'] and h_['filterId'] != fid]
+    row['otherChanges'] = [{'kind': h_['kind'], 'filterId': h_['filterId'], 'block': h_['block'], 'tx': h_['tx']}
+                           for h_ in sorted(others, key=lambda x: x['block'])]
+    expect = set(before)
+    for h_ in sorted(others, key=lambda x: x['block']):
+        (expect.add if h_['kind'] == 'Subscribe' else expect.discard)(h_['filterId'])
+    row['backToBaseline'] = set(active_now) == expect and fid not in active_now
     row['pass'] = all(row[k] for k in ('subscribesCron', 'unsubscribesCron', 'oneInterval', 'unsubscribeAfterDone',
                                        'backToBaseline'))
     return row
@@ -1249,6 +1257,14 @@ def selftest():
         ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b', 'c'}, 1000, 1010)['pass'], 'L-CRON fails: the filter set not restored (one more)')
         ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'c'}, 1000, 1010)['pass'],
            'L-CRON fails: the same count but another filter set (one dropped, one added)')
+        hist3 = hist0 + [{'kind': 'Unsubscribe', 'block': 150, 'filterId': 'b', 'tx': '0xact'}]
+        v3 = lcron_verdict(base(), *good, hist3, 'cron', {'a'}, 1000, 1010)
+        ok(v3['pass'] and v3['otherChanges'][0]['filterId'] == 'b',
+           'another reaction\'s unsubscribe in the window is listed and accounted, not a Cron failure')
+        ok(not lcron_verdict(base(), *good, hist3, 'cron', {'a', 'b'}, 1000, 1010)['pass'],
+           'L-CRON fails: a listed unsubscribe whose filter is still active')
+        ok(not lcron_verdict(base(), *good, hist0, 'cron', {'a', 'b', 'cron'}, 1000, 1010)['pass'],
+           'L-CRON fails: the Cron filter still active')
         hist2 = hist0[:3] + [{'kind': 'Unsubscribe', 'block': 150, 'filterId': 'cron', 'tx': '0x'},
                              {'kind': 'Subscribe', 'block': 160, 'filterId': 'cron', 'tx': '0x'}] + hist0[3:]
         ok(not lcron_verdict(base(), *good, hist2, 'cron', {'a', 'b'}, 1000, 1010)['pass'], 'L-CRON fails: two Cron intervals (a park between)')

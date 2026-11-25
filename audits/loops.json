@@ -1076,6 +1076,67 @@
    "latency_s": 5,
    "leg_callback_s": 5,
    "id": "L-CON-AB"
+  },
+  {
+   "originTx": "0x6f03d328c826a6d3c86421dfdebd0502e549c7ca1e88affbc2d264338204f3b5",
+   "vault": "0x50ad0a9ef6c8f87b4e926fe1ab3ae2285cdde362",
+   "covenant": "0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f",
+   "reactionTx": "0xf2874ed77f0457a4925e2ac1a7725e25834aee8a0ec2807b16e02502e864d968",
+   "cronFilter": "0x735f6a6aa93f6d26e12d13fb76b4fd7c",
+   "subscribeTx": "0xf2874ed77f0457a4925e2ac1a7725e25834aee8a0ec2807b16e02502e864d968",
+   "subscribeBlock": 9211926,
+   "exitNotes": [
+    {
+     "tx": "0xf46f75e98c1a4bf1cc1a3e3ccd5036b6937cdece8b6e045541289f6959e1b155",
+     "block": 68751794,
+     "outcome": 2,
+     "a": 3517,
+     "b": 0
+    },
+    {
+     "tx": "0x163b0d5958cecf7de59f60c87938843dd9e0254e479db51da918cc1abdec6c39",
+     "block": 68755388,
+     "outcome": 1,
+     "a": 60878428,
+     "b": 20199999917942709
+    }
+   ],
+   "exitDoneTx": "0x163b0d5958cecf7de59f60c87938843dd9e0254e479db51da918cc1abdec6c39",
+   "exitDoneBlock": 68755388,
+   "destTx": "0x163b0d5958cecf7de59f60c87938843dd9e0254e479db51da918cc1abdec6c39",
+   "unsubscribeTx": "0x6cd808c5be8686157cc26cfd0499ebe137d889ff4915d930be34b1b70bf2ae51",
+   "unsubscribeBlock": 9215401,
+   "unsubscribeInCronReaction": true,
+   "cronTicks": 35,
+   "subscribesCron": true,
+   "unsubscribesCron": true,
+   "cronIntervals": [
+    [
+     "Subscribe",
+     9211926
+    ],
+    [
+     "Unsubscribe",
+     9215401
+    ]
+   ],
+   "oneInterval": true,
+   "unsubscribeAfterDone": true,
+   "exitDoneTs": 1795607816,
+   "unsubscribeTs": 1795607920,
+   "activeBefore": 27,
+   "activeNow": 26,
+   "otherChanges": [
+    {
+     "kind": "Unsubscribe",
+     "filterId": "0x9d036ea305321a35f47b0e8ba9a8ceb8",
+     "block": 9213533,
+     "tx": "0x058da33ec53ea45430deef35776288963a0a6ce29f75df0d6f979ee33d7fb65d"
+    }
+   ],
+   "backToBaseline": true,
+   "pass": true,
+   "id": "L-CRON"
   }
  ],
  "runs": {
@@ -1126,6 +1187,22 @@
    "recorded_at": "2026-11-25T11:02:41+00:00",
    "note": "one delivery per (chain, kind) at exactly its gasLimit; the Hub entry gas from a parity trace; F = gasLimit - entry*64/63 (spec \u00a75.6, OQ-19); missing or failing: ['1301/budget', '1301/plan', '11155111/budget', '11155111/exit', '11155111/plan']",
    "n": 6
+  },
+  "L-CRON-failing": {
+   "commit": "ca3db98",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T12:01:48+00:00",
+   "note": "L-CRON NOT shown: see the row's flags",
+   "n": 1
+  },
+  "L-CRON": {
+   "commit": "ca3db98",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T12:04:50+00:00",
+   "note": "Cron subscribed in the reaction to the retire (B3 gone) and unsubscribed by a Cron reaction after the patient exit was DONE; the filter set back to what it was (spec \u00a79.5, C-10)",
+   "n": 1
   }
  },
  "stats": [
