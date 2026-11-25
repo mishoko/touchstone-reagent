@@ -61,11 +61,20 @@ def main():
            **stamp(),
            'method': 'entry gas = minimum succeeding entry gas at a constructed worst-case state built in setUp, the search the '
                      'first state-touching step of its test body (every account and slot cold, F-011; vm.cool cools accounts only); '
-                     '11155111 = that + fresh slots x (110,980 - 22,274) + creations x (210,421 - 53,799) (spec 5.6 method (b)); '
+                     '11155111: method (a), 1.3 x the eth_simulateV1 twin minimum (sepolia_twins, same src/); method (b) = that + fresh '
+                     'slots x (110,980 - 22,274) + creations x (210,421 - 53,799) kept as information (spec 5.6, 6); '
                      'NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F',
            'F': F, 'RESERVE': RESERVE, 'kinds': {}}
     bad = []
     CODE = code_needs()
+    # the 11155111 twins (sepgas.py) certify the 11155111 NEEDs only if they passed against the current src/
+    path0 = os.path.join(ROOT, 'audits', 'gas-need.json')
+    tw0 = (json.load(open(path0)) if os.path.exists(path0) else {}).get('sepolia_twins', {})
+    TWINS = {}
+    if tw0 and tw0.get('src_sha') == stamp().get('src_sha'):
+        TWINS = {k: v for k, v in tw0.items() if isinstance(v, dict) and v.get('pass') is True and 'measured' in v}
+    else:
+        print('gasneed: no 11155111 twins for this src/ (run sepgas.py): 11155111 checked by method (b)')
     for kind in ('rcConduct', 'rcVault', 'rcBudget', 'rcExit', 'rcAllocate'):
         p = os.path.join(ROOT, 'output', f'gas-need-{kind}.json')
         d = json.load(open(p))
@@ -82,9 +91,20 @@ def main():
             entry = m['entry_1301'] + m['fresh_slots'] * (SLOT[ch] - SLOT['1301']) + m['creates'] * (CREATE[ch] - CREATE['1301'])
             need_min = math.ceil(entry * 1.3)
             need = CODE[kind][ch]
+            rec = {'entry': entry, 'need_min': need_min}
+            tw = TWINS.get(kind) if ch == '11155111' else None
+            if tw is not None:
+                # spec 5.6/6 (s3): 11155111 NEEDs are certified by method (a), the eth_simulateV1 twins on Sepolia
+                # pricing; method (b) above is kept as information only (s6: the cold 1301 entry moved it 0.4% above
+                # the plan NEED while the twin still certifies it)
+                ms = tw['measured']
+                base = ms['covenantNeedUpper'] if 'covenantNeedUpper' in ms else ms['entryMin']
+                rec = {'method': 'a', 'twin_measured': base, 'need_min': math.ceil(base * 1.3),
+                       'method_b_entry': entry, 'method_b_need_min': need_min}
+                need_min = rec['need_min']
             if need < need_min:
                 bad.append(f'{kind} on {ch}: code NEED {need} < 1.3 x measured {need_min}')
-            row['chains'][ch] = {'entry': entry, 'need_min': need_min, 'need': need, 'gasLimit': gas_limit(ch, need)}
+            row['chains'][ch] = {**rec, 'need': need, 'gasLimit': gas_limit(ch, need)}
         out['kinds'][kind] = row
     for b in bad:
         print('gasneed:', b)

@@ -1,11 +1,11 @@
 {
  "generated_by": "script/deploy/gasneed.py",
  "from": "test/GasNeed.t.sol (T-GAS-*)",
- "generated_at": "2026-11-24T01:59:52+00:00",
- "commit": "6b52e95",
+ "generated_at": "2026-11-25T05:05:25+00:00",
+ "commit": "0cbc297",
  "dirty": true,
- "src_sha": "a734a7a1826c243c",
- "method": "entry gas = minimum succeeding entry gas at a constructed worst-case state, every account cold (vm.cool); 11155111 = that + fresh slots x (110,980 - 22,274) + creations x (210,421 - 53,799) (spec 5.6 method (b)); NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F",
+ "src_sha": "26de10206487b77f",
+ "method": "entry gas = minimum succeeding entry gas at a constructed worst-case state built in setUp, the search the first state-touching step of its test body (every account and slot cold, F-011; vm.cool cools accounts only); 11155111: method (a), 1.3 x the eth_simulateV1 twin minimum (sepolia_twins, same src/); method (b) = that + fresh slots x (110,980 - 22,274) + creations x (210,421 - 53,799) kept as information (spec 5.6, 6); NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F",
  "F": {
   "1301": 177200,
   "11155111": 243300
@@ -24,8 +24,11 @@
      "gasLimit": 261631
     },
     "11155111": {
-     "entry": 115110,
-     "need_min": 149643,
+     "method": "a",
+     "twin_measured": 114641,
+     "need_min": 149034,
+     "method_b_entry": 115110,
+     "method_b_need_min": 149643,
      "need": 150000,
      "gasLimit": 458279
     }
@@ -43,65 +46,77 @@
      "gasLimit": 325202
     },
     "11155111": {
-     "entry": 335522,
-     "need_min": 436179,
+     "method": "a",
+     "twin_measured": 333543,
+     "need_min": 433606,
+     "method_b_entry": 335522,
+     "method_b_need_min": 436179,
      "need": 437000,
      "gasLimit": 784080
     }
    }
   },
   "rcBudget": {
-   "entry_1301": 265196,
+   "entry_1301": 270685,
    "fresh_slots": 1,
    "creates": 0,
    "chains": {
     "1301": {
-     "entry": 265196,
-     "need_min": 344755,
-     "need": 345000,
-     "gasLimit": 613542
+     "entry": 270685,
+     "need_min": 351891,
+     "need": 360000,
+     "gasLimit": 630570
     },
     "11155111": {
-     "entry": 353902,
-     "need_min": 460073,
+     "method": "a",
+     "twin_measured": 383161,
+     "need_min": 498110,
+     "method_b_entry": 359391,
+     "method_b_need_min": 467209,
      "need": 500000,
      "gasLimit": 855598
     }
    }
   },
   "rcExit": {
-   "entry_1301": 639397,
+   "entry_1301": 675079,
    "fresh_slots": 9,
    "creates": 0,
    "chains": {
     "1301": {
-     "entry": 639397,
-     "need_min": 831217,
-     "need": 832000,
-     "gasLimit": 1166383
+     "entry": 675079,
+     "need_min": 877603,
+     "need": 880000,
+     "gasLimit": 1220873
     },
     "11155111": {
-     "entry": 1437751,
-     "need_min": 1869077,
+     "method": "a",
+     "twin_measured": 1707195,
+     "need_min": 2219354,
+     "method_b_entry": 1473433,
+     "method_b_need_min": 1915463,
      "need": 2220000,
      "gasLimit": 2808138
     }
    }
   },
   "rcAllocate": {
-   "entry_1301": 921192,
+   "entry_1301": 986152,
    "fresh_slots": 9,
    "creates": 0,
    "chains": {
     "1301": {
-     "entry": 921192,
-     "need_min": 1197550,
-     "need": 1198000,
-     "gasLimit": 1581866
+     "entry": 986152,
+     "need_min": 1281998,
+     "need": 1290000,
+     "gasLimit": 1686304
     },
     "11155111": {
-     "entry": 1719546,
-     "need_min": 2235410,
+     "method": "a",
+     "twin_measured": 1772379,
+     "need_min": 2304093,
+     "method_b_entry": 1784506,
+     "method_b_need_min": 2319858,
      "need": 2310000,
      "gasLimit": 2910306
     }
