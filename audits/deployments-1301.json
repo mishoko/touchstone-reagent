@@ -1207,6 +1207,29 @@
      "logIndex": 7
     }
    ]
+  },
+  "agent_1301_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "6f7278d",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T14:15:42+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "setAgent",
+     "tx": "0x5d827318430c2e26e806bee2d208f472514289cb0c809c265fcb05469ebf4dbb",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setAgent",
+     "gasLimit": 2000000,
+     "block": 68763715,
+     "gasUsed": 52786,
+     "logIndex": null,
+     "readback": "agent() = 0xACCb871E94bC1d728A5f969928fB8680C3523492",
+     "rederived": "drive.py rederive"
+    }
+   ]
   }
  }
 }

@@ -660,6 +660,59 @@
      "block": 12210027,
      "gasUsed": 815439,
      "logIndex": 32
+    },
+    {
+     "label": "action_XB",
+     "tx": "0xda0deee931f5c622f3f9558d8ec1fa8a261e58d57b3e43b2113c052baf5fd46d",
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "gasLimit": 4000000,
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12210045,
+     "gasUsed": 717519,
+     "logIndex": 209
+    },
+    {
+     "label": "action_XB",
+     "tx": "0xa41edaf213c5f3cb00779dd69b7dee1e5484519513c491d7a5c19fe1c373148d",
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "gasLimit": 4000000,
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12210063,
+     "gasUsed": 717519,
+     "logIndex": 358
+    }
+   ]
+  },
+  "agent_11155111_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "6f7278d",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T14:15:24+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "setAgent",
+     "tx": "0xbed29df4a37cb6ebe8e8dbbf0a32dd64e97ce42c600afd25a5f50add9da1dc78",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setAgent",
+     "gasLimit": 4000000,
+     "block": 12210057,
+     "gasUsed": 135606,
+     "logIndex": null
     }
    ]
   }

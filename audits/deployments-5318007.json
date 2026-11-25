@@ -181,12 +181,12 @@
    ]
   },
   "topup_s8": {
-   "commit": "d1056eb",
-   "dirty": true,
+   "commit": "cdd128e",
+   "dirty": false,
    "src_sha": "26de10206487b77f",
-   "recorded_at": "2026-11-25T13:39:35+00:00",
+   "recorded_at": "2026-11-25T14:18:32+00:00",
    "source": "receipts",
-   "note": "s8: 0.15 Sepolia ETH to the Reactive faucet (15 lREACT to the deployer on Lasna), 12 lREACT into the RC's reserves (owner go in-session; reserves 2.36 -> 14.36)",
+   "note": "s8: 0.15 Sepolia ETH to the Reactive faucet (15 lREACT to the deployer on Lasna), 12 lREACT into the RC's reserves (owner go in-session; reserves 2.36 -> 14.36); re-recorded from the clean tree (s8-forge r1 m-04)",
    "txs": [
     {
      "label": "faucet_request",
@@ -197,7 +197,9 @@
      "status": "ok",
      "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
      "to": "0x9b9bb25f1a81078c544c829c5eb7822d747cf434",
-     "value": "150000000000000000"
+     "value": "150000000000000000",
+     "beneficiary": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+     "call": "request(address)"
     },
     {
      "label": "depositTo_RC",
@@ -208,9 +210,43 @@
      "status": "ok",
      "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
      "to": "0x8888888888888888888888888888888888888888",
-     "value": "12000000000000000000"
+     "value": "12000000000000000000",
+     "beneficiary": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9",
+     "call": "depositTo(address)"
     }
-   ]
+   ],
+   "superseded": {
+    "commit": "d1056eb",
+    "dirty": true,
+    "src_sha": "26de10206487b77f",
+    "recorded_at": "2026-11-25T13:39:35+00:00",
+    "source": "receipts",
+    "note": "s8: 0.15 Sepolia ETH to the Reactive faucet (15 lREACT to the deployer on Lasna), 12 lREACT into the RC's reserves (owner go in-session; reserves 2.36 -> 14.36)",
+    "txs": [
+     {
+      "label": "faucet_request",
+      "chain": 11155111,
+      "tx": "0xc709a804a8e5646297b5deb88df8ca0c3684c902e6262494728772c5d79caa51",
+      "block": 12209869,
+      "gasUsed": 25428,
+      "status": "ok",
+      "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+      "to": "0x9b9bb25f1a81078c544c829c5eb7822d747cf434",
+      "value": "150000000000000000"
+     },
+     {
+      "label": "depositTo_RC",
+      "chain": 5318007,
+      "tx": "0x65e99e9266332f8840f40475dd7da5227bfe9179f5c33cb8b1686005e0bb6d58",
+      "block": 9220911,
+      "gasUsed": 34695,
+      "status": "ok",
+      "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+      "to": "0x8888888888888888888888888888888888888888",
+      "value": "12000000000000000000"
+     }
+    ]
+   }
   },
   "rc_runtime": {
    "commit": "97697c5",
@@ -223,6 +259,48 @@
    "runtimeMaskedSha": "fc510b4d2614f72bf22b8e7f06b8885b54ab19dac81c2fee118aaae42a7cf707",
    "owner": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
    "ext": "0xA9B408A944337A1BbcE77c6823FaD226DE4c228d"
+  },
+  "agent_fund_s8": {
+   "commit": "cdd128e",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T14:18:32+00:00",
+   "source": "receipts",
+   "note": "s8: 0.05 Sepolia ETH from the owner to the reference agent key 0xACCb...3492 (its gas); re-recorded from the clean tree",
+   "txs": [
+    {
+     "label": "fund_agent",
+     "chain": 11155111,
+     "tx": "0xc817fe47b188968588ebee96901eadf9411a9b53d50fe21bab07384a04770543",
+     "block": 12210055,
+     "gasUsed": 204600,
+     "status": "ok",
+     "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+     "to": "0xaccb871e94bc1d728a5f969928fb8680c3523492",
+     "value": "50000000000000000"
+    }
+   ],
+   "superseded": {
+    "commit": "6f7278d",
+    "dirty": true,
+    "src_sha": "26de10206487b77f",
+    "recorded_at": "2026-11-25T14:15:14+00:00",
+    "source": "receipts",
+    "note": "s8: 0.05 Sepolia ETH from the owner to the reference agent key 0xACCb...3492 (its gas)",
+    "txs": [
+     {
+      "label": "fund_agent",
+      "chain": 11155111,
+      "tx": "0xc817fe47b188968588ebee96901eadf9411a9b53d50fe21bab07384a04770543",
+      "block": 12210055,
+      "gasUsed": 204600,
+      "status": "ok",
+      "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+      "to": "0xaccb871e94bc1d728a5f969928fb8680c3523492",
+      "value": "50000000000000000"
+     }
+    ]
+   }
   }
  }
 }
