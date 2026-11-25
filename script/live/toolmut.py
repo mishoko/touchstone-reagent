@@ -87,6 +87,9 @@ MUTANTS = [
     ('plan: the proxy not required', "d = [r for r in rows if r.get('delivered') and r.get('byProxy')]", "d = [r for r in rows if r.get('delivered')]", None),
     ('exit: the drip end not required', "afterDrip=r.get('doneBlock') is not None and r.get('dripEnd') is not None and r['doneBlock'] >= r['dripEnd'],", 'afterDrip=True,', None),
     ('exit: other recipients ignored', "noOtherRecipient=r.get('otherRecipients') == [])", 'noOtherRecipient=True)', None),
+    ('hero: the proving send not indexed', "AGENT_SENDS = ('allocate', 'prove-refusal')", "AGENT_SENDS = ('allocate',)", None),
+    ('hero: the curator binding dropped', "sameCurator=r.get('refusedVaultId') is not None and r.get('refusedVaultId') == r.get('curator'),", 'sameCurator=True,', None),
+    ('exit: the value not required', "valueMeasured=(r.get('forfeitPoolAtProcess') or 0) > 0 and (r.get('poolBurned') or 0) > 0", 'valueMeasured=True or (r.get("x") or 0) > 0', None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 
@@ -97,6 +100,8 @@ DRIVE_MUTANTS = [
      "*wallet(), '--rpc-url', rpc(ch), to, sig,", None),
     ('drive: no margin over the estimate', 'GAS_MARGIN = (3, 2)', 'GAS_MARGIN = (1, 1)', None),
     ('drive: the read-back not retried', 'READBACK_TRIES, READBACK_WAIT = 4, 4', 'READBACK_TRIES, READBACK_WAIT = 1, 4', None),
+    ('drive: no ref-back on an abnormal stop', "        print(f'drive: the breach run stopped abnormally: bringing the reference back (else run: ref-back {name})')\n        ref_back(name, False, step)\n", "        print(f'drive: the breach run stopped abnormally: bringing the reference back (else run: ref-back {name})')\n", None),
+    ('drive: a foreign latch tx not recorded', "            record(ch, step, 'latch',", "            pass\n            if False: record(ch, step, 'latch',", None),
     ('drive: no Sepolia floor', "GAS_FLOOR = {'1301': 2_000_000, '11155111': 4_000_000}", "GAS_FLOOR = {'1301': 2_000_000, '11155111': 0}", None),
     ('drive: the gap-record bound ignored', '    if 1 < len(mine) <= n_max:', '    if 1 < len(mine):', None),
     ('drive: ok without the expected log', '    ok = ok and len(mine) == 1  #', '    ok = ok or len(mine) == 1  #', None),

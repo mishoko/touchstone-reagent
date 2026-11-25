@@ -566,8 +566,9 @@ def ref_driver(ch):
     return d[0]
 
 
-def obs(v):
-    w = cast('call', v['hook'], OBS, rpc=rpc(v['chain'])).strip('()').replace(' ', '').split(',')
+def obs(v, block=None):
+    at = ['--block', str(block)] if block else []
+    w = cast('call', *at, v['hook'], OBS, rpc=rpc(v['chain'])).strip('()').replace(' ', '').split(',')
     num = lambda x: int(x.split('[')[0])  # noqa: E731
     return {'refTick': num(w[2]), 'refFresh': w[4] == 'true', 'outBlocks': num(w[10]), 'breachSeq': num(w[11]),
             'pendingBreaches': num(w[12])}
@@ -624,25 +625,58 @@ def breach(name, dry, yes):
     if dry:
         print('drive: dry runs pass (the reference swap and refreshRef)')
         return
+    try:
+        _hold(v, ch, step, o0)
+    except BaseException:
+        print(f'drive: the breach run stopped abnormally: bringing the reference back (else run: ref-back {name})')
+        ref_back(name, False, step)
+        raise
+    ref_back(name, False, step)
+
+
+def _hold(v, ch, step, o0):
+    """Refresh every REFRESH_EVERY blocks until breachSeq rises, then record the latch from the hook's own logs."""
+    first = None
     t0 = time.time()
     while time.time() - t0 < BREACH_MAX_S:
         b0 = int(cast('block-number', rpc=rpc(ch)))
         rec, _ = send(ch, v['hook'], 'refreshRef()', expect=None, dry=False, step=step, label='refresh')
-        o = obs(v)
+        first = first or rec['block']
+        o = obs(v, rec['block'])
         print(f'drive: refresh {rec["tx"]} block {rec["block"]}: refTick {o["refTick"]} outBlocks {o["outBlocks"]} '
               f'breachSeq {o["breachSeq"]}')
         if o['breachSeq'] > o0['breachSeq']:
-            r = receipt(ch, rec['tx'])
-            lat = [l for l in r['logs'] if l['topics'] and l['topics'][0] == T_LATCHED
-                   and l['address'].lower() == v['hook'].lower()]
-            record_update(ch, step, rec['tx'], {'breachLatched': len(lat), 'breachSeq': o['breachSeq']})
-            print(f'drive: BreachLatched (seq {o["breachSeq"]}) in {rec["tx"]}')
-            break
+            latch_record(v, step, first)
+            return
         while int(cast('block-number', rpc=rpc(ch))) < b0 + REFRESH_EVERY:
             time.sleep(20)
-    else:
-        refuse(f'no breach after {BREACH_MAX_S // 60} min: the reference is still out (run ref-back {name})')
-    ref_back(name, False, step)
+    refuse(f'no breach after {BREACH_MAX_S // 60} min')
+
+
+def latch_record(v, step, frm):
+    """s8-hero r1 m-01: the latch is found in the hook's own BreachLatched logs from `frm`, whoever's tx carried it
+    (a refresh, a poke, an Action, a plan deposit), and that tx is recorded (`label: latch`, `breachLatched: n`)."""
+    ch = v['chain']
+    ls = logs(ch, v['hook'], frm, head(ch), T_LATCHED)
+    if not ls:
+        refuse('breachSeq rose but no BreachLatched log is served yet: re-run `drive.py latch-record XA FROM_BLOCK`')
+    txs = []
+    for l in ls:
+        if l['transactionHash'] not in txs:
+            txs.append(l['transactionHash'])
+    steps = json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps']
+    known = {t['tx'] for t in steps.get(step, {}).get('txs', [])}
+    for h in txs:
+        r = receipt(ch, h)
+        n = sum(1 for l in r['logs'] if l['topics'] and l['topics'][0] == T_LATCHED
+                and l['address'].lower() == v['hook'].lower())
+        fields = {'breachLatched': n, 'block': int(r['blockNumber'], 16), 'status': 'ok' if int(r['status'], 16) == 1 else 'FAILED'}
+        if h in known:
+            record_update(ch, step, h, {**fields, 'label': 'refresh'})
+        else:
+            record(ch, step, 'latch', {'tx': h, 'to': (r.get('to') or '').lower(), 'function': 'n/a (found by its log)',
+                                       **fields})
+        print(f'drive: BreachLatched x{n} in {h} (block {fields["block"]})')
 
 
 def placed_range(name):
@@ -1021,6 +1055,47 @@ def selftest():
         ok6 = o_ == {'refTick': 199000, 'refFresh': True, 'outBlocks': 1801, 'breachSeq': 3, 'pendingBreaches': 1}
         print(('selftest ok: ' if ok6 else 'selftest FAIL: ') + f'obs() parse {o_}')
         fails += not ok6
+        # s8-hero r1 m-01: a latch carried by a foreign tx (a poke) is found by its log and recorded as `latch`
+        import tempfile as _tf9
+        with _tf9.TemporaryDirectory() as td9:
+            os.makedirs(os.path.join(td9, 'audits'))
+            json.dump({'steps': {'lb_t': {'txs': [{'label': 'refresh', 'tx': '0xr1', 'block': 5}]}}},
+                      open(os.path.join(td9, 'audits', 'deployments-1301.json'), 'w'))
+            saved9 = {k: g[k] for k in ('ROOT', 'logs', 'head', 'receipt')}
+            g['ROOT'] = td9
+            g['head'] = lambda ch: 100
+            g['logs'] = lambda ch, a, f, t, top: [{'transactionHash': '0xpoke'}]
+            hk = '0x' + '77' * 20
+            g['receipt'] = lambda ch, tx, tries=30: {'status': '0x1', 'blockNumber': '0x9', 'to': '0xv',
+                                                     'logs': [{'address': hk, 'topics': [T_LATCHED]}]}
+            latch_record({'chain': '1301', 'hook': hk}, 'lb_t', 5)
+            tx9 = json.load(open(os.path.join(td9, 'audits', 'deployments-1301.json')))['steps']['lb_t']['txs']
+            ok9 = [(t['label'], t['tx'], t.get('breachLatched')) for t in tx9] == [('refresh', '0xr1', None),
+                                                                                  ('latch', '0xpoke', 1)]
+            print(('selftest ok: ' if ok9 else 'selftest FAIL: ') + f'a latch in a foreign tx is recorded by its log {tx9}')
+            fails += not ok9
+            g.update(saved9)
+        # s8-hero r1 m-02: an abnormal stop after the reference went out brings it back
+        saved10 = {k: g[k] for k in ('placed_range', 'obs', 'drive_ref', 'send', '_hold', 'ref_back')}
+        g['cast'] = lambda *a, rpc: '7'
+        g['placed_range'] = lambda nm: (195190, 197190)
+        g['obs'] = lambda v_, b=None: {'refTick': 0, 'refFresh': True, 'outBlocks': 0, 'breachSeq': 0, 'pendingBreaches': 0}
+        g['drive_ref'] = lambda *a: None
+        g['send'] = lambda *a, **k: (None, True)
+        backs = []
+        g['ref_back'] = lambda nm, dry, step=None: backs.append(nm)
+
+        def _boom(*a):
+            raise Refused('drive: refusing: no receipt after 2 min')
+        g['_hold'] = _boom
+        try:
+            breach('XA', False, True)
+        except Refused:
+            pass
+        ok10 = backs == ['XA']
+        print(('selftest ok: ' if ok10 else 'selftest FAIL: ') + 'an abnormal stop mid-hold brings the reference back')
+        fails += not ok10
+        g.update(saved10)
         # agent-set: the owner key as agent is refused; another address passes (dry)
         saved6 = {k: g[k] for k in ('signer', 'send')}
         g['signer'] = lambda: '0x' + 'aa' * 20
@@ -1129,6 +1204,9 @@ def main(argv):
         retire(name, '--dry' in argv, '--yes-irreversible' in argv)
     elif cmd == 'breach':
         breach(name, '--dry' in argv, '--yes-irreversible' in argv)
+    elif cmd == 'latch-record':
+        v_ = resolve(name)
+        latch_record(v_, f'lbreach_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}', int(argv[2]))
     elif cmd == 'ref-back':
         ref_back(name, '--dry' in argv)
     elif cmd == 'process':

@@ -3,7 +3,7 @@
 the depositor's rules and allocate within the caps, into the allowlist (`agentAllocate`; the Covenant picks no
 recipient). This script is the reference: it reads a policy file and acts on it until it is stopped.
 
-  python3 script/agent/agent.py run --policy script/agent/policy.json [--once] [--dry] [--prove-refusal]
+  python3 script/agent/agent.py run --policy script/agent/policy.json [--once] [--dry] [--prove-refusal [ERROR]]
       every `intervalSec`, for each policy entry (chain, covenant, vault, sharesPerTick): an eth_call dry run of
       `agentAllocate(vault, sharesPerTick, max0, max1)` (max0/max1 = the Covenant's token balances), pinned to one
       block. Passes -> sent (unless --dry). Reverts -> the 4-byte error decoded against CovenantBase's errors and
@@ -279,7 +279,8 @@ def tick(policy, me, dry, prove, proved):
         name, sel = decode(out)
         log_line(ch, {'block': blk, 'action': 'allocate', 'status': 'refused (dry run, not sent)',
                       'error': name or f'unknown {sel}', 'selector': sel, **base})
-        if prove and not dry and name and (ch, v.lower()) not in proved:
+        # s8-hero r1 m-05: the single proof is spent only on the expected error (`prove` names it, e.g. HubPaused)
+        if prove and not dry and name == prove and (ch, v.lower()) not in proved:
             proved.add((ch, v.lower()))  # before the send: a failed send never earns a second one
             # the estimate of a reverting call fails, so the proving send carries the chain's floor
             send(ch, c, ALLOC, *args, lim=GAS_FLOOR[ch], action='prove-refusal',
@@ -552,7 +553,7 @@ def selftest():
             st['rstatus'] = '0x0'
             proved = set()
             for _ in range(3):
-                tick(load_policy(p2), AG, False, True, proved)
+                tick(load_policy(p2), AG, False, 'HubPaused', proved)
             to_v = sorted(a[a.index(CV) + 2].lower() for a in sent)
             check('(d) three ticks over V1, V2 and V1 again -> exactly two proving sends, one per vault',
                   len(sent) == 2 and to_v == sorted([V1.lower(), V2.lower()]))
@@ -565,12 +566,16 @@ def selftest():
             sent.clear()
             proved2 = set()
             g['try_call'] = lambda *a, block: (False, 'execution reverted, data: "0xdeadbeef"')
-            tick(load_policy(p1), AG, False, True, proved2)
+            tick(load_policy(p1), AG, False, 'HubPaused', proved2)
             check('(d) control: an undecoded revert is not proven on chain', not sent)
+            agentcap = '0x' + subprocess.run(['cast', 'sig', 'AgentCap()'], capture_output=True, text=True).stdout.strip()[2:]
+            g['try_call'] = lambda *a, block: (False, f'execution reverted, data: "{agentcap}"')
+            tick(load_policy(p1), AG, False, 'HubPaused', set())
+            check('(d) an AgentCap refusal does not spend the HubPaused proof (m-05)', not sent)
             g['try_call'] = lambda *a, block: (False, f'execution reverted, data: "{HUBPAUSED}"')
-            tick(load_policy(p1), AG, True, True, proved2)
+            tick(load_policy(p1), AG, True, 'HubPaused', proved2)
             check('(d) control: --dry never sends a proving refusal', not sent)
-            run(p1, True, False, True)
+            run(p1, True, False, 'HubPaused')
             check('(d) control: a fresh run proves again (once)', len(sent) == 1)
             sent.clear()
 
@@ -672,7 +677,11 @@ def main(argv):
     if not pol:
         refuse('--policy FILE is required')
     if argv[0] == 'run':
-        run(pol, '--once' in argv, '--dry' in argv, '--prove-refusal' in argv)
+        prove = None
+        if '--prove-refusal' in argv:
+            i = argv.index('--prove-refusal')
+            prove = argv[i + 1] if i + 1 < len(argv) and not argv[i + 1].startswith('--') else 'HubPaused'
+        run(pol, '--once' in argv, '--dry' in argv, prove)
     elif argv[0] == 'tighten':
         tighten(pol, '--dry' in argv)
     else:

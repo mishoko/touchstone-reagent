@@ -17,7 +17,7 @@ export RC_KEYSTORE_DIR=...   # holds the keystore `agent`
 export RC_KEYSTORE_PW=...    # its password file
 export ETH_SEPOLIA_RPC_URL=... UNICHAIN_SEPOLIA_RPC_URL=...
 
-python3 script/agent/agent.py run --policy script/agent/policy.json [--once] [--dry] [--prove-refusal]
+python3 script/agent/agent.py run --policy script/agent/policy.json [--once] [--dry] [--prove-refusal [ERROR]]
 python3 script/agent/agent.py tighten --policy script/agent/policy.json [--dry]
 python3 script/agent/agent.py --selftest
 ```
@@ -25,7 +25,8 @@ python3 script/agent/agent.py --selftest
 - `run`: on each tick, for each policy entry, makes an eth_call dry run of `agentAllocate` (max0/max1 = the Covenant's
   token balances) pinned to one block. A passing dry run is sent. A revert is decoded against CovenantBase's errors
   (`HubPaused`, `RecordPaused`, `Pending`, `AgentCap`, `OverBudget`, `PriceTolerance`, ...) and logged, and nothing is
-  sent. `--prove-refusal` also sends one refused allocation per (chain, vault) per run, so the refusal exists as an
+  sent. `--prove-refusal [ERROR]` (default `HubPaused`) also sends one refused allocation per (chain, vault) per run,
+  only when the dry run fails with that error, so the refusal exists as an
   on-chain reverted transaction. SIGINT/SIGTERM stop it after the action in flight, printing `agent stopped <time>`.
 - `tighten`: applies the policy's `tighten` block (null by default, so nothing is applied) only if it is stricter than
   the Covenant's current `rules()`. Otherwise it is refused before any send. The block looks like this:

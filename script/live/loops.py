@@ -1329,7 +1329,8 @@ def selftest():
         g.update(saved)
     # ---- s8 hero rows (L-PAUSE / L-OFFLINE): a passing row, then each check broken alone fails its row only
     good = dict(appliedTx='0xd', appliedTs=100, originTs=50, pausedBefore=False, pausedAt=True, refusedStatus=0,
-                refusedSelector=HUB_PAUSED, refusedTs=130, refusedNonce=8, lastOkNonce=7, lastOkTs=10, lastOkStatus=1)
+                refusedSelector=HUB_PAUSED, refusedTs=130, refusedNonce=8, lastOkNonce=7, lastOkTs=10, lastOkStatus=1,
+                curator=1, refusedVaultId=1)
     vp, vo = hero_verdict(good)
     ok(vp['pass'] and vo['pass'], 'hero: control: a full pause and offline row passes')
     for over, which, label in (({'appliedTx': None}, 'p', 'no Applied on the other chain'),
@@ -1339,6 +1340,7 @@ def selftest():
                                ({'refusedSelector': '0x12345678'}, 'p', 'refused for another error'),
                                ({'refusedSelector': None}, 'p', 'a refused tx whose replay passes'),
                                ({'refusedTs': 90}, 'p', 'the refusal precedes the Applied'),
+                               ({'refusedVaultId': 2}, 'p', 'the refused vault belongs to another curator'),
                                ({'refusedNonce': 9}, 'o', 'the agent sent between (nonce gap)'),
                                ({'lastOkStatus': 0}, 'o', 'the control allocation failed'),
                                ({'lastOkTs': 60}, 'o', 'the control is after the breach'),
@@ -1346,6 +1348,38 @@ def selftest():
         vp, vo = hero_verdict({**good, **over})
         bad = (not vp['pass']) if which == 'p' else (not vo['pass'] and vp['pass'])
         ok(bad, f'hero: {label} fails its row')
+    # s8-hero r1 M-01: the agent log's proving send is indexed (an ok allocate, then a prove-refusal)
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as td:
+        lp = os.path.join(td, 'a.jsonl')
+        with open(lp, 'w') as f:
+            f.write(json.dumps({'action': 'allocate', 'tx': '0xa1', 'status': 'ok'}) + '\n')
+            f.write(json.dumps({'action': 'allocate', 'tx': None, 'status': 'refused HubPaused'}) + '\n')
+            f.write(json.dumps({'action': 'prove-refusal', 'tx': '0xa2', 'status': 'reverted'}) + '\n')
+        saved_log, saved_cast2, saved_ts, saved_rpc = g['AGENT_LOG'], g['cast'], g['ts'], g['rpc']
+        g['rpc'] = lambda ch: 'http://selftest.invalid'
+        g['AGENT_LOG'] = lp
+        g['ts'] = lambda ch, b: b
+        nonces = {'0xa1': 7, '0xa2': 8}
+
+        def fake(*a, rpc):
+            h = a[-1]
+            if a[0] == 'tx':
+                return json.dumps({'from': AGENT, 'to': COVENANT, 'input': SEL_AGENT_ALLOC + '0' * 24 + 'ab' * 20 + '0' * 192,
+                                   'nonce': hex(nonces[h]), 'gas': hex(4_000_000)})
+            return json.dumps({'blockNumber': hex(10 + nonces[h]), 'status': '0x1' if h == '0xa1' else '0x0',
+                               'gasUsed': hex(900_000)})
+        g['cast'] = fake
+        got = agent_txs('11155111')
+        g['AGENT_LOG'], g['cast'], g['ts'], g['rpc'] = saved_log, saved_cast2, saved_ts, saved_rpc
+        ok([x['tx'] for x in got] == ['0xa1', '0xa2'] and got[1]['status'] == 0 and got[1]['vault'] == '0x' + 'ab' * 20,
+           'hero: the agent\'s proving send is indexed after its ok allocation (by nonce)')
+    for txt, want in (('Error: custom error 0x67be7162', HUB_PAUSED), ('custom error: 0x67be7162 ()', HUB_PAUSED),
+                      ('execution reverted, data: "0x67be7162"', HUB_PAUSED), ('revert: HubPaused()', HUB_PAUSED),
+                      ('custom error 0x12345678', '0x12345678'), ('execution reverted', 'undecoded')):
+        ok(error_selector(txt) == want, f'hero: the revert text {txt!r} decodes to {want}')
+    ok(revert_selector('11155111', {'gas': 100, 'gasUsed': 100}) == 'out-of-gas',
+       'hero: an out-of-gas revert is never named by its replay')
     # ---- s8 L-PLAN verdict
     rd = dict(delivered=True, byProxy=True, outcome=PLAN_DONE, reason=0, noteBlock=90)
     rs = dict(delivered=True, byProxy=True, outcome=PLAN_SKIPPED, reason=SKIP_PAUSED, noteBlock=150)
@@ -1368,12 +1402,15 @@ def selftest():
     ok(len(got) == 1 and got[0]['dest'] == '1301' and got[0]['payload'][:8] == SEL_PLAN,
        'plan: callback_requests keeps this RC\'s request only (a foreign RC\'s is ignored)')
     # ---- s8 L-EXIT verdict
-    ge = dict(doneTx='0x1', doneBlock=200, dripEnd=150, toOwner=[5, 7], noteA=5, noteB=7, otherRecipients=[])
+    ge = dict(doneTx='0x1', doneBlock=200, dripEnd=150, toOwner=[5, 7], noteA=5, noteB=7, otherRecipients=[],
+              forfeitPoolAtProcess=10, poolBurned=10, covGainShares=3, netSupplyDrop=8)
     ok(lexit_verdict(ge)['pass'], 'exit: control: DONE after the drip, tokens to the owner only = the note')
     for over, label in (({'doneTx': None}, 'no DONE'), ({'doneBlock': 140}, 'DONE before the drip end'),
                         ({'toOwner': [5, 6]}, 'the owner got less than the note'),
                         ({'toOwner': [0, 0], 'noteA': 0, 'noteB': 0}, 'a DONE(0, 0)'),
-                        ({'otherRecipients': ['0xbad']}, 'another recipient')):
+                        ({'otherRecipients': ['0xbad']}, 'another recipient'),
+                        ({'forfeitPoolAtProcess': 0}, 'no forfeit set aside'), ({'poolBurned': 0}, 'no pool burned'),
+                        ({'netSupplyDrop': 0}, 'no net supply drop'), ({'covGainShares': None}, 'no gain measured')):
         ok(not lexit_verdict({**ge, **over})['pass'], f'exit: {label} fails')
     print(f'loops selftest: {n_ok[0]} cells passed,', 'OK' if not fails else f'FAIL ({len(fails)})')
     return not fails
@@ -1387,6 +1424,7 @@ COVENANT = '0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f'   # the owner's Covenant
 SEL_AGENT_ALLOC = '0xbdd2fad4'                            # ICovenant.agentAllocate
 HUB_PAUSED = '0x67be7162'                                 # CovenantBase.HubPaused()
 AGENT_LOG = os.path.join(ROOT, 'output', 'agent', 'agent-11155111.jsonl')
+AGENT_SENDS = ('allocate', 'prove-refusal')  # the agent log's send actions (s8-hero r1 M-01: the proving send too)
 
 
 def hero_verdict(r):
@@ -1396,6 +1434,7 @@ def hero_verdict(r):
     L-OFFLINE: the agent's last send before the latch landed, its next send (nonce + 1: nothing in between) is that
     refused one, and the order is lastOk < latch <= Applied <= refused."""
     p = dict(delivered=bool(r.get('appliedTx')), pausedBefore=r.get('pausedBefore') is False,
+             sameCurator=r.get('refusedVaultId') is not None and r.get('refusedVaultId') == r.get('curator'),
              pausedAt=r.get('pausedAt') is True, refusedOnChain=r.get('refusedStatus') == 0,
              hubPaused=r.get('refusedSelector') == HUB_PAUSED,
              refusedAfterApplied=r.get('refusedTs') is not None and r.get('appliedTs') is not None
@@ -1416,7 +1455,7 @@ def agent_txs(ch):
     hs = []
     for line in open(AGENT_LOG):
         e = json.loads(line)
-        if e.get('action') == 'allocate' and e.get('tx') and not e.get('dry') and e['tx'] not in hs:
+        if e.get('action') in AGENT_SENDS and e.get('tx') and not e.get('dry') and e['tx'] not in hs:
             hs.append(e['tx'])
     out = []
     for h in hs:
@@ -1427,29 +1466,42 @@ def agent_txs(ch):
             raise SystemExit(f'loops: {h} is not the agent\'s agentAllocate on the Covenant')
         b = int(r['blockNumber'], 16)
         out.append({'tx': h, 'block': b, 'ts': ts(ch, b), 'nonce': int(t['nonce'], 16), 'status': int(r['status'], 16),
-                    'from': t['from'], 'input': t['input']})
+                    'from': t['from'], 'input': t['input'], 'gas': int(t['gas'], 16), 'gasUsed': int(r['gasUsed'], 16),
+                    'vault': '0x' + t['input'][10 + 24:10 + 64]})
     return sorted(out, key=lambda x: x['nonce'])
 
 
+def error_selector(text):
+    """The 4-byte error in cast's revert text: `custom error 0x…`, `custom error: 0x…`, `data: "0x…"`, or by name
+    (`HubPaused()`), the formats agent.py's decoder accepts too (s8-hero r1 m-03)."""
+    import re
+    m = re.search(r'(?:custom error:? |data: "?)(0x[0-9a-fA-F]{8})', text)
+    if m:
+        return m.group(1).lower()
+    return HUB_PAUSED if re.search(r'\bHubPaused\b', text) else 'undecoded'
+
+
 def revert_selector(ch, a):
-    """The 4-byte error of the agent's reverted call, replayed by eth_call at the state before its block."""
+    """The 4-byte error of the agent's reverted call, replayed by eth_call at the state before its block; an
+    out-of-gas revert (gasUsed = gasLimit) is never named by its replay."""
+    if a.get('gasUsed') is not None and a.get('gas') is not None and a['gasUsed'] >= a['gas']:
+        return 'out-of-gas'
     r = subprocess.run(['cast', 'call', '--rpc-url', rpc(ch), '--from', a['from'], '--block', str(a['block'] - 1),
                         COVENANT, a['input']], capture_output=True, text=True)
     if r.returncode == 0:
         return None  # the replay passes: no revert to name
-    import re
-    m = re.search(r'(?:custom error |data: "?)(0x[0-9a-fA-F]{8})', redact(r.stderr + r.stdout))
-    return m.group(1).lower() if m else 'undecoded'
+    return error_selector(redact(r.stderr + r.stdout))
 
 
-def paused_at(ch, block):
-    return cast('call', '--block', str(block), hub(ch), 'paused(address,uint32)(bool)', COVENANT, '1', rpc=rpc(ch)) == 'true'
+def paused_at(ch, block, id_):
+    return cast('call', '--block', str(block), hub(ch), 'paused(address,uint32)(bool)', COVENANT, str(id_),
+                rpc=rpc(ch)) == 'true'
 
 
 def lhero():
     steps = deployments('1301')
     lat = [(k, t) for k, st in sorted(steps.items()) if k.startswith('lbreach_XA_') for t in st['txs']
-           if t.get('label') == 'refresh' and t.get('breachLatched') == 1 and t.get('status') == 'ok']
+           if t.get('label') in ('refresh', 'latch') and t.get('breachLatched') == 1 and t.get('status') == 'ok']
     if len(lat) != 1:
         raise SystemExit(f'loops: {len(lat)} recorded latches on X_A (want exactly 1 for this run)')
     otx = lat[0][1]['tx']
@@ -1477,7 +1529,7 @@ def lhero():
         raise SystemExit(f'loops: no Applied >= seq {snd["seq"]} on {dest} yet (searched to {upto}); re-run later')
     db = int(e['blockNumber'], 16)
     row.update(appliedTx=e['transactionHash'], appliedBlock=db, appliedTs=ts(dest, db), latency_s=ts(dest, db) - t0,
-               pausedBefore=paused_at(dest, db - 1), pausedAt=paused_at(dest, db))
+               pausedBefore=paused_at(dest, db - 1, snd['id']), pausedAt=paused_at(dest, db, snd['id']))
     ag = agent_txs(dest)
     pre = [a for a in ag if a['ts'] < t0]
     post = [a for a in ag if a['ts'] >= row['appliedTs']]
@@ -1487,7 +1539,10 @@ def lhero():
     if post:
         ref = post[0]
         row.update(refusedTx=ref['tx'], refusedNonce=ref['nonce'], refusedTs=ref['ts'], refusedBlock=ref['block'],
-                   refusedStatus=ref['status'], refusedSelector=revert_selector(dest, ref) if ref['status'] == 0 else None)
+                   refusedStatus=ref['status'], refusedSelector=revert_selector(dest, ref) if ref['status'] == 0 else None,
+                   refusedVault=ref['vault'],
+                   refusedVaultId=int(cast('call', hub(dest), 'vaultId(address)(uint32)', ref['vault'],
+                                           rpc=rpc(dest)).split()[0]))
     vp, vo = hero_verdict(row)
     doc = load()
     save(doc, 'L-PAUSE', [{**row, 'verdict': vp}], 'L-PAUSE: a 1301 breach of X_A (BreachLatched, script/live/drive.py '
@@ -1550,7 +1605,7 @@ def lplan():
     ch = '1301'
     steps = deployments(ch)
     lat = [t for k, st in sorted(steps.items()) if k.startswith('lbreach_XA_') for t in st['txs']
-           if t.get('label') == 'refresh' and t.get('breachLatched') == 1 and t.get('status') == 'ok']
+           if t.get('label') in ('refresh', 'latch') and t.get('breachLatched') == 1 and t.get('status') == 'ok']
     if len(lat) != 1:
         raise SystemExit(f'loops: {len(lat)} recorded latches on X_A (want 1)')
     latch_block = lat[0]['block']
@@ -1569,13 +1624,16 @@ def lplan():
                 rows.append({**row, 'delivered': False, 'why': f'no reaction ({tr["verdict"]})'})
                 continue
             check_reaction(ch, lx, p['tx'], li, vault, topic0=T_EPOCH)
-            plans = [q for q in callback_requests(lx) if q['payload'][:8] == SEL_PLAN and q['dest'] == ch]
+            plans = [q for q in callback_requests(lx) if q['payload'][:8] == SEL_PLAN and q['dest'] == ch
+                     and int(q['payload'][8 + 64:8 + 128], 16) == int(COVENANT, 16)]  # s8-hero r1 m-06: our Covenant
             row.update(lasnaTx=lx, planSent=len(plans))
             if not plans:
                 rows.append({**row, 'delivered': False, 'why': 'the reaction sent no plan callback'})
                 continue
             a = [plans[0]['payload'][8 + 64 * i:8 + 64 * (i + 1)] for i in range(4)]
             cov, pv, pe = '0x' + a[1][-40:], '0x' + a[2][-40:], int(a[3], 16)
+            if pv.lower() != vault.lower():
+                raise SystemExit(f'loops: {lx}: a plan callback for {pv}, not the EpochRecorded vault {vault}')
             row.update(covenant=cov, planEpoch=pe)
             ns = [n for n in plan_notes(ch, cov, ob, ob + 900) if n['vault'] == pv and n['epoch'] == pe]
             if not ns:
@@ -1608,8 +1666,12 @@ def drip_window(ch, vault, block):
 
 
 def lexit_verdict(r):
-    """Pure (selftest): a DONE answer after the drip, its tokens to the owner only and equal to the note's amounts."""
+    """Pure (selftest): a DONE answer after the drip, its tokens to the owner only and equal to the note's amounts,
+    and the forfeit's value measured (s8-hero r1 M-02): a pool set aside at processing, burned by the drip, and the
+    Covenant's gain from the net supply drop."""
     v = dict(done=bool(r.get('doneTx')),
+             valueMeasured=(r.get('forfeitPoolAtProcess') or 0) > 0 and (r.get('poolBurned') or 0) > 0
+             and r.get('covGainShares') is not None and (r.get('netSupplyDrop') or 0) > 0,
              afterDrip=r.get('doneBlock') is not None and r.get('dripEnd') is not None and r['doneBlock'] >= r['dripEnd'],
              toOwnerExactly=r.get('toOwner') is not None and r['toOwner'] == [r.get('noteA'), r.get('noteB')]
              and r['toOwner'] != [0, 0],
@@ -1621,7 +1683,7 @@ def lexit():
     ch = '1301'
     steps = deployments(ch)
     lat = [t for k, st in sorted(steps.items()) if k.startswith('lbreach_XA_') for t in st['txs']
-           if t.get('label') == 'refresh' and t.get('breachLatched') == 1 and t.get('status') == 'ok']
+           if t.get('label') in ('refresh', 'latch') and t.get('breachLatched') == 1 and t.get('status') == 'ok']
     if len(lat) != 1:
         raise SystemExit(f'loops: {len(lat)} recorded latches on X_A (want 1)')
     lb = lat[0]['block']
@@ -1629,30 +1691,39 @@ def lexit():
     if len(vault) != 1:
         raise SystemExit('loops: X_A is not one recorded L-DYN vault')
     vault = vault[0]
-    owner = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))['steps']['rc']['owner']
+    owner = cast('call', COVENANT, 'owner()(address)', rpc=rpc(ch))  # s8-hero r1 m-04: the Covenant's own owner
     proc, _ = logs_chunked(ch, vault, lb, 10**12, T_PROCESSED)
     if not proc:
         raise SystemExit('loops: no BreachProcessed on X_A after the latch yet; re-run later')
     p0 = proc[0]
     pb = int(p0['blockNumber'], 16)
-    start, drip = drip_window(ch, vault, pb)
     notes = exit_notes(COVENANT, vault, lb)
     done = [n for n in notes if n['outcome'] == EXIT_DONE]
     if not done:
         raise SystemExit(f'loops: no ExitDone yet ({len(notes)} EXIT notes so far); re-run later')
     d = done[0]
+    start, drip = drip_window(ch, vault, d['block'])  # the state the Covenant checked (m-04)
+    sup = lambda b: int(cast('call', '--block', str(b), vault, 'totalSupply()(uint256)', rpc=rpc(ch)).split()[0])  # noqa: E731
+    pool = lambda b: int(cast('call', '--block', str(b), vault, 'extsload(bytes32)(bytes32)', hex(17), rpc=rpc(ch)), 16) >> 128  # noqa: E731
+    cov_sh = int(cast('call', '--block', str(d['block'] - 1), vault, 'balanceOf(address)(uint256)', COVENANT,
+                      rpc=rpc(ch)).split()[0])
+    s_pb, s_pre = sup(pb), sup(d['block'] - 1)
+    p_pb, p_pre = pool(pb), pool(d['block'] - 1)
     r = json.loads(cast('receipt', '--json', d['tx'], rpc=rpc(ch)))
     hook = cast('call', vault, 'HOOK()(address)', rpc=rpc(ch))
     pool = cast('call', hook, 'REF_POOL()(address)', rpc=rpc(ch))
     toks = [cast('call', pool, f'token{i}()(address)', rpc=rpc(ch)).lower() for i in (0, 1)]
     to_owner, others = [0, 0], []
-    for l in r['logs']:
-        if l['topics'] and l['topics'][0] == T_TRANSFER and l['address'].lower() in toks:
-            dst = '0x' + l['topics'][2][-40:]
-            if dst.lower() == owner.lower():
-                to_owner[toks.index(l['address'].lower())] += int(l['data'], 16)
-            elif dst.lower() not in (COVENANT.lower(), vault.lower()):
-                others.append(dst)
+    for l in r['logs']:  # every Transfer in the DONE tx is classified (m-04)
+        if not l['topics'] or l['topics'][0] != T_TRANSFER:
+            continue
+        dst, tok = ('0x' + l['topics'][2][-40:]).lower(), l['address'].lower()
+        if tok in toks and dst == owner.lower():
+            to_owner[toks.index(tok)] += int(l['data'], 16)
+        elif tok == vault.lower() and dst == '0x' + '0' * 40:
+            continue  # the Covenant's shares burned by the withdrawal
+        elif dst not in (COVENANT.lower(), vault.lower()):
+            others.append({'token': tok, 'to': dst})
     t = json.loads(cast('tx', '--json', d['tx'], rpc=rpc(ch)))
     row = {'originTx': lat[0]['tx'], 'latchBlock': lb, 'vault': vault, 'covenant': COVENANT, 'owner': owner,
            'processTx': p0['transactionHash'], 'processBlock': pb, 'forfeitedShares': int(words(p0['data'])[2], 16),
@@ -1660,6 +1731,12 @@ def lexit():
            'earlyBeforeDone': any(n['outcome'] == EXIT_EARLY and n['block'] < d['block'] for n in notes),
            'doneTx': d['tx'], 'destTx': d['tx'], 'doneBlock': d['block'], 'noteA': d['a'], 'noteB': d['b'],
            'toOwner': to_owner, 'otherRecipients': others, 'byProxy': t['to'].lower() == CH[ch]['proxy'].lower(),
+           # the forfeit's value (M-02): the pool set aside at processing and burned by the drip; the net supply drop
+           # over the wait (the burn less the curator's pay minted meanwhile, T-DRIP's measure); the Covenant's gain
+           'forfeitPoolAtProcess': p_pb, 'poolBurned': p_pb - p_pre, 'supplyAtProcess': s_pb,
+           'supplyBeforeDone': s_pre, 'netSupplyDrop': s_pb - s_pre, 'covSharesBeforeDone': cov_sh,
+           'covGainShares': cov_sh * (s_pb - s_pre) // s_pre if s_pre else None,
+           'covGainPpm': (s_pb - s_pre) * 10**6 // s_pre if s_pre else None,
            'latency_s': ts(ch, d['block']) - ts(ch, lb)}
     row['verdict'] = lexit_verdict(row)
     row['verdict']['pass'] = row['verdict']['pass'] and row['byProxy']
