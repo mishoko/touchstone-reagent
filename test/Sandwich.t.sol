@@ -14,6 +14,8 @@ import {IVaultEntries} from "touchstone/interfaces/ITouchstoneVaultExtension.sol
 contract SandwichTest is ReagentEnv {
     ICovenant internal c;
     uint256 internal constant SH = 1e23;
+    uint256 internal constant DEP = SH; // the deposit size of the agent cell AND its PC (s8-forge r1 m-02)
+    uint256 internal constant FRONT = 6e17; // the front leg of every deposit cell
     address internal twin = makeAddr("twin");
 
     function setUp() public {
@@ -145,6 +147,13 @@ contract SandwichTest is ReagentEnv {
         (uint8 o, uint256 u0, uint256 u1) = _exitNow();
         assertEq(o, Outcome.DONE);
         uint256 fair = u0 + u1; // the Covenant's unmoved in-kind take for the same SH
+        // the same price-based exit with no sandwich: what a sale costs on its own (the pool's fee and impact)
+        vm.revertToState(snap);
+        uint256 tu = _val(twin);
+        vm.prank(twin);
+        (uint256 wu,) = IVaultEntries(X.vault).withdraw(SH, 0, 0, twin);
+        _sellAs(twin, wu);
+        uint256 soldUnmoved = _val(twin) - tu;
         vm.revertToState(snap);
         uint256 before = _val(address(this));
         uint256 bought = _front(true, 6e17); // spot far below: token0 is cheap in the pool
@@ -155,11 +164,17 @@ contract SandwichTest is ReagentEnv {
         uint256 sold = _sellAs(twin, w0);
         _back(true, bought);
         uint256 take = _val(twin) - t0;
+        int256 attacker = _net(before);
         assertLt(take, fair, "PC: the price-based exit's take is below the unmoved exit's");
-        emit log_named_uint("price-based take", take);
+        // s8-forge r1 m-01: the loss is the sandwich's, not the sale's own cost: the sandwiched sale takes > 1% less
+        // than the same sale unmoved, and the attacker nets > 0
+        assertLt(take * 100, soldUnmoved * 99, "PC: the sandwich, not the sale, costs the price-based exit > 1%");
+        assertGt(attacker, 0, "PC: the attacker profits from the price-based exit");
+        emit log_named_uint("price-based take (sandwiched)", take);
+        emit log_named_uint("price-based take (unmoved)", soldUnmoved);
         emit log_named_uint("unmoved in-kind take", fair);
         emit log_named_uint("token0 sold", sold);
-        emit log_named_int("attacker net", _net(before));
+        emit log_named_int("attacker net", attacker);
     }
 
     /// @dev `who` sells `amount0` token0 for token1 through the vault's pool (a router call paid by `who`).
@@ -181,15 +196,20 @@ contract SandwichTest is ReagentEnv {
     ///         (PriceTolerance) and the plan's is SKIPPED (slippage); the Covenant pays nothing; the attacker's
     ///         round trip with no victim in between nets at most zero.
     function test_A_DEPOSIT_SANDWICH__theDepositIsRefusedAndTheAttackerLoses() public {
+        // control: the same allocation at the reference goes through
+        uint256 snap0 = vm.snapshotState();
+        vm.prank(agentKey);
+        c.agentAllocate(X.vault, DEP, type(uint256).max, type(uint256).max);
+        vm.revertToState(snap0);
         for (uint256 d; d < 2; ++d) {
             uint256 snap = vm.snapshotState();
             bool down = d == 0;
             uint256 before = _val(address(this));
             uint256 cv = _val(address(c));
-            uint256 bought = _front(down, 6e17);
+            uint256 bought = _front(down, FRONT);
             vm.prank(agentKey);
             vm.expectRevert(CovenantBase.PriceTolerance.selector);
-            c.agentAllocate(X.vault, SH / 10, type(uint256).max, type(uint256).max);
+            c.agentAllocate(X.vault, DEP, type(uint256).max, type(uint256).max);
             _back(down, bought);
             assertEq(_val(address(c)), cv, "the Covenant paid nothing");
             int256 net = _net(before);
@@ -206,33 +226,38 @@ contract SandwichTest is ReagentEnv {
         uint256 snap = vm.snapshotState();
         (uint8 o0,) = _plan(0.1e18);
         assertEq(o0, Outcome.DONE, "control: the same plan at the reference deposits");
-        vm.revertToState(snap);
-        vm.prank(alice);
-        c.setPlan(X.vault, 0.1e18);
-        _keepAlive(X, tier.EPOCH);
-        IVaultEntries(X.vault).poke();
-        uint32 cur = uint32(_ld(X.vault, 8) >> 40);
-        uint256 cv = _val(address(c));
-        _front(true, 6e17);
-        vm.recordLogs();
-        vm.prank(PROXY);
-        hub.rcAllocate{gas: 5_000_000}(RC, address(c), X.vault, cur - 1);
-        (bytes memory d, bool found) = _lastNote(vm.getRecordedLogs(), address(c), NoteKind.PLAN);
-        assertTrue(found);
-        (,, uint8 o, uint8 reason) = abi.decode(d, (address, uint32, uint8, uint8));
-        assertEq(o, Outcome.SKIPPED, "the plan skips at a moved spot");
-        assertEq(reason, Outcome.SKIP_SLIPPAGE, "reason: slippage");
-        assertEq(_val(address(c)), cv, "the plan's tokens stay in the Covenant");
+        for (uint256 dir; dir < 2; ++dir) {
+            vm.revertToState(snap);
+            vm.prank(alice);
+            c.setPlan(X.vault, 0.1e18);
+            _keepAlive(X, tier.EPOCH);
+            IVaultEntries(X.vault).poke();
+            uint32 cur = uint32(_ld(X.vault, 8) >> 40);
+            uint256 cv = _val(address(c));
+            uint256 before = _val(address(this));
+            uint256 bought = _front(dir == 0, FRONT);
+            vm.recordLogs();
+            vm.prank(PROXY);
+            hub.rcAllocate{gas: 5_000_000}(RC, address(c), X.vault, cur - 1);
+            (bytes memory d, bool found) = _lastNote(vm.getRecordedLogs(), address(c), NoteKind.PLAN);
+            _back(dir == 0, bought);
+            assertTrue(found);
+            (,, uint8 o, uint8 reason) = abi.decode(d, (address, uint32, uint8, uint8));
+            assertEq(o, Outcome.SKIPPED, "the plan skips at a moved spot");
+            assertEq(reason, Outcome.SKIP_SLIPPAGE, "reason: slippage");
+            assertEq(_val(address(c)), cv, "the plan's tokens stay in the Covenant");
+            assertLe(_net(before), 0, "the attacker's round trip around a skipped plan does not profit");
+        }
     }
 
     /// @notice A-DEPOSIT-SANDWICH's positive control (max-ins removed): the same deposit without the Covenant's
     ///         max-in check is a direct vault deposit at unbounded max-ins at the moved spot (the Covenant's own call
     ///         minus the check). The depositor overpays at the reference and the attacker nets > 0 on the swap back.
     function test_A_DEPOSIT_SANDWICH__PC_withoutTheMaxInsTheDepositorOverpaysAndTheAttackerProfits() public {
-        uint256 shares = SH;
+        uint256 shares = DEP; // the agent cell's size
         uint256 before = _val(address(this));
         uint256 t0 = _val(twin);
-        uint256 bought = _front(true, 6e17);
+        uint256 bought = _front(true, FRONT);
         vm.prank(twin);
         IVaultEntries(X.vault).deposit(shares, type(uint256).max, type(uint256).max, twin);
         _back(true, bought);
