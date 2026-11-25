@@ -574,8 +574,9 @@ def obs(v, block=None):
             'pendingBreaches': num(w[12])}
 
 
-def ref_tick(ch, pool):
-    return int(cast('call', pool, 'slot0()(uint160,int24,uint16,uint16,uint16,uint8,bool)', rpc=rpc(ch)).splitlines()[1].split()[0])
+def ref_tick(ch, pool, block=None):
+    at = ['--block', str(block)] if block else []
+    return int(cast('call', *at, pool, 'slot0()(uint160,int24,uint16,uint16,uint16,uint8,bool)', rpc=rpc(ch)).splitlines()[1].split()[0])
 
 
 def drive_ref(v, target, step, label, dry):
@@ -585,17 +586,19 @@ def drive_ref(v, target, step, label, dry):
     pool, drv = cast('call', v['hook'], 'REF_POOL()(address)', rpc=rpc(ch)), ref_driver(ch)
     if cast('call', drv, 'owner()(address)', rpc=rpc(ch)).lower() != signer().lower():
         refuse('the RefDriver is not the signer\'s')
+    at = None  # every read after a swap is pinned to that swap's block (a lagging node served the pre-swap tick: s8)
     for _ in range(3):
-        cur = ref_tick(ch, pool)
+        cur = ref_tick(ch, pool, at)
         if abs(cur - target) <= 1:  # a swap stopped at sqrt(target) can land on target - 1 (tick rounding; s8 live)
             return
         up = target > cur
         amt = str(50 * 10**18) if up else str(200_000 * 10**6)
-        send(ch, drv, 'swap(bool,uint256,uint160)', 'false' if up else 'true', amt, str(sqrt_at(target)),
-             expect=(pool, T_V3SWAP), dry=dry, step=step, label=label, extra={'from': cur, 'target': target})
+        rec, _ = send(ch, drv, 'swap(bool,uint256,uint160)', 'false' if up else 'true', amt, str(sqrt_at(target)),
+                      expect=(pool, T_V3SWAP), dry=dry, step=step, label=label, extra={'from': cur, 'target': target})
         if dry:
             return
-    if abs(ref_tick(ch, pool) - target) > 1:
+        at = rec['block']
+    if abs(ref_tick(ch, pool, at) - target) > 1:
         refuse(f'the reference did not reach {target} in 3 swaps (at {ref_tick(ch, pool)})')
 
 
