@@ -914,6 +914,17 @@
      "block": 68752928,
      "gasUsed": 760678,
      "logIndex": 18
+    },
+    {
+     "label": "setRules",
+     "tx": "0x1836b499005a345e51073a6082ed14cb2635c0940ad22cacb3ebf2a2920dbd3e",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setRules",
+     "rules": "(1,true,0,6000,50000000000000000000,false,0,5000000000000000000,[2,1,0,0])",
+     "block": 68756044,
+     "gasUsed": 182776,
+     "logIndex": 0
     }
    ]
   },

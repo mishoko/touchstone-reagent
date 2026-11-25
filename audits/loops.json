@@ -1102,6 +1102,27 @@
    "id": "L-GAS-partial"
   },
   {
+   "chain": 1301,
+   "kind": "budget",
+   "destTx": "0x7ba9621c1e7f70467b9374634b14c93ff0ed90c1b76314c15e4d54b9e20ee163",
+   "txGas": 630570,
+   "gasLimit": 630570,
+   "atGasLimit": true,
+   "need": 360000,
+   "entryGas": 447209,
+   "F_measured": 176262.44444444444,
+   "F_spec": 177200,
+   "calldataBytes": 516,
+   "hubFrameError": null,
+   "precheck": 405714.28571428574,
+   "entryCoversPrecheck": true,
+   "outcome": null,
+   "fillsCell": true,
+   "traceSource": "parity trace_transaction (publicnode)",
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
    "chain": 11155111,
    "kind": "vault",
    "destTx": "0x56a544f0feed436d37a77a996c41b83dc360eb4c9f2c2573d9d92ce122769cfe",
@@ -1159,6 +1180,27 @@
    "precheck": 2386666.6666666665,
    "entryCoversPrecheck": true,
    "outcome": 1,
+   "fillsCell": true,
+   "traceSource": "parity trace_transaction (publicnode)",
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
+   "chain": 11155111,
+   "kind": "budget",
+   "destTx": "0xe6aa9751d8a18988ecc6e133f9907cdd51ddd3ad0992769a9cb97e2984879fc3",
+   "txGas": 855598,
+   "gasLimit": 855598,
+   "atGasLimit": true,
+   "need": 500000,
+   "entryGas": 603552,
+   "F_measured": 242465.80952380947,
+   "F_spec": 243300,
+   "calldataBytes": 516,
+   "hubFrameError": null,
+   "precheck": 547936.5079365079,
+   "entryCoversPrecheck": true,
+   "outcome": null,
    "fillsCell": true,
    "traceSource": "parity trace_transaction (publicnode)",
    "pass": true,
@@ -1233,12 +1275,12 @@
    "n": 1
   },
   "L-GAS-partial": {
-   "commit": "cc90854",
-   "dirty": true,
+   "commit": "5e01027",
+   "dirty": false,
    "src_sha": "26de10206487b77f",
-   "recorded_at": "2026-11-25T12:07:35+00:00",
-   "note": "one delivery per (chain, kind) at exactly its gasLimit; the Hub entry gas from a parity trace; F = gasLimit - entry*64/63 (spec \u00a75.6, OQ-19); missing or failing: ['1301/budget', '1301/plan', '11155111/budget', '11155111/exit']",
-   "n": 8
+   "recorded_at": "2026-11-25T12:12:27+00:00",
+   "note": "one delivery per (chain, kind) at exactly its gasLimit; the Hub entry gas from a parity trace; F = gasLimit - entry*64/63 (spec \u00a75.6, OQ-19); missing or failing: ['1301/plan', '11155111/exit']",
+   "n": 10
   },
   "L-CRON-failing": {
    "commit": "ca3db98",
