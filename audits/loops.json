@@ -2651,6 +2651,98 @@
     "pass": true
    },
    "id": "L-OFFLINE"
+  },
+  {
+   "originTx": "0xc0e16af14e86eb0864e3193ba7d5f5ee47a2009727990d1cfea3ce80be0d75ec",
+   "originBlock": 68752851,
+   "logIndex": 7,
+   "originTs": 1795605279,
+   "vault": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+   "epoch": 19097,
+   "lasnaTx": "0xc80406fb0626d25e378af1cf00ac47baf8802a9599df0867eba865f3ad9ee64d",
+   "planSent": 0,
+   "reactionChecked": true,
+   "delivered": false,
+   "withheld": true,
+   "planSet": true,
+   "pausedAtOrigin": false,
+   "why": "the reaction sent no plan callback (the RC withholds it while paused or an exit is pending; RcExt.onEpoch)",
+   "latchBlock": 68766968,
+   "id": "L-PLAN"
+  },
+  {
+   "originTx": "0x88618e3ddc155ff93f4ce227d4b9222f011378298cd0228ee349a17fe991b715",
+   "originBlock": 68756447,
+   "logIndex": 7,
+   "originTs": 1795608875,
+   "vault": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+   "epoch": 19098,
+   "lasnaTx": "0x4e1b3f06904e839052f5585a8403345fb3d8a3852579ea18fb9e98eb447cf9e8",
+   "planSent": 1,
+   "reactionChecked": true,
+   "covenant": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+   "planEpoch": 19098,
+   "delivered": true,
+   "noteTx": "0xc62444d0970717404e6a47ef476c2bfc74265a48780c89f995ec1bbb9f45d8d9",
+   "noteBlock": 68756449,
+   "noteTs": 1795608877,
+   "outcome": 1,
+   "reason": 0,
+   "byProxy": true,
+   "latency_s": 2,
+   "latchBlock": 68766968,
+   "id": "L-PLAN"
+  },
+  {
+   "originTx": "0x8926b044564115bab04d80b250ddec4fbe73b4b8a55fbd3da7051a18fb6e1a59",
+   "originBlock": 68761806,
+   "logIndex": 7,
+   "originTs": 1795614234,
+   "vault": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+   "epoch": 19099,
+   "lasnaTx": "0xd91a655a842b76b1748733e177cdb4e99df3663dddd0881a76f780edecc8e6ba",
+   "planSent": 1,
+   "reactionChecked": true,
+   "covenant": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+   "planEpoch": 19099,
+   "delivered": true,
+   "noteTx": "0x90287a7fba325e5d73a0dfbcba58c11f040aec868877b976a38cf26a585dfc33",
+   "noteBlock": 68761808,
+   "noteTs": 1795614236,
+   "outcome": 1,
+   "reason": 0,
+   "byProxy": true,
+   "latency_s": 2,
+   "latchBlock": 68766968,
+   "id": "L-PLAN"
+  },
+  {
+   "originTx": "0x5904e526ff15cafecd70f6e53488c7c8a4479527cca16a846dd1153d834b331b",
+   "originBlock": 68767256,
+   "logIndex": 2,
+   "originTs": 1795619684,
+   "vault": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+   "epoch": 19101,
+   "lasnaTx": "0x104dbcf8124bc202dd37687d36da670071d299b825a2279755753197e17c5a32",
+   "planSent": 0,
+   "reactionChecked": true,
+   "delivered": false,
+   "withheld": true,
+   "planSet": true,
+   "pausedAtOrigin": true,
+   "why": "the reaction sent no plan callback (the RC withholds it while paused or an exit is pending; RcExt.onEpoch)",
+   "latchBlock": 68766968,
+   "id": "L-PLAN"
+  },
+  {
+   "verdict": {
+    "doneBeforeBreach": true,
+    "skippedPausedAfter": false,
+    "withheldWhilePaused": true,
+    "pass": true
+   },
+   "latchBlock": 68766968,
+   "id": "L-PLAN"
   }
  ],
  "runs": {
@@ -2741,6 +2833,14 @@
    "recorded_at": "2026-11-25T15:12:57+00:00",
    "note": "L-OFFLINE: the agent's last allocation landed before the breach, it sent nothing until after the pause was delivered (nonce + 1), and that allocation was refused (spec \u00a73.7, \u00a79.5, C-03)",
    "n": 1
+  },
+  "L-PLAN": {
+   "commit": "dff2610",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T15:17:43+00:00",
+   "note": "L-PLAN: each X_A EpochRecorded (drive.py poke) -> the RC reaction -> its rcAllocate -> the PLAN note on the 1301 Hub: DONE before the breach, SKIPPED(PAUSED) after it (spec \u00a73.7, \u00a79.5)",
+   "n": 5
   }
  },
  "stats": [
