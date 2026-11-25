@@ -12,6 +12,17 @@
    "address": "0xdb671db6df964f18d58d23d8324ae1faae43ef9e",
    "contract": "RcB6",
    "runtimeMaskedSha": "5de87297f4d4acc81f5429e1291400c3dacbf069ed91cc812afc6d57f7fd4aa4"
+  },
+  "rcext": {
+   "commit": "2e24f1e",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T06:54:21+00:00",
+   "from": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
+   "tx": "0xafb7507277dc35ac2fa446c24d44d3efe445a33b3e77747472a1a21501dac1b4",
+   "address": "0xa9b408a944337a1bbce77c6823fad226de4c228d",
+   "contract": "RcExt",
+   "runtimeMaskedSha": "e0f819b2ed8cac51ecf1061ac7c1c898f16fffb08879428f23974b7c9f219287"
   }
  }
 }
