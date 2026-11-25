@@ -230,10 +230,11 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
     if r is None:
         refuse(f'{h}: no receipt after 2 min (recorded as pending in {step}): check it before anything else')
     ok = int(r['status'], 16) == 1
-    mine = [l for l in r['logs'] if l['topics'] and l['address'].lower() == expect[0].lower()
-            and l['topics'][0] == expect[1]]
+    # expect = None: a call that emits nothing (setAllowed); its receipt status alone decides
+    mine = [None] if expect is None else [l for l in r['logs'] if l['topics'] and l['address'].lower() == expect[0].lower()
+                                          and l['topics'][0] == expect[1]]
     rec = {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if ok else 'FAILED',
-           'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 else None}
+           'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 and mine[0] else None}
     record_update(ch, step, h, rec)
     rec['tx'] = h
     if not (ok and len(mine) == 1):
@@ -242,7 +243,8 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
 
 
 # label (or its prefix) -> the log a landed send of that kind must carry (the same as each send's `expect`)
-EXPECT = {'action': T_ACTION, 'poke': T_EPOCH, 'factory': T_ALLOWED, 'covenant': T_CREATED, 'setRules': T_NOTE,
+NO_LOG = 'none'  # a label whose call emits nothing: its status alone decides
+EXPECT = {'setAllowed': NO_LOG, 'setPlan': T_NOTE, 'action': T_ACTION, 'poke': T_EPOCH, 'factory': T_ALLOWED, 'covenant': T_CREATED, 'setRules': T_NOTE,
           'fund': T_TRANSFER, 'allocate': T_NOTE, 'retire': T_RETIRED, 'spoof': T_TRANSFER}
 
 
@@ -262,11 +264,11 @@ def resolve_pending(step, tx):
     r = receipt(ch, tx, tries=3)
     if r is None:
         refuse(f'{tx}: still no receipt')
-    mine = [l for l in r['logs'] if l['topics'] and l['topics'][0] == want]
+    mine = [None] if want == NO_LOG else [l for l in r['logs'] if l['topics'] and l['topics'][0] == want]
     ok = int(r['status'], 16) == 1 and len(mine) == 1
     record_update(ch, step, tx, {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16),
                                  'status': 'ok' if ok else 'FAILED',
-                                 'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 else None})
+                                 'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 and mine[0] else None})
     print(f'drive: {step} {tx} resolved: {"ok" if ok else "FAILED (status or the expected log)"}')
 
 
@@ -394,6 +396,25 @@ def cov_alloc(name, shares, dry):
     send(ch, c, 'allocate(address,uint256,uint256,uint256)', v['vault'], str(shares), m0, m1,
          expect=(hub_, T_NOTE), dry=dry, step=step, label=f'allocate_{name}')
     print(f'drive: allocate {shares} shares of {name} {"(dry: does not revert)" if dry else "landed"}')
+
+
+def cov_plan(name, amount, dry):
+    """A standing plan (A7b): `amount` token1 per vault epoch into VAULT, run by the RC on the vault's
+    `EpochRecorded` (rcAllocate: the L-GAS plan cell). setAllowed(VAULT) first (plans go only to allowlisted vaults);
+    setPlan emits the STATE note that carries the plan to the RC."""
+    v = resolve(name)
+    ch = v['chain']
+    _, hub_ = reagent(ch)
+    c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    if cast('call', c, 'allowed(address)(bool)', v['vault'], rpc=rpc(ch)) != 'true':
+        send(ch, c, 'setAllowed(address,bool)', v['vault'], 'true', expect=None, dry=dry, step=step,
+             label=f'setAllowed_{name}')
+        if dry:
+            print('drive: dry run: setAllowed does not revert (setPlan is dry-run after it lands)')
+            return
+    send(ch, c, 'setPlan(address,uint128)', v['vault'], str(amount), expect=(hub_, T_NOTE), dry=dry, step=step,
+         label=f'setPlan_{name}')
+    print(f'drive: plan {amount} into {name} {"(dry: does not revert)" if dry else "landed"}')
 
 
 RETIRABLE = ('YA',)  # owner decision s7: only Y_A (curator 2) is retired; X_A / X_B carry the L-CON paths
@@ -748,6 +769,8 @@ def main(argv):
         cov_fund(name, opt('--t0', 0), opt('--t1', 0), '--dry' in argv)
     elif cmd == 'cov-alloc':
         cov_alloc(name, opt('--shares', 0), '--dry' in argv)
+    elif cmd == 'cov-plan':
+        cov_plan(name, opt('--amount', 10**16), '--dry' in argv)
     elif cmd == 'retire':
         retire(name, '--dry' in argv, '--yes-irreversible' in argv)
     elif cmd == 'spoof-deploy':

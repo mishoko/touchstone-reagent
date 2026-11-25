@@ -764,6 +764,26 @@
      "block": 68751711,
      "gasUsed": 293671,
      "logIndex": 6
+    },
+    {
+     "label": "setAllowed_XA",
+     "tx": "0x0006089a1f840982985c8d0b88a08d94ccfaa50a572a840d6c129c673430884f",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setAllowed",
+     "block": 68752235,
+     "gasUsed": 52888,
+     "logIndex": null
+    },
+    {
+     "label": "setPlan_XA",
+     "tx": "0x8ab2c0e992b28dfbb97df338b1a828020bfdc8933677d5343fb29e7fe68832f2",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setPlan",
+     "block": 68752237,
+     "gasUsed": 206017,
+     "logIndex": 0
     }
    ]
   }
