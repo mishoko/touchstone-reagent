@@ -39,6 +39,7 @@ MODULES = ('RcB6', 'RcExt', 'ReagentRC')
 
 
 KEYSTORE = {'DEPLOYER_PK': 'owner', 'RC_DEPLOYER_PK': 'rcdep'}
+OFFLINE = {'abi-encode'}  # subcommands that take no --rpc-url
 
 
 def _wallet(key, env=os.environ):
@@ -54,7 +55,8 @@ def _wallet(key, env=os.environ):
 def cast(*a, key=None, rpc=LASNA):
     w = _wallet(key) if key else []
     # options before the positionals: `send --create <CODE> [SIG] [ARGS]...` takes anything after CODE as ARGS (s6)
-    r = subprocess.run(['cast', a[0], *w, '--rpc-url', rpc, *a[1:]], capture_output=True, text=True)
+    net = [] if a[0] in OFFLINE else ['--rpc-url', rpc]
+    r = subprocess.run(['cast', a[0], *w, *net, *a[1:]], capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(f'rc: cast {a[0]} failed: {(r.stderr or r.stdout).strip()[-300:]}')
     return r.stdout.strip()
