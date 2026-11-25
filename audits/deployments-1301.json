@@ -685,6 +685,87 @@
      "logIndex": 5
     }
    ]
+  },
+  "lcron_1301_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "9058d60",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T10:54:09+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "factory_allow",
+     "tx": "0x3a580fd639234c589697cbc6b3392721a23fe5303ee33ab902e621a13da756ec",
+     "status": "ok",
+     "to": "0xa3fe3c3756fc204df54a221a45405e82b19d481f",
+     "function": "allow",
+     "block": 68751622,
+     "gasUsed": 45472,
+     "logIndex": 0
+    },
+    {
+     "label": "covenant_create",
+     "tx": "0xcd8a570f6ee099b5a0e9d07a7115f05c2d195775a54f781793b7d3e1d5fbeecd",
+     "status": "ok",
+     "to": "0xa3fe3c3756fc204df54a221a45405e82b19d481f",
+     "function": "create",
+     "block": 68751624,
+     "gasUsed": 188983,
+     "logIndex": 1
+    },
+    {
+     "label": "setRules",
+     "tx": "0xdf0506688fac5962d3ca8a89882ae23f2ba90e074a7cf0dd5312944b8582e7d1",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setRules",
+     "rules": "(1,true,0,6000,100000000000000000000,false,0,10000000000000000000,[2,1,0,0])",
+     "block": 68751635,
+     "gasUsed": 301388,
+     "logIndex": 0
+    },
+    {
+     "label": "fund_covenant",
+     "tx": "0x769ae343ef654f89ad9d2fbf194b8a90d6d108d90d1aa28356b938a4566b6f83",
+     "status": "ok",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64",
+     "function": "transfer",
+     "block": 68751645,
+     "gasUsed": 51260,
+     "logIndex": 0
+    },
+    {
+     "label": "fund_covenant",
+     "tx": "0x657792d2770d3a7f6b2a1e301cdfbc136274b27eb69c6609b02ee7d5788993e7",
+     "status": "ok",
+     "to": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d",
+     "function": "transfer",
+     "block": 68751647,
+     "gasUsed": 51284,
+     "logIndex": 0
+    },
+    {
+     "label": "allocate_YA",
+     "tx": "0xf6db032f2db2e2862dcad419ec78a2673a56a61df02155e6b97e8a2955d92e5e",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "allocate",
+     "block": 68751660,
+     "gasUsed": 1127572,
+     "logIndex": 19
+    },
+    {
+     "label": "retire_YA",
+     "tx": "0x6f03d328c826a6d3c86421dfdebd0502e549c7ca1e88affbc2d264338204f3b5",
+     "status": "ok",
+     "to": "0xa6ebf9196905ddf5174403a932d75654d5d02a5d",
+     "function": "retire",
+     "block": 68751711,
+     "gasUsed": 293671,
+     "logIndex": 6
+    }
+   ]
   }
  }
 }

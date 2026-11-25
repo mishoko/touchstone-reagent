@@ -404,6 +404,47 @@
      "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0"
     }
    ]
+  },
+  "lcron_11155111_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "9058d60",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T10:57:16+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "factory_allow",
+     "tx": "0xffdfd3c64357aa6984a9a60f8032feafd40a2f321ff42f94af93fd373d7fabd8",
+     "status": "ok",
+     "to": "0xa3fe3c3756fc204df54a221a45405e82b19d481f",
+     "function": "allow",
+     "block": 12209109,
+     "gasUsed": 127492,
+     "logIndex": 101
+    },
+    {
+     "label": "covenant_create",
+     "tx": "0x6b288cb2854d7879a9ebdc44f0af34c011813c5fd0e10ef2560357056c8a4ff5",
+     "status": "ok",
+     "to": "0xa3fe3c3756fc204df54a221a45405e82b19d481f",
+     "function": "create",
+     "block": 12209110,
+     "gasUsed": 847545,
+     "logIndex": 43
+    },
+    {
+     "label": "setRules",
+     "tx": "0xbc3ba0ca1c55c2b0c6583ba5d016d3cd84b79aaa29908117979dedc2bdca1e71",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setRules",
+     "rules": "(1,true,0,6000,100000000000000000000,false,0,10000000000000000000,[2,1,0,0])",
+     "block": 12209111,
+     "gasUsed": 1008548,
+     "logIndex": 97
+    }
+   ]
   }
  }
 }

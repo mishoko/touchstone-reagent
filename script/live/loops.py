@@ -493,8 +493,28 @@ def gas_set_logs():
 def hub_entry(ch, tx):
     """The gas the callback proxy forwarded into the Hub (the first call frame whose callee is the Hub with a
     callback selector), from a parity `trace_transaction`; the kind is that frame's selector."""
-    tr = json.loads(cast('rpc', 'trace_transaction', tx, rpc=TRACE[ch]))
     h = hub(ch).lower()
+    tr = None
+    for _ in range(5):  # publicnode load-balances across nodes, some without trace_ (seen s7): a bounded retry
+        try:
+            tr = json.loads(cast('rpc', 'trace_transaction', tx, rpc=TRACE[ch]))
+            break
+        except SystemExit as e:
+            if 'insufficient changesets' in str(e) or 'pruned' in str(e).lower():
+                break
+    if tr is None:
+        if ch != '1301':
+            raise SystemExit(f'loops: {ch} {tx}: no trace_transaction after 5 tries')
+        # the 1301 publicnode keeps ~10k blocks of state; drpc's callTracer serves older 1301 deliveries (same frame)
+        ct = json.loads(cast('rpc', 'debug_traceTransaction', tx, '{"tracer":"callTracer"}', rpc=DEBUG_1301))
+        tr = []
+
+        def walk(f):
+            tr.append({'action': {'to': f.get('to'), 'callType': (f.get('type') or '').lower(), 'input': f['input'],
+                                  'gas': f['gas']}, 'error': f.get('error')})
+            for c in f.get('calls', []):
+                walk(c)
+        walk(ct)
     fr = [f for f in tr if (f['action'].get('to') or '').lower() == h and f['action'].get('callType') == 'call'
           and f['action']['input'][2:10] in KIND_SEL]
     if not fr:
@@ -764,6 +784,95 @@ def lspoof():
     save(doc, 'L-SPOOF', [row], note)
     print('loops: L-SPOOF', {k: row[k] for k in ('destStatus', 'rejectedNotRc', 'charged', 'billed', 'pass')})
 
+
+# ------------------------------------------------------------------ L-CRON (spec §9.5, C-10, §5.5 the Cron gate)
+
+CRON_BASELINE = 27  # the RC's subscriptions at the s7 pre-flight, Cron off (MCP list_subscriptions, 2026-11-25)
+T_MODE = '0x73f069d8a008c9e2fe78e308751100d873455f99593c7d60eff545e91a90ab04'  # RcBase.T_MODE
+
+
+def rc_subscriptions():
+    sys.path.insert(0, os.path.join(ROOT, 'script', 'rnk'))
+    from rmcp import call  # noqa: E402
+    d = call('list_subscriptions', {'rc': RC, 'lookbackBlocks': 200000})
+    if not isinstance(d, dict) or not isinstance(d.get('data'), dict):
+        raise SystemExit('loops: the MCP subscription listing failed: refusing')
+    return d['data']
+
+
+def lasna_input(tx):
+    t = json.loads(cast('tx', '--json', tx, rpc=LASNA))
+    return t, words(t['input'][10:])
+
+
+def exit_notes(c, vault, frm):
+    """The Hub's EXIT notes for (covenant, vault) from `frm`: (tx, block, outcome) in order."""
+    h = hub('1301')
+    es, _ = logs_chunked('1301', h, frm, 10**12, T_NOTE)
+    out = []
+    for e in sorted(es, key=lambda x: (int(x['blockNumber'], 16), int(x['logIndex'], 16))):
+        if int(e['topics'][3], 16) != 2 or int(e['topics'][2], 16) != int(c, 16):
+            continue
+        w = words(e['data'])[2:]
+        if int(w[0], 16) != int(vault, 16):
+            continue
+        out.append({'tx': e['transactionHash'], 'block': int(e['blockNumber'], 16), 'outcome': int(w[1], 16),
+                    'a': int(w[3], 16), 'b': int(w[4], 16)})
+    return out
+
+
+def lcron():
+    """L-CRON: the Cron subscribe and unsubscribe txs around one exit (the owner's Covenant on Y_A, retired by its
+    curator: B3 gone, the owner decision of s7), and the RC's subscription count back to its baseline."""
+    st = [s for k, s in deployments('1301').items() if k.startswith('lcron_')]
+    ret = [t for s in st for t in s['txs'] if t['label'] == 'retire_YA' and t.get('status') == 'ok']
+    alloc = [t for s in st for t in s['txs'] if t['label'] == 'allocate_YA' and t.get('status') == 'ok']
+    if len(ret) != 1 or not alloc:
+        raise SystemExit('loops: L-CRON needs one landed retire_YA and an allocate_YA (lcron_ steps)')
+    rtx = ret[0]['tx']
+    r = json.loads(cast('receipt', '--json', rtx, rpc=rpc('1301')))
+    mode = [l for l in r['logs'] if l['topics'][0] == T_MODE]
+    if len(mode) != 1:
+        raise SystemExit(f'loops: {rtx}: not one ModeChanged log')
+    vault, li = mode[0]['address'], int(mode[0]['logIndex'], 16)
+    covenant = alloc[-1]['to']
+    d = rc_subscriptions()
+    hist = sorted(d['history'], key=lambda x: x['block'])
+    # the Cron filter id: the one subscribed in the retire's reaction
+    tr = mcp_trace(('1301'), rtx, li)
+    rx = (tr['data'].get('reaction') or {}).get('tx')
+    if not rx:
+        raise SystemExit(f'loops: no reaction to the retire\'s ModeChanged yet ({tr["verdict"]})')
+    t, w = lasna_input(rx)
+    if w[0] != RC[2:].lower().rjust(64, '0') or w[12] != rtx[2:].lower() or int(w[13], 16) != li or w[4] != T_MODE[2:]:
+        raise SystemExit(f'loops: {rx} is not the RC\'s reaction to the retire\'s ModeChanged')
+    subs = [h_ for h_ in hist if h_['tx'].lower() == rx.lower() and h_['kind'] == 'Subscribe']
+    if len(subs) != 1:
+        raise SystemExit(f'loops: the retire\'s reaction {rx} made {len(subs)} subscriptions (want the Cron one)')
+    fid = subs[0]['filterId']
+    unsubs = [h_ for h_ in hist if h_['filterId'] == fid and h_['kind'] == 'Unsubscribe' and h_['block'] > subs[0]['block']]
+    notes = exit_notes(covenant, vault, ret[0]['block'])
+    done = [n for n in notes if n['outcome'] == 1]
+    active = sum(1 for s in d['subscriptions'] if s['active'])
+    row = {'originTx': rtx, 'vault': vault.lower(), 'covenant': covenant, 'reactionTx': rx, 'cronFilter': fid,
+           'subscribeTx': subs[0]['tx'], 'subscribeBlock': subs[0]['block'], 'exitNotes': notes,
+           'baselineSubscriptions': CRON_BASELINE, 'activeSubscriptionsNow': active}
+    if not done:
+        raise SystemExit(f'loops: no ExitDone yet for {covenant} on {vault} (notes so far: {notes}); re-run later')
+    if not unsubs:
+        raise SystemExit('loops: Cron is still subscribed after the exit; re-run later (the sweep ends within 2 laps)')
+    u = unsubs[0]
+    ut, uw = lasna_input(u['tx'])
+    row.update(unsubscribeTx=u['tx'], unsubscribeBlock=u['block'],
+               unsubscribeInCronReaction=uw[0] == RC[2:].lower().rjust(64, '0') and uw[4] == T_CRON100[2:],
+               exitDoneTx=done[0]['tx'], exitDoneBlock=done[0]['block'], destTx=done[0]['tx'],
+               cronTicks=len(cron_reactions(subs[0]['block'], u['block'])))
+    row['pass'] = (row['unsubscribeInCronReaction'] and active == CRON_BASELINE
+                   and not any(s['filterId'] == fid and s['active'] for s in d['subscriptions']))
+    doc = load()
+    save(doc, 'L-CRON', [row], 'Cron subscribed in the reaction to the retire (B3 gone) and unsubscribed by a Cron '
+         'reaction after the patient exit was DONE; the subscription count back to its baseline (spec §9.5, C-10)')
+    print('loops: L-CRON', {k: row[k] for k in ('subscribeBlock', 'unsubscribeBlock', 'cronTicks', 'activeSubscriptionsNow', 'pass')})
 
 # ------------------------------------------------------------------ selftest (offline: the seams replaced; s7 r1 M-03)
 
@@ -1064,7 +1173,7 @@ if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else ''
     if what == '--selftest':
         sys.exit(0 if selftest() else 1)
-    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof}
+    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron}
     if what not in cmds:
         raise SystemExit(__doc__)
     cmds[what]()

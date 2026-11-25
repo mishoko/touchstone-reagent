@@ -523,6 +523,127 @@
    "charged": 145558050000,
    "billed": true,
    "id": "L-SPOOF"
+  },
+  {
+   "chain": 1301,
+   "kind": "vault",
+   "destTx": "0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088",
+   "txGas": 325202,
+   "gasLimit": 325202,
+   "atGasLimit": true,
+   "need": 91000,
+   "entryGas": 147067,
+   "F_measured": 175800.60317460317,
+   "F_spec": 177200,
+   "calldataBytes": 420,
+   "hubFrameError": null,
+   "precheck": 132444.44444444444,
+   "entryCoversPrecheck": true,
+   "outcome": null,
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
+   "chain": 1301,
+   "kind": "conduct",
+   "destTx": "0x190adeb63586ec5920a1b7f2dc887ed0e79913a0e06c827a5126ddc53a217c10",
+   "txGas": 261631,
+   "gasLimit": 261631,
+   "atGasLimit": true,
+   "need": 35000,
+   "entryGas": 84271,
+   "F_measured": 176022.3650793651,
+   "F_spec": 177200,
+   "calldataBytes": 516,
+   "hubFrameError": null,
+   "precheck": 75555.55555555556,
+   "entryCoversPrecheck": true,
+   "outcome": null,
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
+   "chain": 1301,
+   "kind": "exit",
+   "destTx": "0xf46f75e98c1a4bf1cc1a3e3ccd5036b6937cdece8b6e045541289f6959e1b155",
+   "txGas": 1220873,
+   "gasLimit": 1220873,
+   "atGasLimit": true,
+   "need": 880000,
+   "entryGas": 1028220,
+   "F_measured": 176332.04761904757,
+   "F_spec": 177200,
+   "calldataBytes": 484,
+   "hubFrameError": null,
+   "precheck": 933968.253968254,
+   "entryCoversPrecheck": true,
+   "outcome": 2,
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
+   "chain": 11155111,
+   "kind": "vault",
+   "destTx": "0x56a544f0feed436d37a77a996c41b83dc360eb4c9f2c2573d9d92ce122769cfe",
+   "txGas": 784080,
+   "gasLimit": 784080,
+   "atGasLimit": true,
+   "need": 437000,
+   "entryGas": 533678,
+   "F_measured": 241930.9206349206,
+   "F_spec": 243300,
+   "calldataBytes": 420,
+   "hubFrameError": null,
+   "precheck": 483936.50793650793,
+   "entryCoversPrecheck": true,
+   "outcome": null,
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
+   "chain": 11155111,
+   "kind": "conduct",
+   "destTx": "0x6195de50baf14362b6280177f04bda142ad3de99a1416b71e60b078fdd3f1ca7",
+   "txGas": 458279,
+   "gasLimit": 458279,
+   "atGasLimit": true,
+   "need": 150000,
+   "entryGas": 212748,
+   "F_measured": 242154.04761904763,
+   "F_spec": 243300,
+   "calldataBytes": 516,
+   "hubFrameError": null,
+   "precheck": 192380.95238095237,
+   "entryCoversPrecheck": true,
+   "outcome": null,
+   "pass": true,
+   "id": "L-GAS-partial"
+  },
+  {
+   "kind": "cronForward",
+   "reactions": [
+    {
+     "lasnaTx": "0x48e8cbddb2f346830897e9f47a35b70eab7de9f2febbd9dbd4042aa6f30a1155",
+     "forward": 833592
+    },
+    {
+     "lasnaTx": "0x04487d4aee8f93bf1201a1e46360d42cf2a920268fd9adbeaefb07d1d8682d06",
+     "forward": 833592
+    },
+    {
+     "lasnaTx": "0x2103e74347d33ff38c43f49cb2e36dae116ba8b02fde9a55be9ae488c346d449",
+     "forward": 833604
+    }
+   ],
+   "liveForwardMin": 833592,
+   "modelledForward": 749597,
+   "reservationLhsMax": 624491,
+   "marginRule": "lhs <= 0.9 x the live Cron forward (spec \u00a75.5, C3-04)",
+   "liveAtLeastModelled": true,
+   "pass": true,
+   "originTx": "0x48e8cbddb2f346830897e9f47a35b70eab7de9f2febbd9dbd4042aa6f30a1155",
+   "destTx": "0x48e8cbddb2f346830897e9f47a35b70eab7de9f2febbd9dbd4042aa6f30a1155",
+   "id": "L-GAS-partial"
   }
  ],
  "runs": {
@@ -565,6 +686,14 @@
    "recorded_at": "2026-11-25T10:53:38+00:00",
    "note": "a third-party RC's rcConduct to the 1301 Hub: rejected (NotRc, word 0 = the third party, no Hub log, conduct(99) zero); the charge 145558050000 wei (billed: True) (OQ-18, PB-12)",
    "n": 1
+  },
+  "L-GAS-partial": {
+   "commit": "9058d60",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T11:02:41+00:00",
+   "note": "one delivery per (chain, kind) at exactly its gasLimit; the Hub entry gas from a parity trace; F = gasLimit - entry*64/63 (spec \u00a75.6, OQ-19); missing or failing: ['1301/budget', '1301/plan', '11155111/budget', '11155111/exit', '11155111/plan']",
+   "n": 6
   }
  },
  "stats": [
