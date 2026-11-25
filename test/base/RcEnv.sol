@@ -153,6 +153,7 @@ abstract contract RcEnv is TsEnv {
         bytes4 selector;
         uint64 gasLimit;
         uint8 outcome; // 1 delivered ok, 2 reverted (charged), 3 dropped < 100k, 4 Hub in debt, 5 dropped by policy
+        uint256 arg2; // the payload's third argument word (the curator id of rcBudget/rcConduct; s6 r1 m-3)
     }
 
     enum Act {
@@ -633,7 +634,7 @@ abstract contract RcEnv is TsEnv {
                 dueQ.push(Due(rs[i], at));
                 dueQ.push(Due(rs[i], at));
             } else {
-                deliveries.push(Delivery(rs[i].chainId, rs[i].recipient, _sel(rs[i].payload), rs[i].gasLimit, 5));
+                deliveries.push(Delivery(rs[i].chainId, rs[i].recipient, _sel(rs[i].payload), rs[i].gasLimit, 5, _arg2(rs[i].payload)));
             }
         }
     }
@@ -675,15 +676,15 @@ abstract contract RcEnv is TsEnv {
     function _deliver(Req memory r) internal {
         bytes4 s = _sel(r.payload);
         if (r.gasLimit < 100_000) {
-            deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, 3));
+            deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, 3, _arg2(r.payload)));
             return;
         }
         if (r.chainId != CA && r.chainId != CB) {
-            deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, 5));
+            deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, 5, _arg2(r.payload)));
             return;
         }
         if (hubInDebt[r.chainId]) {
-            deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, 4));
+            deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, 4, _arg2(r.payload)));
             return;
         }
         uint256 saveCur = cur;
@@ -699,7 +700,7 @@ abstract contract RcEnv is TsEnv {
         uint256 g = r.gasLimit > ch[r.chainId].F ? (r.gasLimit - ch[r.chainId].F) * 63 / 64 : 0;
         vm.prank(ch[r.chainId].proxy);
         (bool ok,) = to.call{gas: g}(p);
-        deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, ok ? 1 : 2));
+        deliveries.push(Delivery(r.chainId, r.recipient, s, r.gasLimit, ok ? 1 : 2, _arg2(r.payload)));
         _on(saveCur);
     }
 
@@ -736,7 +737,23 @@ abstract contract RcEnv is TsEnv {
         }
     }
 
+    function _arg2(bytes memory p) internal pure returns (uint256 w) {
+        if (p.length >= 100) {
+            assembly ("memory-safe") {
+                w := mload(add(p, 100))
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ queries
+
+    /// @notice Deliveries to chain `c` with selector `s` whose third argument word is `a` (an id, s6 r1 m-3).
+    function _deliveredFor(uint256 c, bytes4 s, uint256 a) internal view returns (uint256 n) {
+        for (uint256 i; i < deliveries.length; ++i) {
+            Delivery memory d = deliveries[i];
+            if (d.chainId == c && d.selector == s && d.arg2 == a) ++n;
+        }
+    }
 
     function _deliveredCount(uint256 c, bytes4 s, uint8 outcome) internal view returns (uint256 n) {
         for (uint256 i; i < deliveries.length; ++i) {

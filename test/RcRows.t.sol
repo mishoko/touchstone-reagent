@@ -12,17 +12,26 @@ import {IVaultEntries} from "touchstone/interfaces/ITouchstoneVaultExtension.sol
 contract RcRowsTest is ExitFixture {
     uint256 constant T_APPLIED = 0xce93009ccd5ff6e5058f9aacacf4db6e4bdf49a9fbab795441ddeebee88b1615;
     bool dropAppliedB;
+    bool dropEveryAppliedA; // every Applied from chain A is lost (the lag never closes by itself; s6 MU-241)
+    bool holdStateA; // chain A's STATE notes are held (released late, after newer ones; s6 MU-231)
 
     function setUp() public {
         _exitBase();
     }
 
     function _logPolicy(LogRecord memory l) internal override returns (Act) {
-        if (dropAppliedB && l.chainId == CA && l.topic0 == T_APPLIED) {
-            dropAppliedB = false; // drop exactly one
+        if (l.chainId == CA && l.topic0 == T_APPLIED && (dropAppliedB || dropEveryAppliedA)) {
+            dropAppliedB = false; // drop exactly one (or every one while dropEveryAppliedA)
             return Act.DROP;
         }
+        if (holdStateA && l.chainId == CA && l.topic0 == T_NOTE && l.topic3 == 1) return Act.HOLD;
         return Act.DELIVER;
+    }
+
+    function _covNonce(uint256 c, address cov) internal returns (uint32 noteNonce, uint8 nHold) {
+        uint256 p = _lasna();
+        (,, noteNonce,,, nHold) = rc.covOf(c, cov);
+        _leave(p);
     }
 
     function _action(V memory v) internal {
@@ -120,6 +129,63 @@ contract RcRowsTest is ExitFixture {
         (out, applied,,) = rc.seqOf(CA, 1);
         _leave(p);
         assertEq(applied, out, "the fresh-seq resend applied: A level (a reused seq would be Stale(1))");
+    }
+
+    /// @notice R-RESEND (PB-7 rate, s6 MU-241): while chain A stays behind (every Applied from A is lost), three
+    ///         STATEs ≥ NOTE_INTERVAL apart inside 1,000 Lasna blocks bring exactly ONE fresh-seq resend (no limit → 3);
+    ///         after the window, the next STATE resends again (the rate reopens, never a permanent block).
+    function test_R_RESEND__aPersistentLagResendsOncePerThousandBlocks() public {
+        dropEveryAppliedA = true;
+        _on(CB);
+        _action(xb); // an Action snapshot to both Hubs; its Applied on A is lost
+        _elapse(60);
+        uint256 p = _lasna();
+        (uint32 out, uint32 applied,,) = rc.seqOf(CA, 1);
+        _leave(p);
+        assertLt(applied, out, "non-vacuous: A behind");
+        uint256 c0 = _sends(CA, IReagentHub.rcConduct.selector);
+        for (uint256 i; i < 3; ++i) {
+            _on(CA);
+            vm.prank(alice);
+            ca.flush();
+            _elapse(301); // 3 STATEs ≥ NOTE_INTERVAL apart, inside 1,000 Lasna blocks (≈ 1,130 s)
+        }
+        assertEq(_sends(CA, IReagentHub.rcConduct.selector) - c0, 1, "one resend per (chain, id) per 1,000 blocks");
+        p = _lasna();
+        (out, applied,,) = rc.seqOf(CA, 1);
+        _leave(p);
+        assertLt(applied, out, "non-vacuous: A still behind after the window's STATEs");
+        _elapse(1_200); // past the window
+        _on(CA);
+        vm.prank(alice);
+        ca.flush();
+        _elapse(60);
+        assertEq(_sends(CA, IReagentHub.rcConduct.selector) - c0, 2, "the rate reopens after 1,000 blocks");
+    }
+
+    /// @notice §5.5 `Note(STATE)` (s6 MU-231): a STATE older than the last one applied changes nothing: an older STATE
+    ///         (one holding) released after a newer one (two holdings) leaves the RC's noteNonce and holdings at the
+    ///         newer values (s6 r1 m-2: the two STATEs differ in their holdings).
+    function test_R_B6SCHED__anOlderStateReleasedLateChangesNothing() public {
+        _elapse(301);
+        holdStateA = true;
+        _on(CA);
+        vm.prank(alice);
+        ca.flush(); // STATE n1 (one holding), held
+        _elapse(60);
+        assertEq(heldLogs.length, 1, "non-vacuous: the older STATE is held");
+        holdStateA = false;
+        V memory x2 = _registeredVault(CA, 1);
+        _allocOn(CA, ca, x2.vault, SH); // STATE n2 (a new holding, reported at once), delivered
+        _elapse(60);
+        (uint32 n2, uint8 h2) = _covNonce(CA, address(ca));
+        assertEq(h2, 2, "non-vacuous: the newer STATE carries two holdings");
+        _releaseHeldLogs(); // n1 arrives late
+        _elapse(60);
+        assertEq(heldLogs.length, 0, "non-vacuous: the older STATE was delivered");
+        (uint32 n, uint8 h) = _covNonce(CA, address(ca));
+        assertEq(n, n2, "the older STATE changed nothing: noteNonce");
+        assertEq(h, 2, "the older STATE changed nothing: holdings");
     }
 
     // ================================================================== R-CRON
@@ -318,15 +384,35 @@ contract RcRowsTest is ExitFixture {
         _elapse(301);
         _setRulesOn(CB, cb, r);
         _elapse(60);
-        uint256 b0 = _sends(CB, IReagentHub.rcBudget.selector);
+        uint256 b0 = _deliveredFor(CB, IReagentHub.rcBudget.selector, 1);
         _on(CA);
         _keepAlive(xa, 2);
         _allocOn(CA, ca, xa.vault, SH * 136); // E ≈ 27.4 of 30 (SH ≈ 0.2 mWETH): A runs short on id 1
         _elapse(1200);
-        assertEq(_sends(CB, IReagentHub.rcBudget.selector), b0, "never messaged for an id it does not list");
+        assertEq(_deliveredFor(CB, IReagentHub.rcBudget.selector, 1), b0, "never messaged for an id it does not list");
         _on(CA);
         uint256 e = ca.exposure(1);
         (uint256 b,,) = ch[CA].hub.budget(address(ca), 1);
         assertLt(b - e, 3e18, "non-vacuous: A is short (headroom < MIN_MOVE), so a listing chain B would be messaged");
+    }
+
+    /// @notice R-B6SCHED (step 0, r24 D24-02; s6 MU-257): chain B removes id 1 while it still holds exposure there (its
+    ///         STATE keeps a Base for the id: budget min(B, E) = E, no headroom) and A has headroom ≥ 2 · MIN_MOVE. B
+    ///         is never messaged for the id (no rebalance or raise towards an unlisting chain: each answer would bring
+    ///         another, unbounded).
+    function test_R_B6SCHED__anIdListedOnOneChainAfterARemovalIsNeverMessagedThere() public {
+        _allocOn(CB, cb, xb.vault, SH);
+        _elapse(301);
+        Rulebook memory r = _rulesFor(1, 0);
+        r.ids = [uint32(2), 0, 0, 0]; // chain B removes curator 1 (still exposed)
+        uint256 b0 = _deliveredFor(CB, IReagentHub.rcBudget.selector, 1);
+        _setRulesOn(CB, cb, r);
+        _on(CB);
+        assertGt(cb.exposure(1), 0, "non-vacuous: B still exposed to id 1 (a Base is reported)");
+        _elapse(1_200); // B's removal STATE ran the reconcile; any move (and its answers' moves) would land here
+        assertEq(_deliveredFor(CB, IReagentHub.rcBudget.selector, 1), b0, "never messaged for an id it no longer lists");
+        _on(CA);
+        (uint256 b,,) = ch[CA].hub.budget(address(ca), 1);
+        assertGe(b - ca.exposure(1), 6e18, "non-vacuous: A has headroom >= 2 * MIN_MOVE (a move would be sendable)");
     }
 }

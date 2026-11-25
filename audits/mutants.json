@@ -941,7 +941,8 @@
    "find": "        // [MU-200] an extension without code would make every delegated reaction a silent no-op (D2-07 class)\n        if (ext_.code.length == 0) revert NotDelegated();",
    "replace": "        // [MU-200] an extension without code would make every delegated reaction a silent no-op (D2-07 class)\n        if (false) revert NotDelegated();",
    "kill": "test_R_EXT__theConstructorRefusesAnExtensionWithoutCode",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "adf8c9998fca12ad"
   },
   {
    "id": "MU-201",
@@ -952,7 +953,8 @@
    "find": "        // [MU-201] the registry and the gas table are the owner's (spec §7 trust roots)\n        if (msg.sender != OWNER) revert NotOwner();",
    "replace": "        // [MU-201] the registry and the gas table are the owner's (spec §7 trust roots)\n        if (false) revert NotOwner();",
    "kill": "test_R_REG__ownerOnlyAndBounds",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "3cc1b5562880fadf"
   },
   {
    "id": "MU-202",
@@ -963,7 +965,8 @@
    "find": "        // [MU-202] ids start at 1 (r2 m-4); once\n        if (id == 0 || _curator[id].exists) revert Exists();",
    "replace": "        // [MU-202] ids start at 1 (r2 m-4); once\n        if (_curator[id].exists) revert Exists();",
    "kill": "test_R_REG__ownerOnlyAndBounds",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "3736c6fa3e06d8ea"
   },
   {
    "id": "MU-203",
@@ -974,7 +977,8 @@
    "find": "        // [MU-203] only the two chains, write-once\n        if (!_isChain(c)) revert BadChain();",
    "replace": "        // [MU-203] only the two chains, write-once\n        if (false) revert BadChain();",
    "kill": "test_R_REG__onlyTheTwoChainsAndBundlersNeedTheFactory",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "9efb53f23ffbe6bc"
   },
   {
    "id": "MU-204",
@@ -985,7 +989,8 @@
    "find": "        // [MU-204] the chain's factory first: the subscription names it (s3 rc r1 D1-10)\n        if (_factory[c] == address(0)) revert NoFactory();",
    "replace": "        // [MU-204] the chain's factory first: the subscription names it (s3 rc r1 D1-10)\n        if (false) revert NoFactory();",
    "kill": "test_R_REG__onlyTheTwoChainsAndBundlersNeedTheFactory",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "fc1b5e6e0ff9910d"
   },
   {
    "id": "MU-205",
@@ -996,7 +1001,8 @@
    "find": "        // [MU-205] at most 4 bundlers per id per chain (PB-8)\n        if (n >= MAX_PER_CHAIN) revert Full();",
    "replace": "        // [MU-205] at most 4 bundlers per id per chain (PB-8)\n        if (n > MAX_PER_CHAIN) revert Full();",
    "kill": "test_R_REG__ownerOnlyAndBounds",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "fc1b5e6e0ff9910d"
   },
   {
    "id": "MU-206",
@@ -1007,7 +1013,8 @@
    "find": "        // [MU-206] never below the formula (no callback starves) and never above MAX (every kind deliverable)\n        if (limit < _formula(c, kind) || limit > MAX_CALLBACK_GAS) revert BadGas();",
    "replace": "        // [MU-206] never below the formula (no callback starves) and never above MAX (every kind deliverable)\n        if (limit > MAX_CALLBACK_GAS) revert BadGas();",
    "kill": "test_R_SETGAS__rangeFormulaToMaxOwnerOnly",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "ceff81376ac97a6a"
   },
   {
    "id": "MU-207",
@@ -1018,7 +1025,8 @@
    "find": "        // [MU-207] only the system contract asks for payment\n        if (msg.sender != SYSTEM) revert NotSystem();",
    "replace": "        // [MU-207] only the system contract asks for payment\n        if (false) revert NotSystem();",
    "kill": "test_R_PAYER__onlySystemExactAmount",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "cb4f5512a5f1c0f0"
   },
   {
    "id": "MU-209",
@@ -1029,7 +1037,8 @@
    "find": "        // [MU-209] only the system contract delivers logs (PB-21: the only revert)\n        if (msg.sender != SYSTEM) revert NotSystem();",
    "replace": "        // [MU-209] only the system contract delivers logs (PB-21: the only revert)\n        if (false) revert NotSystem();",
    "kill": "test_R_SUB__reactRevertsOnlyForAWrongCaller",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "67ee1716c6a82d4c"
   },
   {
    "id": "MU-210",
@@ -1040,7 +1049,8 @@
    "find": "            // [MU-210] the (chain, registered Hub) filter (A-XCHAIN, A-NOTE-FORGE)\n            if (e == _hub[c] && e != address(0)) {",
    "replace": "            // [MU-210] the (chain, registered Hub) filter (A-XCHAIN, A-NOTE-FORGE)\n            if (e != address(0) && (e == _hub[c] || l.topic0 == T_APPLIED)) {",
    "kill": "test_A_XCHAIN__aHubCloneOrForeignChainIsNotProcessed",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "67ee1716c6a82d4c"
   },
   {
    "id": "MU-211",
@@ -1051,7 +1061,8 @@
    "find": "        // [MU-211] only a registered bundler's vault (R-DYN-FOREIGN)\n        if (id == 0 || l.data.length < 96) return;",
    "replace": "        // [MU-211] only a registered bundler's vault (R-DYN-FOREIGN)\n        if (l.data.length < 96) return;",
    "kill": "test_R_DYN_FOREIGN__aDeployedForAnUnregisteredBundlerIsIgnored",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "93bcc5e3dd25ccc1"
   },
   {
    "id": "MU-212",
@@ -1062,7 +1073,8 @@
    "find": "        // [MU-212] a duplicated Deployed changes nothing (s3 rc r1 D1-10)\n        if (_vault[c][vault].id != 0 || vault == address(0)) return;",
    "replace": "        // [MU-212] a duplicated Deployed changes nothing (s3 rc r1 D1-10)\n        if (vault == address(0)) return;",
    "kill": "test_R_DYN__aDuplicatedDeployedChangesNothing",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "93bcc5e3dd25ccc1"
   },
   {
    "id": "MU-213",
@@ -1073,7 +1085,8 @@
    "find": "        // [MU-213] the record is the max latched seq per vault: a duplicate or reordered latch adds nothing (A-DELTA)\n        if (s <= v.maxSeq) return;",
    "replace": "        // [MU-213] the record is the max latched seq per vault: a duplicate or reordered latch adds nothing (A-DELTA)\n        if (false) return;",
    "kill": "test_R_BREACH_DUP__reorderedLatchesGiveTheSameRecord",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "d26bffdf4e34ec6f"
   },
   {
    "id": "MU-214",
@@ -1084,7 +1097,8 @@
    "find": "            // [MU-214] EXITED is gone (B3)\n            if (to == 2) _gone(v);",
    "replace": "            // [MU-214] EXITED is gone (B3)\n            if (to == 3) _gone(v);",
    "kill": "test_R_GONE__exitedAfterThreeBreachesSetsGoneOnce",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "63110c208ab01f62"
   },
   {
    "id": "MU-215",
@@ -1095,7 +1109,8 @@
    "find": "        // [MU-215] at the per-epoch budget, the exact six-argument unsubscribe (A-ACTION-SPAM)\n        if (w.actionsThisEpoch == ACTION_BUDGET) {",
    "replace": "        // [MU-215] at the per-epoch budget, the exact six-argument unsubscribe (A-ACTION-SPAM)\n        if (w.actionsThisEpoch == ACTION_BUDGET + 100) {",
    "kill": "test_R_ACTION__budgetThenExactUnsubscribeThenResubscribeAtTheNextEpoch",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "7b5ea3d7834c96fd"
   },
   {
    "id": "MU-216",
@@ -1106,7 +1121,8 @@
    "find": "        // [MU-216] Cron only while there is deferred work (C-10)\n        if (!_cronOn && _pendingPairs + _workLen + _sweeps > 0) {",
    "replace": "        // [MU-216] Cron only while there is deferred work (C-10)\n        if (!_cronOn) {",
    "kill": "test_R_SUB__exactTopicsNoWildcardNoNeverList",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "809ca82866f28697"
   },
   {
    "id": "MU-230",
@@ -1117,7 +1133,8 @@
    "find": "        // [MU-230] only on the RC's storage, inside a reaction: never a direct call, never an outsider's\n        if (address(this) == SELF) revert NotDelegated();",
    "replace": "        // [MU-230] only on the RC's storage, inside a reaction: never a direct call, never an outsider's\n        if (false) revert NotDelegated();",
    "kill": "test_R_EXT__aDirectCallToTheExtensionReverts",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "0c0b0954b751e551"
   },
   {
    "id": "MU-231",
@@ -1127,19 +1144,55 @@
    "file": "src/RcExt.sol",
    "find": "        // [MU-231] a STATE older than the last one changes nothing (spec §5.5)\n        if (nn <= k.noteNonce) return;",
    "replace": "        // [MU-231] a STATE older than the last one changes nothing (spec §5.5)\n        if (false) return;",
-   "kill": "test_R_B6SCHED__seed",
-   "status": "new"
+   "kill": "test_R_B6SCHED__seed|test_R_B6SCHED__anOlderStateReleasedLate",
+   "status": "KILLED",
+   "basis": "f53c7d244bca0998"
   },
   {
    "id": "MU-232",
    "area": "rc",
    "desc": "rules only from a STATE at or above the stored rulesNonce",
-   "killer_id": "R-B6SCHED",
-   "file": "src/RcExt.sol",
-   "find": "        // [MU-232] rules only from a STATE at or above the stored rulesNonce (the only source of cap and k, r3 D3-01)\n        if (rn >= k.rulesNonce) {",
-   "replace": "        // [MU-232] rules only from a STATE at or above the stored rulesNonce (the only source of cap and k, r3 D3-01)\n        if (true) {",
-   "kill": "test_R_B6SCHED__seed",
-   "status": "new"
+   "killer_id": null,
+   "file": null,
+   "find": null,
+   "replace": null,
+   "kill": "pending",
+   "status": "EQUIVALENT",
+   "reason": "The rules gate `if (rn >= k.rulesNonce)` is always true behind the STATE gate `if (nn <= k.noteNonce) return;` (MU-231): a Covenant's STATE carries `nn = ++noteNonce` and its `rulesNonce` at emission (CovenantExt), and the Covenant's only writers of both are increments, so a STATE accepted with nn above the stored noteNonce was emitted after the stored one and carries rn >= the stored rulesNonce (stored only from accepted STATEs). Only the registered Hub's Notes reach `_onState` (ReagentRC's Hub filter; the Hub registration is set-once, `addHub` reverts Exists), and the Hub's `note` is callable only by its factory's Covenants, so no other payload exists. Removing the gate changes no outcome. (mutation: if (rn >= k.rulesNonce) { -> if (true) {; s6 campaign b2 survivor)",
+   "anchors": [
+    {
+     "file": "src/RcExt.sol",
+     "find": "        if (nn <= k.noteNonce) return;"
+    },
+    {
+     "file": "src/CovenantExt.sol",
+     "find": "        ++rulesNonce;"
+    },
+    {
+     "file": "src/CovenantExt.sol",
+     "find": "        uint64 nn = ++noteNonce;"
+    },
+    {
+     "file": "src/CovenantExt.sol",
+     "find": "        return abi.encode(nn, rulesNonce, _rules, h, bs, pv, pa);"
+    },
+    {
+     "file": "src/ReagentRC.sol",
+     "find": "            if (e == _hub[c] && e != address(0)) {"
+    },
+    {
+     "file": "src/RcExt.sol",
+     "find": "        if (rn >= k.rulesNonce) {"
+    },
+    {
+     "file": "src/ReagentRC.sol",
+     "find": "        if (_hub[c] != address(0) || h == address(0)) revert Exists();"
+    },
+    {
+     "file": "src/ReagentHub.sol",
+     "find": "        if (!_isCovenant(msg.sender)) revert NotCovenant();"
+    }
+   ]
   },
   {
    "id": "MU-233",
@@ -1150,7 +1203,8 @@
    "find": "        // [MU-233] a suspension clears when the id's totals or the rules move past it\n        if (p.suspended && (t.breaches > p.suspB || t.gone > p.suspG || k.rulesNonce > p.suspR)) {",
    "replace": "        // [MU-233] a suspension clears when the id's totals or the rules move past it\n        if (p.suspended && false) {",
    "kill": "test_R_EXIT_SCHED__relayFailedThrice",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "0c783daa05e8e980"
   },
   {
    "id": "MU-234",
@@ -1161,7 +1215,8 @@
    "find": "            // [MU-234] unpark on a callback result after the park (r18 m-4)\n            if (q.hubLogCount < p.parkedLogCount) return false;",
    "replace": "            // [MU-234] unpark on a callback result after the park (r18 m-4)\n            return false;",
    "kill": "test_R_EXIT_SCHED__parkedThenTheHubs",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "0c783daa05e8e980"
   },
   {
    "id": "MU-235",
@@ -1172,7 +1227,8 @@
    "find": "        // [MU-235] the wait releases lazily on the scan that finds the snapshot applied (r13 D13-01)\n        if (p.waitSeq != 0 && q.seqApplied >= p.waitSeq) (p.waitSeq, p.waitSince) = (0, 0);",
    "replace": "        // [MU-235] the wait releases lazily on the scan that finds the snapshot applied (r13 D13-01)\n        if (false) (p.waitSeq, p.waitSince) = (0, 0);",
    "kill": "test_R_EXIT_SCHED__aLaggingSnapshot",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "0c783daa05e8e980"
   },
   {
    "id": "MU-236",
@@ -1184,7 +1240,7 @@
    "replace": "        // (no second gas gate here: the evaluation was admitted whole by its caller's guard, v13 r3 V3-01)\n        // [MU-281]\n        if (p.waitSeq == 0 && bud.sends > 0 && bud.exits > 0) {",
    "kill": "test_R_EXIT_SCHED__relayFailedThrice|test_A_EXIT_DENY__failures",
    "status": "KILLED",
-   "basis": "e2c03fd3590d6f52"
+   "basis": "eb5991814a88b18b"
   },
   {
    "id": "MU-237",
@@ -1195,7 +1251,8 @@
    "find": "        // [MU-237] park after 6·EPOCH_TICKS without progress (A-CRON-PIN)\n        if (p.waitSince != 0 && now_ > p.waitSince + _parkTicks(c)) {",
    "replace": "        // [MU-237] park after 6·EPOCH_TICKS without progress (A-CRON-PIN)\n        if (false) {",
    "kill": "test_A_CRON_PIN__aHubInDebt",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e62f39097df14848"
   },
   {
    "id": "MU-238",
@@ -1206,7 +1263,8 @@
    "find": "        // [MU-238] the vault check: a breach or gone event on V since the Covenant's baseline for it (PB-2)\n        return v.maxSeq > baseSeq || (v.gone && !baseGone);",
    "replace": "        // [MU-238] the vault check: a breach or gone event on V since the Covenant's baseline for it (PB-2)\n        return true;",
    "kill": "test_R_EXIT_SCHED__noExitForAHealthy",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "1c0abbcb2e538f09"
   },
   {
    "id": "MU-239",
@@ -1217,7 +1275,8 @@
    "find": "        // [MU-239] B7 against the unpause baseline; B3 only when on\n        return (t.breaches >= x.baseBreaches + k.k) || (k.b3 && t.gone > x.baseGone);",
    "replace": "        // [MU-239] B7 against the unpause baseline; B3 only when on\n        return false;",
    "kill": "test_R_E2E__|test_T_EXIT_BOUND__",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "c7d2b33f5a66bf7a"
   },
   {
    "id": "MU-240",
@@ -1228,7 +1287,8 @@
    "find": "        // [MU-240] the third try suspends (MAX_TRIES; A-EXIT-DENY)\n        if (p.tries >= 3) _suspend(c, cov, vault, p, _vault[c][vault].id);",
    "replace": "        // [MU-240] the third try suspends (MAX_TRIES; A-EXIT-DENY)\n        if (false) _suspend(c, cov, vault, p, _vault[c][vault].id);",
    "kill": "test_R_EXIT_SCHED__relayFailedThrice",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "4b55a6025341fb15"
   },
   {
    "id": "MU-241",
@@ -1239,7 +1299,8 @@
    "find": "        // [MU-241] the PB-7 rate (R-RESEND)\n        if (q.lastResendBlock != 0 && bn < q.lastResendBlock + RESEND_BLOCKS) return false;",
    "replace": "        // [MU-241] the PB-7 rate (R-RESEND)\n        if (false) return false;",
    "kill": "test_R_RESEND__",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "f499b4bce41666c7"
   },
   {
    "id": "MU-242",
@@ -1250,7 +1311,8 @@
    "find": "        // [MU-242] a 17th Covenant is untracked and gets no pair state (PB-8, s3 rc r1 D1-03)\n        if (v.nCov >= MAX_COV) {",
    "replace": "        // [MU-242] a 17th Covenant is untracked and gets no pair state (PB-8, s3 rc r1 D1-03)\n        if (false) {",
    "kill": "test_R_UNTRACKED__",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "3120b93a40f6a59a"
   },
   {
    "id": "MU-243",
@@ -1261,7 +1323,8 @@
    "find": "        // [MU-243] plans are stored lazily, from the Covenant's second STATE on this chain (R-GAS selected the lazy\n        // path: the first STATE at the bounds stays within PB-8; spec §5.5 Bounds, §12)\n        uint256 np = first ? 0 : (pv.length < 4 ? pv.length : 4);",
    "replace": "        // [MU-243] plans are stored lazily, from the Covenant's second STATE on this chain (R-GAS selected the lazy\n        // path: the first STATE at the bounds stays within PB-8; spec §5.5 Bounds, §12)\n        uint256 np = pv.length < 4 ? pv.length : 4;",
    "kill": "test_R_GAS__firstState",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "fa47a54b46ec7b92"
   },
   {
    "id": "MU-244",
@@ -1272,7 +1335,8 @@
    "find": "        // [MU-244] the nonce gate on STATE: an older budget never overwrites a newer answer (r4 D4-02; LF-S4-2)\n        if (nonce < x.appliedNonce) return;",
    "replace": "        // [MU-244] the nonce gate on STATE: an older budget never overwrites a newer answer (r4 D4-02; LF-S4-2)\n        if (false) return;",
    "kill": "test_R_B6SCHED__aStaleStateBudgetNeverOverwritesANewerAnswer",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "37aebac184e04cf7"
   },
   {
    "id": "MU-245",
@@ -1284,7 +1348,7 @@
    "replace": "            break; // [MU-245] a stale head costs one pop (never a correctness fault)\n        }",
    "kill": "test_R_GAS__atTheExactReservationFloorTwoPopsAndServes",
    "status": "KILLED",
-   "basis": "04214c44c0876795"
+   "basis": "d0e1754ffd77b94c"
   },
   {
    "id": "MU-246",
@@ -1325,7 +1389,8 @@
    "find": "            // [MU-247] every send ≤ the answered nonce is answered\n            if (bb.flags & F_UN != 0 && n >= bb.nonce) {",
    "replace": "            // [MU-247] every send ≤ the answered nonce is answered\n            if (false) {",
    "kill": "test_R_BUDGET__",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "4ac80bbf2a98a58c"
   },
   {
    "id": "MU-248",
@@ -1336,7 +1401,8 @@
    "find": "            // [MU-248] a newer rulesNonce than the RC's: rules-unsettled until its STATE arrives (r1 D1-03)\n            if (r > k.rulesNonce && r > k.unsettledR) k.unsettledR = uint32(r);",
    "replace": "            // [MU-248] a newer rulesNonce than the RC's: rules-unsettled until its STATE arrives (r1 D1-03)\n            if (false) k.unsettledR = uint32(r);",
    "kill": "test_R_B6SCHED__aRaiseRejectedByARuleChangeWaitsForItsState",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "879cad60fb89dae8"
   },
   {
    "id": "MU-249",
@@ -1347,7 +1413,8 @@
    "find": "        // [MU-249] the entry stays listed while anything remains (the lifecycle predicate, s3 rc r11 D11-02)\n        if (!left) _unlistEntry(c, cov);",
    "replace": "        // [MU-249] the entry stays listed while anything remains (the lifecycle predicate, s3 rc r11 D11-02)\n        _unlistEntry(c, cov);",
    "kill": "test_R_B6SCHED__park|test_R_B6SCHED__seed",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e35aa824b299cab6"
   },
   {
    "id": "MU-250",
@@ -1358,7 +1425,8 @@
    "find": "            // [MU-250] extend, never restart (LF-S4-4)\n            uint32 e = w.pos == 0 ? w.lap + 1 : w.lap + 2;",
    "replace": "            // [MU-250] extend, never restart (LF-S4-4)\n            uint32 e = w.lap + 1;",
    "kill": "test_R_COUNTERS__aMidLapMarkGetsAnotherFullLap",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "0ba46d0f9a6abce6"
   },
   {
    "id": "MU-251",
@@ -1395,7 +1463,8 @@
    "find": "        // [MU-252] committed counts the unanswered sends (r1 D1-02: never \"applied only\")\n        if (bb.flags & F_UN != 0 && bb.unB > m) m = bb.unB;",
    "replace": "        // [MU-252] committed counts the unanswered sends (r1 D1-02: never \"applied only\")\n        m = m;",
    "kill": "test_R_B6SCHED__aTightenUnderARaiseInFlightLowersTheOtherChain",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "578b0ef51b2dcfe0"
   },
   {
    "id": "MU-253",
@@ -1406,7 +1475,8 @@
    "find": "        // [MU-253] only a chain whose latest STATE lists the id is ever messaged (step 0, r24 D24-02)\n        return k.noteNonce != 0 && _inIds(k.ids, id);",
    "replace": "        // [MU-253] only a chain whose latest STATE lists the id is ever messaged (step 0, r24 D24-02)\n        return k.noteNonce != 0;",
    "kill": "test_R_B6SCHED__anIdListedOnOneChain",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "8f6586251be7638a"
   },
   {
    "id": "MU-254",
@@ -1447,7 +1517,8 @@
    "find": "        // [MU-255] the back-off\n        if (bb.sentTick != 0 && now_ < bb.sentTick + delay) return true;",
    "replace": "        // [MU-255] the back-off\n        if (false) return true;",
    "kill": "test_R_B6SCHED__park",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "b0fdc61bd33f97d3"
   },
   {
    "id": "MU-256",
@@ -1458,7 +1529,8 @@
    "find": "        // [MU-256] park: a raise after MOVE_RESENDS, a lower after 6·EPOCH_TICKS (A-CRON-PIN)\n        if (raise ? bb.resends >= MOVE_RESENDS : now_ > bb.runSince + 6 * et) {",
    "replace": "        // [MU-256] park: a raise after MOVE_RESENDS, a lower after 6·EPOCH_TICKS (A-CRON-PIN)\n        if (false) {",
    "kill": "test_R_B6SCHED__park",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "b0fdc61bd33f97d3"
   },
   {
    "id": "MU-257",
@@ -1469,7 +1541,8 @@
    "find": "        // [MU-257] raises and rebalances only at rest (r3 D3-01, r5 D5-03)\n        if (!_listing(CA, cov, id) || !_listing(CB, cov, id)) return false;",
    "replace": "        // [MU-257] raises and rebalances only at rest (r3 D3-01, r5 D5-03)\n        if (false) return false;",
    "kill": "test_R_B6SCHED__anIdListedOnOneChain|test_I_CAP__",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "f9f917ec0edef215"
   },
   {
    "id": "MU-258",
@@ -1480,7 +1553,8 @@
    "find": "        // [MU-258] step 1b: the donor keeps MIN_MOVE of its headroom (hysteresis, r6 D6-04)\n        if (ha < mm && hb >= 2 * mm) {\n            (c, target) = (CB, xb.appliedB - (hb - mm));",
    "replace": "        // [MU-258] step 1b: the donor keeps MIN_MOVE of its headroom (hysteresis, r6 D6-04)\n        if (ha < mm && hb >= 2 * mm) {\n            (c, target) = (CB, xb.appliedB - hb);",
    "kill": "test_R_BUDGET__",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "cc5b249faa63d9a6"
   },
   {
    "id": "MU-259",
@@ -1491,7 +1565,8 @@
    "find": "        // [MU-259] unpark only on a callback result after the park (r18 m-4)\n        if (bb.parkLog == 0 || _seq[c][id].hubLogCount < bb.parkLog) return (false, false);",
    "replace": "        // [MU-259] unpark only on a callback result after the park (r18 m-4)\n        if (bb.parkLog == 0) return (false, false);",
    "kill": "test_R_COUNTERS__aMidLapMarkGetsAnotherFullLap",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e9c4346d82559e9a"
   },
   {
    "id": "MU-260",
@@ -1502,7 +1577,8 @@
    "find": "        // [MU-260] only on the RC's storage, inside a reaction (as RcExt's MU-230)\n        if (address(this) == SELF) revert NotDelegated();",
    "replace": "        // [MU-260] only on the RC's storage, inside a reaction (as RcExt's MU-230)\n        if (false) revert NotDelegated();",
    "kill": "test_R_EXT__theB6Module",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e16d7dc028f60a31"
   },
   {
    "id": "MU-261",
@@ -1513,7 +1589,8 @@
    "find": "        // [MU-261] a module without code would make every B6 step a silent no-op (D2-07 class, F-011)\n        if (b6_.code.length == 0) revert NotDelegated();",
    "replace": "        // [MU-261] a module without code would make every B6 step a silent no-op (D2-07 class, F-011)\n        if (false) revert NotDelegated();",
    "kill": "test_R_EXT__theB6Module",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "9237200f534c8904"
   },
   {
    "id": "MU-262",
@@ -1525,7 +1602,7 @@
    "replace": "        // [MU-262] the tail kept back for the rest of the reaction (the entry bookkeeping and the Cron subscribe)\n        (ok, r) = B6.delegatecall(data);",
    "kill": "test_R_GAS__aStepOutOfGasLeavesTheCallerItsTail",
    "status": "KILLED",
-   "basis": "d8fb0af583a81d79"
+   "basis": "66b2ea6b815e9584"
   },
   {
    "id": "MU-263",
@@ -1536,7 +1613,8 @@
    "find": "                // [MU-263] an unanswered, unparked message keeps the entry listed\n                if (bb.flags & F_UN != 0 && bb.parkLog == 0) left = true;",
    "replace": "                // [MU-263] an unanswered, unparked message keeps the entry listed\n                if (false) left = true;",
    "kill": "test_R_B6SCHED__park|test_R_B6SCHED__seed",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "6befbf1b8d263ae5"
   },
   {
    "id": "MU-264",
@@ -1547,7 +1625,8 @@
    "find": "        // [MU-264] an Untracked (17th) Covenant gets no pair state at all (PB-8; s4 rc-fix r1 C1-04)\n        if (!held || id == 0 || !p.listed) {",
    "replace": "        // [MU-264] an Untracked (17th) Covenant gets no pair state at all (PB-8; s4 rc-fix r1 C1-04)\n        if (!held || id == 0) {",
    "kill": "test_R_UNTRACKED__aStateAfterTheBreach",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e9b4cb3bac2cbe28"
   },
   {
    "id": "MU-265",
@@ -1558,7 +1637,8 @@
    "find": "        // [MU-265] while waiting, the snapshot is resent at the PB-7 rate on every evaluation, not once at the\n        // wait's start (§3.5; s4 rc-fix r1 C1-03)\n        if (p.waitSeq != 0) _resend(c, id, bud);",
    "replace": "        // [MU-265] while waiting, the snapshot is resent at the PB-7 rate on every evaluation, not once at the\n        // wait's start (§3.5; s4 rc-fix r1 C1-03)\n        if (false) _resend(c, id, bud);",
    "kill": "test_R_EXIT_SCHED__aWaitingPairResends",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "e9b4cb3bac2cbe28"
   },
   {
    "id": "MU-266",
@@ -1569,7 +1649,8 @@
    "find": "            // [MU-266] round-robin over the dirty ids, one item each (s4 rc-fix r1 C1-10: no head-of-line)\n            if (_dirtyPtr >= _nDirty) _dirtyPtr = 0;",
    "replace": "            // [MU-266] round-robin over the dirty ids, one item each (s4 rc-fix r1 C1-10: no head-of-line)\n            _dirtyPtr = 0;",
    "kill": "test_R_COUNTERS__dirtyIdsAreServedRoundRobin",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "aba1b1fa98353885"
   },
   {
    "id": "MU-267",
@@ -1580,7 +1661,8 @@
    "find": "                // [MU-267] an unpark shrinks the walked list: step back so the next element is not skipped, whether\n                // the swap-remove moved one here or the last element left (s4 rc-fix r1 C1-02)\n                if (unparked) w.pos -= 1;",
    "replace": "                // [MU-267] an unpark shrinks the walked list: step back so the next element is not skipped, whether\n                // the swap-remove moved one here or the last element left (s4 rc-fix r1 C1-02)\n                if (false) w.pos -= 1;",
    "kill": "test_R_COUNTERS__oneResultWakesEveryParkInTheSweepsOnlyLap",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "aba1b1fa98353885"
   },
   {
    "id": "MU-268",
@@ -1591,7 +1673,8 @@
    "find": "        // [MU-268] an unanswered LOWER whose own target is ≤ t already covers it (its target, not the run's max)\n        if (bb.flags & F_UN != 0 && bb.flags & F_RAISE == 0 && _lowB[cov][id][c] <= t) return (false, 0);",
    "replace": "        // [MU-268] an unanswered LOWER whose own target is ≤ t already covers it (its target, not the run's max)\n        if (bb.flags & F_UN != 0 && bb.flags & F_RAISE == 0 && bb.unB <= t) return (false, 0);",
    "kill": "test_R_B6SCHED__aTightenUnderAnUnanswered",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "a6441caba1888523"
   },
   {
    "id": "MU-269",
@@ -1603,7 +1686,7 @@
    "replace": "            // [MU-269] a head that still owes after its sends goes to the tail (round-robin; rc-fix r1 C1-01)\n            _lowersRemove(cov);",
    "kill": "test_R_COUNTERS__aHeadThatStillOwesAfterItsSendsStaysListed",
    "status": "KILLED",
-   "basis": "c12a112718257427"
+   "basis": "f002a016ddfb57f9"
   },
   {
    "id": "MU-270",
@@ -1614,7 +1697,8 @@
    "find": "            // [MU-270] a re-sent lower carries its recomputed target (never degraded to a hold by its own flight)\n            (bool need, uint256 t) = _lowerNeed(c, cov, id, cap);",
    "replace": "            // [MU-270] a re-sent lower carries its recomputed target (never degraded to a hold by its own flight)\n            (bool need, uint256 t) = _lowerOwed(c, cov, id, cap);",
    "kill": "test_R_COUNTERS__aSweepUnparks|test_R_B6SCHED__aTightenUnderAnUnanswered",
-   "status": "new"
+   "status": "KILLED",
+   "basis": "691a7b8f95f7bf39"
   },
   {
    "id": "MU-271",
@@ -1652,7 +1736,7 @@
    "replace": "            // [MU-272] the floors rotate with the Cron event's phase\n            uint256 cls = k;",
    "kill": "test_R_GAS__theFirstFloorIsServedInFullAtTheLiveForward",
    "status": "KILLED",
-   "basis": "54fd336574bf05c4"
+   "basis": "9a995cdf94d7d6a2"
   },
   {
    "id": "MU-273",
@@ -1664,7 +1748,7 @@
    "replace": "                // [MU-273] a lap end is the step's item",
    "kill": "test_R_GAS__aLapEndIsFloorThreesItem",
    "status": "KILLED",
-   "basis": "c36c0fc3abdb96d2"
+   "basis": "aba1b1fa98353885"
   },
   {
    "id": "MU-274",
@@ -1676,7 +1760,7 @@
    "replace": "    uint256 internal constant GAS_GUARD = 150_000; // [MU-274]",
    "kill": "test_R_GAS__theGuardCoversTheLargestMeasuredItem",
    "status": "KILLED",
-   "basis": "ff7077a3fa969d31"
+   "basis": "b1372cb3b99096ff"
   },
   {
    "id": "MU-275",
@@ -1688,7 +1772,7 @@
    "replace": "    uint256 internal constant SENDS_PER_REACTION = 5; // [MU-275]",
    "kill": "test_R_COUNTERS__aHeadThatStillOwesAfterItsSendsStaysListed",
    "status": "KILLED",
-   "basis": "6cefffa34d09c1c0"
+   "basis": "04e306a5c4664c69"
   },
   {
    "id": "MU-276",
@@ -1700,7 +1784,7 @@
    "replace": "_delegate(abi.encodeCall(RcExt.cron, ((block.number / 100) % 3))); // [MU-276]",
    "kill": "test_R_GAS__aBacklogOfCronEventsStillRotates",
    "status": "KILLED",
-   "basis": "cb06a83755bdf74c"
+   "basis": "e8ab3791c649b672"
   },
   {
    "id": "MU-277",
@@ -1734,7 +1818,7 @@
    "replace": "        if (false) { // [MU-278]",
    "kill": "test_R_COUNTERS__anOverflowedParkUnparksThroughItsOwnState",
    "status": "KILLED",
-   "basis": "cae25b77cd77cb0d"
+   "basis": "ed1c174cccddb8ea"
   },
   {
    "id": "MU-279",
@@ -1746,7 +1830,7 @@
    "replace": "    uint256 internal constant CURSOR_FLOOR = 5; // [MU-279]",
    "kill": "test_R_GAS__theFirstFloorIsServedInFullAtTheLiveForward",
    "status": "KILLED",
-   "basis": "2bc376d65bf0352c"
+   "basis": "57be975fa4cc9916"
   },
   {
    "id": "MU-280",
@@ -1758,7 +1842,7 @@
    "replace": "            if (nc == 0 && false) {\n                _vaultList[_cursorV] = _vaultList[nv - 1];",
    "kill": "test_R_GAS__vaultsWithoutCovenantsCostTheCursorOneStepOnce",
    "status": "KILLED",
-   "basis": "b98f9c8d039e51b2"
+   "basis": "cf5dd3a6f60504c5"
   },
   {
    "id": "MU-281",
@@ -1770,7 +1854,7 @@
    "replace": "        // [MU-281]\n        if (p.waitSeq == 0 && now_ >= p.nextTick && bud.sends > 0 && bud.exits > 0 && gasleft() >= GAS_GUARD) {",
    "kill": "test_R_GAS__atTheExactCursorReservationEveryEvaluationExits",
    "status": "KILLED",
-   "basis": "9dc62e86d1ba1585"
+   "basis": "1efb793a4f9ae858"
   },
   {
    "id": "MU-282",
@@ -1782,7 +1866,7 @@
    "replace": "_resendOnce(c, id, GAS_GUARD)) bud.sends -= 1; // [MU-282]",
    "kill": "test_R_GAS__atTheExactCursorReservationEveryEvaluationResends",
    "status": "KILLED",
-   "basis": "67cc5a3e0b43f494"
+   "basis": "2823f614151cbc8b"
   },
   {
    "id": "MU-283",
@@ -1794,7 +1878,7 @@
    "replace": "        if (v.nCov == 0 && v.unlisted && false) {",
    "kill": "test_R_GAS__aDroppedEmptyVaultRejoinsTheCursorAtItsFirstCovenant",
    "status": "KILLED",
-   "basis": "f92bbb85e4b6ce25"
+   "basis": "b770ba5e14e60fcf"
   },
   {
    "id": "MU-284",
@@ -1806,7 +1890,7 @@
    "replace": "        if (nv < _vaultHigh && false) {\n            _vaultList[_vaultHigh] = (c << 160) | uint160(vault);",
    "kill": "test_R_GAS__firstStateAtTheBoundsWithFourPlans",
    "status": "KILLED",
-   "basis": "6100649f78df1678"
+   "basis": "6cdadfbb794a630d"
   }
  ]
 }
