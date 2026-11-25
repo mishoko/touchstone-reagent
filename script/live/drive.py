@@ -586,7 +586,7 @@ def drive_ref(v, target, step, label, dry):
         refuse('the RefDriver is not the signer\'s')
     for _ in range(3):
         cur = ref_tick(ch, pool)
-        if cur == target:
+        if abs(cur - target) <= 1:  # a swap stopped at sqrt(target) can land on target - 1 (tick rounding; s8 live)
             return
         up = target > cur
         amt = str(50 * 10**18) if up else str(200_000 * 10**6)
@@ -594,7 +594,7 @@ def drive_ref(v, target, step, label, dry):
              expect=(pool, T_V3SWAP), dry=dry, step=step, label=label, extra={'from': cur, 'target': target})
         if dry:
             return
-    if ref_tick(ch, pool) != target:
+    if abs(ref_tick(ch, pool) - target) > 1:
         refuse(f'the reference did not reach {target} in 3 swaps (at {ref_tick(ch, pool)})')
 
 
@@ -613,7 +613,7 @@ def breach(name, dry, yes):
         refuse(f'the owner\'s Covenant holds no {name} shares: nothing would exit')
     if not dry and not yes:
         refuse('a breach is irreversible: pass --yes-irreversible')
-    lr, lo, hi = range_now(v)
+    lo, hi = placed_range(name)
     target = (hi + OUT_TICKS) // CH[ch]['spacing'] * CH[ch]['spacing']
     o0 = obs(v)
     step = f'lbreach_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
@@ -645,10 +645,23 @@ def breach(name, dry, yes):
     ref_back(name, False, step)
 
 
+def placed_range(name):
+    """The curator's range as last placed: the `range` of the last landed Action this driver recorded on the vault
+    (the hook keeps it internal; liveRef moves with the reference, so it cannot give the range during a breach)."""
+    ch = VAULTS[name][0]
+    steps = json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps']
+    acts = [t for k, st in sorted(steps.items()) if k.startswith(f'lcon_{name}_') for t in st['txs']
+            if t.get('status') == 'ok' and t.get('range')]
+    if not acts:
+        refuse(f'no landed Action recorded on {name}: its range is unknown')
+    last = max(acts, key=lambda t: t['block'])
+    return int(last['range'][0]), int(last['range'][1])
+
+
 def ref_back(name, dry, step=None):
     """The reference back to the range centre (after a breach latched, or to abort one)."""
     v = resolve(name)
-    lr, lo, hi = range_now(v)
+    lo, hi = placed_range(name)
     step = step or f'lbreach_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
     drive_ref(v, (lo + hi) // 2, step, 'ref_back', dry)
     print(f'drive: reference back to {(lo + hi) // 2}{" (dry)" if dry else ""}')
@@ -989,9 +1002,9 @@ def selftest():
             except Refused as e:
                 print(f'selftest ok: {label} is refused' if must in str(e) else f'selftest FAIL: {label}: {e}')
                 fails += 0 if must in str(e) else 1
-        saved5 = {k: g[k] for k in ('range_now', 'obs', 'drive_ref', 'send')}
+        saved5 = {k: g[k] for k in ('placed_range', 'obs', 'drive_ref', 'send')}
         g['cast'] = lambda *a, rpc: '7'
-        g['range_now'] = lambda v_: (196191, 195190, 197190)
+        g['placed_range'] = lambda nm: (195190, 197190)
         g['obs'] = lambda v_: {'refTick': 0, 'refFresh': True, 'outBlocks': 0, 'breachSeq': 0, 'pendingBreaches': 0}
         tgt = []
         g['drive_ref'] = lambda v_, t, *a: tgt.append(t)

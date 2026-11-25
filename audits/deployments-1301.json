@@ -1230,6 +1230,55 @@
      "rederived": "drive.py rederive"
     }
    ]
+  },
+  "lbreach_XA_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "aa01b14",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T14:31:45+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "ref_out",
+     "tx": "0x618b7efa98b4cde65dab6e197be22de4928482d42f0b904c73e17818eba86956",
+     "status": "ok",
+     "to": "0x27aa7be0feddee069892227c3557192ab4f4f749",
+     "function": "swap",
+     "gasLimit": 2000000,
+     "from": 196191,
+     "target": 198690,
+     "block": 68764678,
+     "gasUsed": 103947,
+     "logIndex": 2
+    },
+    {
+     "label": "ref_out",
+     "tx": "0xb186490e143c63ce2e366baa9be4e0dafedd69b842aeac6c0d04146456bfb2d7",
+     "status": "ok",
+     "to": "0x27aa7be0feddee069892227c3557192ab4f4f749",
+     "function": "swap",
+     "gasLimit": 2000000,
+     "from": 197165,
+     "target": 198690,
+     "block": 68764681,
+     "gasUsed": 96687,
+     "logIndex": 2
+    },
+    {
+     "label": "ref_out",
+     "tx": "0x6fe7f878d4674e1349c1f1ecd5894ab83c7e0f2dfbcc960587bbc196a13e4f49",
+     "status": "ok",
+     "to": "0x27aa7be0feddee069892227c3557192ab4f4f749",
+     "function": "swap",
+     "gasLimit": 2000000,
+     "from": 197165,
+     "target": 198690,
+     "block": 68764684,
+     "gasUsed": 97015,
+     "logIndex": 2
+    }
+   ]
   }
  }
 }
