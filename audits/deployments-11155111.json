@@ -522,7 +522,8 @@
      "function": "poke",
      "block": 12209404,
      "gasUsed": 1391121,
-     "logIndex": null
+     "logIndex": 70,
+     "epochRecorded": 2
     }
    ]
   }

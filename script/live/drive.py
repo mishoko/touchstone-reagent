@@ -215,7 +215,7 @@ def receipt(ch, tx, tries=30):
     return None
 
 
-def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None):
+def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_max=1):
     """The eth_call dry run of the exact call (a revert raises: nothing is sent); then (unless dry) an async send
     whose hash is recorded as `pending` BEFORE waiting, so a landed tx is never lost to a receipt timeout (r1 m-01);
     then the receipt: status 1 and exactly one log `expect` = (emitter, topic0)."""
@@ -235,6 +235,9 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None):
                                           and l['topics'][0] == expect[1]]
     rec = {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if ok else 'FAILED',
            'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 and mine[0] else None}
+    # n_max: a poke's epoch roll emits one EpochRecorded, or two when epochs were skipped (the gap record; seen live)
+    if len(mine) > 1 and len(mine) <= n_max:
+        mine = mine[:1]
     if ok and len(mine) == 1 and post is not None and not post():
         ok, rec['status'] = False, 'FAILED'  # landed, but the state it should have set is not there (lcron r1 m-04)
         rec['readback'] = 'failed'
@@ -269,6 +272,8 @@ def resolve_pending(step, tx):
     if r is None:
         refuse(f'{tx}: still no receipt')
     mine = [None] if want == NO_LOG else [l for l in r['logs'] if l['topics'] and l['topics'][0] == want]
+    if want == T_EPOCH and 1 < len(mine) <= 2:
+        mine = mine[:1]  # the epoch roll's gap record
     ok = int(r['status'], 16) == 1 and len(mine) == 1
     record_update(ch, step, tx, {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16),
                                  'status': 'ok' if ok else 'FAILED',
@@ -330,7 +335,7 @@ def poke(name, dry):
     preflight(v, 0)
     step = f'poke_{name}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
     rec, _ = send(v['chain'], v['vault'], 'poke()', expect=(v['vault'], T_EPOCH), dry=dry, step=step,
-                  label=f'poke_{name}')
+                  label=f'poke_{name}', n_max=2)
     print(f'drive: dry run: poke() on {name} does not revert' if dry else
           f'drive: poke {rec["tx"]} {rec["status"]}: EpochRecorded emitted')
 
