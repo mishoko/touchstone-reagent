@@ -657,6 +657,126 @@
      "block": 68751266,
      "gasUsed": 504948,
      "logIndex": 13
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x36a7adc6b66d294f9a1ae0c406d060bed7605def2844172ed92d2b115778035a",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68752996,
+     "gasUsed": 455826,
+     "logIndex": 10
+    },
+    {
+     "label": "action_XA",
+     "tx": "0xd73555bbc836e75991efbeaa9c56e6ec9f2fa00b9804c222949217153608091f",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753065,
+     "gasUsed": 499330,
+     "logIndex": 17
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x571e3c5c24e1f38c391bf55210fb3a00d83fdc36cca3384bd4bac621fb135918",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753134,
+     "gasUsed": 530069,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x1373cc580e8241134e9708210d4c72ea840b57d2a27592854f168787bfdbbcc1",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753201,
+     "gasUsed": 509085,
+     "logIndex": 13
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x94e0ee8356dba7ae8beeefeb74a17142499538bb8d7cddcfdf1bfcf5d6213ede",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753268,
+     "gasUsed": 517729,
+     "logIndex": 21
+    },
+    {
+     "label": "action_XA",
+     "tx": "0xf16a999e83d0a98c7e4e3586b092e6ae7a54fad96090bb3711e2feddb18f50d8",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753334,
+     "gasUsed": 500629,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x55515105f4b918254c379cc5001c85427c65c9e049a6cfe3723895e6d80fa534",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753401,
+     "gasUsed": 531368,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x21c94a1590f12bf7fc80bfb4ad5bc57b08dce887255228cc14e118a9a039669b",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68753467,
+     "gasUsed": 500629,
+     "logIndex": 12
     }
    ]
   },
@@ -784,6 +904,36 @@
      "block": 68752237,
      "gasUsed": 206017,
      "logIndex": 0
+    },
+    {
+     "label": "allocate_XA",
+     "tx": "0x40f7bf7091e9ab58dee784957d613b52db0d39af4e6103e6c604f9dde7b88f9e",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "allocate",
+     "block": 68752928,
+     "gasUsed": 760678,
+     "logIndex": 18
+    }
+   ]
+  },
+  "poke_XA_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "4a93ad0",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T11:14:38+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "poke_XA",
+     "tx": "0xc0e16af14e86eb0864e3193ba7d5f5ee47a2009727990d1cfea3ce80be0d75ec",
+     "status": "ok",
+     "to": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+     "function": "poke",
+     "block": 68752851,
+     "gasUsed": 541253,
+     "logIndex": 7
     }
    ]
   }
