@@ -111,19 +111,19 @@
  "sepolia_twins": {
   "generated_by": "script/deploy/sepgas.py",
   "method": "For each callback kind:\n  1. `forge test` (SEPGAS_DUMP=1, test/SepGasTwin.t.sol) builds the T-GAS worst-case state at chain id 11155111 with\n     the LIVE deterministic addresses (the Hub is 0x5887\u2026 with the deployed runtime) on a timeline that ends just\n     above Sepolia's head, and dumps every account the callback touches (code, balance, the pre-call value of each\n     accessed slot);\n  2. `eth_simulateV1` on Sepolia replays the callback with those accounts as state overrides (Glamsterdam pricing),\n     from the proxy address (its code overridden by a forwarder that calls the Hub with exactly the entry gas a\n     delivery at a chosen gasLimit brings: 63/64 \u00b7 (gasLimit \u2212 F)), the Hub's own code left as deployed (checked\n     equal to the dumped code);\n  3. runs: at the \u00a75.6 formula gasLimit (the success event), 1% under (DEFERRED for exit and plan, else a failure),\n     the positive control (the formula at the forge NEED: a failure; for exit and plan through the forge-NEED Hub\n     runtime: RELAY_FAILED or no success), and for A-SEPGAS63 the exit at the pre-check threshold \u2212 1 (DEFERRED).",
-  "commit": "6b52e95",
+  "commit": "bd4f35c",
   "dirty": true,
-  "src_sha": "a734a7a1826c243c",
-  "generated_at": "2026-11-24T02:00:01+00:00",
+  "src_sha": "26de10206487b77f",
+  "generated_at": "2026-11-25T05:03:00+00:00",
   "rcConduct": {
    "need": 150000,
    "gasLimit": 458279,
    "entry": 211619,
-   "block": 12199655,
-   "hubCodeSha": "f9e0e8b2bb4f7879",
+   "block": 12207448,
+   "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "APPLIED",
-    "gasUsed": 133926,
+    "gasUsed": 133938,
     "pass": true
    },
    "measured": {
@@ -131,23 +131,23 @@
     "under1000": "FAILED",
     "pass": true
    },
-   "pass": true,
    "pc_forge_need": {
     "what": "the formula at the forge NEED (informational)",
     "entry": 83111,
     "outcome": "FAILED",
-    "gasUsed": 103652
-   }
+    "gasUsed": 103664
+   },
+   "pass": true
   },
   "rcVault": {
    "need": 437000,
    "gasLimit": 784080,
    "entry": 532330,
-   "block": 12199656,
-   "hubCodeSha": "f9e0e8b2bb4f7879",
+   "block": 12207448,
+   "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "BOUND",
-    "gasUsed": 353600,
+    "gasUsed": 353612,
     "pass": true
    },
    "measured": {
@@ -155,23 +155,23 @@
     "under1000": "FAILED",
     "pass": true
    },
-   "pass": true,
    "pc_forge_need": {
     "what": "the formula at the forge NEED (informational)",
     "entry": 145689,
     "outcome": "FAILED",
-    "gasUsed": 165828
-   }
+    "gasUsed": 165840
+   },
+   "pass": true
   },
   "rcBudget": {
    "need": 500000,
    "gasLimit": 855598,
    "entry": 602730,
-   "block": 12199657,
-   "hubCodeSha": "f9e0e8b2bb4f7879",
+   "block": 12207449,
+   "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "ANSWERED",
-    "gasUsed": 392975,
+    "gasUsed": 392987,
     "pass": true
    },
    "measured": {
@@ -179,23 +179,23 @@
     "under1000": "STALE6",
     "pass": true
    },
-   "pass": true,
    "pc_forge_need": {
     "what": "the formula at the forge NEED (informational)",
-    "entry": 429524,
+    "entry": 446286,
     "outcome": "ANSWERED",
-    "gasUsed": 392975
-   }
+    "gasUsed": 392987
+   },
+   "pass": true
   },
   "rcExit": {
    "need": 2220000,
    "gasLimit": 2808138,
    "entry": 2524762,
-   "block": 12199687,
-   "hubCodeSha": "f9e0e8b2bb4f7879",
+   "block": 12207489,
+   "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "DONE",
-    "gasUsed": 1604936,
+    "gasUsed": 1604948,
     "pass": true
    },
    "measured": {
@@ -208,14 +208,14 @@
    "minus1": {
     "entry": 2272285,
     "outcome": "DEFERRED",
-    "gasUsed": 45856,
+    "gasUsed": 45868,
     "pass": true
    },
    "pc": {
     "what": "the forge-NEED Hub runtime at the forge-NEED formula limit",
-    "entry": 973727,
+    "entry": 1027365,
     "outcome": "FAILED",
-    "gasUsed": 606176,
+    "gasUsed": 653477,
     "pass": true
    },
    "a_sepgas63": {
@@ -229,11 +229,11 @@
    "need": 2310000,
    "gasLimit": 2910306,
    "entry": 2625334,
-   "block": 12199688,
-   "hubCodeSha": "f9e0e8b2bb4f7879",
+   "block": 12207490,
+   "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "DONE",
-    "gasUsed": 1702232,
+    "gasUsed": 1702244,
     "pass": true
    },
    "measured": {
@@ -246,14 +246,14 @@
    "minus1": {
     "entry": 2362799,
     "outcome": "DEFERRED",
-    "gasUsed": 42867,
+    "gasUsed": 42879,
     "pass": true
    },
    "pc": {
     "what": "the forge-NEED Hub runtime at the forge-NEED formula limit",
-    "entry": 1382718,
+    "entry": 1485524,
     "outcome": "EARLY/SKIPPED",
-    "gasUsed": 1319527,
+    "gasUsed": 1417601,
     "pass": true
    },
    "pass": true

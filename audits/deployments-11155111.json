@@ -241,7 +241,7 @@
    "superseded_at": "2026-11-24T01:58:31+00:00",
    "superseded_by": "script/deploy/record.py supersede"
   },
-  "reagent": {
+  "reagent_superseded_2": {
    "script": "Reagent.s.sol",
    "commit": "6b52e95",
    "dirty": true,
@@ -274,6 +274,63 @@
      "address": "0xbd589073F4B3B210158F466451A9650AcFF2Bee7",
      "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
      "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    }
+   ],
+   "superseded": "s6 F-013: superseded by the factory/Hub 0xA3fE\u2026481f / 0xb414\u20267a91",
+   "superseded_at": "2026-11-25T05:02:24+00:00",
+   "superseded_by": "script/deploy/record.py supersede"
+  },
+  "reagent": {
+   "script": "Reagent.s.sol",
+   "commit": "bd4f35c",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "reads": {
+    "addresses": {
+     "ext": "0x39Da1F404B98fe0390A4d4E648C0bC8E030Aa061",
+     "impl": "0xDEb3E647AC0f9f972D5Ba6A45aCb5Bd572541731",
+     "factory": "0xA3fE3C3756Fc204DF54A221A45405e82B19d481f",
+     "hub": "0xb41433C9585d230A2607f253E1EA844923e07a91"
+    },
+    "source": "script/deploy/record.py (cast call at record time)",
+    "at": "2026-11-25T05:02:32+00:00",
+    "CovenantFactory.HUB()": "0xb41433C9585d230A2607f253E1EA844923e07a91",
+    "ReagentHub.FACTORY()": "0xA3fE3C3756Fc204DF54A221A45405e82B19d481f",
+    "ReagentHub.RC()": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
+    "ReagentHub.PROXY()": "0xAa14d9Cd0f788Ca23d11805986C1d8bd035D23b4",
+    "ReagentHub.needs()": "2220000 [2.22e6] 2310000 [2.31e6]"
+   },
+   "recorded_at": "2026-11-25T05:02:33+00:00",
+   "note": "s6 F-013 redeploy; ext and impl reused; node gas estimate (--skip-simulation, Glamsterdam). A first attempt at forge's cancun estimate (3.11M) ran out of gas: tx 0x7d17eb6f\u202674cd, step reagent_failed_s6",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0x26b89b2c1a9907b0048621469a8599848917efa2a4061f269687fd6f5c77e13b",
+     "block": 12207384,
+     "gasUsed": 15812265,
+     "status": "ok",
+     "contract": "CovenantFactory",
+     "address": "0xA3fE3C3756Fc204DF54A221A45405e82B19d481f",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13"
+    }
+   ]
+  },
+  "reagent_failed_s6": {
+   "source": "receipts",
+   "commit": "bd4f35c",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T05:02:34+00:00",
+   "note": "s6: the F-013 factory CREATE2 sent at forge's simulated limit (3.11M) ran out of gas under Glamsterdam pricing (TRAPS); nothing deployed; retried with --skip-simulation",
+   "txs": [
+    {
+     "label": "CovenantFactory_oog",
+     "tx": "0x7d17eb6f2407a7ea8f303832b401de1ed7c1f442d8be05488e087de7083e74cd",
+     "block": 12207381,
+     "gasUsed": 2661493,
+     "status": "FAILED",
+     "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
     }
    ]
   }

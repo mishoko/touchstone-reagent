@@ -300,7 +300,7 @@
    "superseded_at": "2026-11-24T01:57:42+00:00",
    "superseded_by": "script/deploy/record.py supersede"
   },
-  "reagent": {
+  "reagent_superseded_3": {
    "script": "Reagent.s.sol",
    "commit": "6b52e95",
    "dirty": true,
@@ -337,6 +337,51 @@
       {
        "contract": "ReagentHub",
        "address": "0x057ee66bd1c706c5852320e47c4badaa75900010"
+      }
+     ]
+    }
+   ],
+   "superseded": "s6 F-013: superseded by the factory/Hub at the cold NEEDs (0xA3fE\u2026481f / 0xb414\u20267a91)",
+   "superseded_at": "2026-11-25T05:02:24+00:00",
+   "superseded_by": "script/deploy/record.py supersede"
+  },
+  "reagent": {
+   "script": "Reagent.s.sol",
+   "commit": "bd4f35c",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "reads": {
+    "addresses": {
+     "ext": "0x39Da1F404B98fe0390A4d4E648C0bC8E030Aa061",
+     "impl": "0xDEb3E647AC0f9f972D5Ba6A45aCb5Bd572541731",
+     "factory": "0xA3fE3C3756Fc204DF54A221A45405e82B19d481f",
+     "hub": "0xb41433C9585d230A2607f253E1EA844923e07a91"
+    },
+    "source": "script/deploy/record.py (cast call at record time)",
+    "at": "2026-11-25T05:02:28+00:00",
+    "CovenantFactory.HUB()": "0xb41433C9585d230A2607f253E1EA844923e07a91",
+    "ReagentHub.FACTORY()": "0xA3fE3C3756Fc204DF54A221A45405e82B19d481f",
+    "ReagentHub.RC()": "0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9",
+    "ReagentHub.PROXY()": "0x775c9B990ADe401060B78D0e98684eEf8d2466C1",
+    "ReagentHub.needs()": "880000 [8.8e5] 1290000 [1.29e6]"
+   },
+   "recorded_at": "2026-11-25T05:02:29+00:00",
+   "note": "s6 F-013 redeploy: the 1301 Hub with the cold NEEDs (880k/1.29M); ext and impl reused; same salt and arguments",
+   "txs": [
+    {
+     "type": "CREATE2",
+     "tx": "0x8e9abdf0e7c377e51e21b0d26ecae2b0cfda1aab19f74ef41ca0ef2b0b898ba0",
+     "block": 68730444,
+     "gasUsed": 2251681,
+     "status": "ok",
+     "contract": "CovenantFactory",
+     "address": "0xA3fE3C3756Fc204DF54A221A45405e82B19d481f",
+     "deployer": "0x4e59b44847b379578588920ca78fbf26c0b4956c",
+     "salt": "0x97e8d4ed806287a4d6c295ecda6dc8b3d7c6ebeebc136e0a3b7442c56b135b13",
+     "created": [
+      {
+       "contract": "ReagentHub",
+       "address": "0xb41433c9585d230a2607f253e1ea844923e07a91"
       }
      ]
     }

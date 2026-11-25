@@ -11,7 +11,8 @@ import {ReagentHub} from "../../src/ReagentHub.sol";
 ///         `CovenantFactory(RC, admin, impl)` (whose constructor deploys this chain's Hub) through the CREATE2 deployer
 ///         `0x4e59…956C` with one salt, so every address is the same on 1301 and 11155111 (T-ADDR, live).
 ///         Env: RC (the ReagentRC's Lasna address: CREATE(the dedicated RC deployer key, nonce 0), whose first Lasna
-///         transaction must be the RC deploy), ADMIN (the demo allowlist admin).
+///         transaction must be the RC deploy), ADMIN (the demo allowlist admin), BROADCAST_PK (optional: the sending key,
+///         read from the environment so it never appears on argv).
 contract ReagentDeploy is Script {
     bytes32 internal constant SALT = keccak256("touchstone-reagent/v1");
 
@@ -23,7 +24,10 @@ contract ReagentDeploy is Script {
         address extA = vm.computeCreate2Address(SALT, keccak256(extInit), d);
         bytes memory implInit = abi.encodePacked(type(Covenant).creationCode, abi.encode(extA));
         address implA = vm.computeCreate2Address(SALT, keccak256(implInit), d);
-        vm.startBroadcast();
+        // the key travels in the environment (BROADCAST_PK = 0x || DEPLOYER_PK), never on the command line (s6)
+        uint256 pk = vm.envOr("BROADCAST_PK", uint256(0));
+        if (pk != 0) vm.startBroadcast(pk);
+        else vm.startBroadcast();
         // unchanged contracts keep their CREATE2 address: deploy only what is not there yet (s3 redeploy)
         CovenantExt ext = extA.code.length > 0 ? CovenantExt(extA) : new CovenantExt{salt: SALT}();
         Covenant impl = implA.code.length > 0 ? Covenant(payable(implA)) : new Covenant{salt: SALT}(address(ext));
