@@ -704,7 +704,7 @@ function buildHeroTimeline(gsap, root, data, scale = .4, onStep) {
   const svg = $("#hero-svg"), hz = D.hero, list = $("#hero-steps");
   const steps = [
     ["Curator X acts on Unichain Sepolia: each Action leaves a streak on its record", null],
-    ["The breach latches on Unichain Sepolia, block " + hz.originBlock, [hz.originChain, hz.originTx]],
+    ["Touchstone records the breach on Unichain Sepolia, block " + hz.originBlock, [hz.originChain, hz.originTx]],
     ["The reactive contract reacts on Lasna, +" + (hz.lasnaTs - hz.originTs) + " s", [5318007, hz.lasnaTx]],
     ["The Hub on Ethereum Sepolia applies it: curator X is paused, +" + hz.latency_s + " s", [hz.destChain, hz.appliedTx]],
     ["The agent wakes and allocates: refused, HubPaused", [hz.destChain, hz.refusedTx]],
@@ -889,7 +889,7 @@ function buildHeroTimeline(gsap, root, data, scale = .4, onStep) {
     hubB: { t: "ReagentHub", s: "same on both chains", d: [1000, 300], m: [350, 268], role: "One address on both chains (CREATE2). On this chain it is the mirror that refused the agent in the live run.", a: [[11155111, dp.hub]] },
     pxA: { t: "Callback proxy", s: "Unichain Sepolia", d: [200, 425], m: [70, 386], role: "Reactive's proxy on this chain. It delivers the RC's callbacks and bills the Hub.", a: [[1301, dp.proxy["1301"]]] },
     pxB: { t: "Callback proxy", s: "Ethereum Sepolia", d: [1000, 425], m: [350, 386], role: "Reactive's proxy on this chain. It delivers the RC's callbacks and bills the Hub.", a: [[11155111, dp.proxy["11155111"]]] },
-    vA: { t: "Vault + hook", s: "Touchstone X_A", d: [200, 560], m: [70, 510], role: "The curator's Touchstone vault. Its hook latches breaches; the RC reads its logs: Action, BreachLatched, EpochRecorded, Retired.", a: [[1301, dp.vaults.XA.address]] },
+    vA: { t: "Vault + hook", s: "Touchstone X_A", d: [200, 560], m: [70, 510], role: "The curator's Touchstone vault. Its hook records breaches; the RC reads its logs: Action, BreachLatched, EpochRecorded, Retired.", a: [[1301, dp.vaults.XA.address]] },
     vB: { t: "Vault + hook", s: "Touchstone X_B", d: [1000, 560], m: [350, 510], role: "Curator X's vault on the second chain, bound to the same curator id.", a: [[11155111, dp.vaults.XB.address]] },
     rc: { t: "ReagentRC", s: "Lasna", d: [600, 250], m: [210, 236], role: "The reactive contract. Subscribes to vault and Hub logs on both chains, keeps the cross-chain record, decides what to send.", a: [[5318007, dp.lasna.rc]] },
     ext: { t: "RcExt", s: "reaction logic", d: [600, 380], m: [210, 352], role: "Reaction logic, reached only by delegatecall from inside react(). A direct call reverts.", a: [[5318007, dp.lasna.rcext]] },
@@ -904,7 +904,7 @@ function buildHeroTimeline(gsap, root, data, scale = .4, onStep) {
     ["covA", "vA", [5], "withdraw", null, "left"], ["covA", "owner", [5], "tokens, in kind", "gold"],
   ];
   const STEPS = [
-    ["Observe", "The reactive contract subscribes to the curator's vault logs on both chains: every Action, every latched breach, every epoch."],
+    ["Observe", "The reactive contract subscribes to the curator's vault logs on both chains: every Action, every recorded breach, every epoch."],
     ["Remember", "It keeps what no single chain can see: the curator's breach record across vaults and chains, and each depositor's exposure per curator."],
     ["Evaluate", "Each reaction checks the depositor's rules against that record. The budget split across chains runs in RcB6."],
     ["React", "It sends callbacks through each chain's callback proxy to the Hub, which mirrors the record."],

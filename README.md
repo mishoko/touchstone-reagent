@@ -49,7 +49,7 @@ These are the timestamps of the recorded live run (25 Nov 2026, UTC; we induced 
 ```
 14:31:24  Sepolia   Alice's agent makes its last allocation into X_B (ok). Then the agent is stopped.
           ...       38 minutes of silence from the agent.
-15:09:56  Unichain  X_A's hook latches a breach (BreachLatched).
+15:09:56  Unichain  X_A's hook records the breach on chain (BreachLatched).
                     -> On Unichain, Alice's Covenant refuses any new allocation to X from this block.
 15:09:56  Lasna     ReagentRC reacts: curator X now has 1 breach; snapshot seq 50 sent to both Hubs.
 15:10:00  Sepolia   ReagentHub applies it (Applied). Alice is paused for X on Sepolia too.       (+4 s)
@@ -146,9 +146,9 @@ hashes for each are in [VERIFY.md](VERIFY.md).
 
 | Run | What happened | Key tx |
 |---|---|---|
-| **L-PAUSE** | A breach latched on Unichain paused the curator for the depositor on Ethereum Sepolia **4 s** later (paused false the block before, true at it). | [breach](https://sepolia.uniscan.xyz/tx/0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d) → [reaction](https://lasna.reactscan.net/tx/0x5c554e647479ec1eaa39db517d79753ed1c981a2095b0c5017d92fe4de52396a) → [Applied](https://sepolia.etherscan.io/tx/0x7d405efb660322915707c12f4252754c86b42d78a747933e983824ea1085ac63) |
+| **L-PAUSE** | A breach recorded on Unichain paused the curator for the depositor on Ethereum Sepolia **4 s** later (paused false the block before, true at it). | [breach](https://sepolia.uniscan.xyz/tx/0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d) → [reaction](https://lasna.reactscan.net/tx/0x5c554e647479ec1eaa39db517d79753ed1c981a2095b0c5017d92fe4de52396a) → [Applied](https://sepolia.etherscan.io/tx/0x7d405efb660322915707c12f4252754c86b42d78a747933e983824ea1085ac63) |
 | **L-OFFLINE** | The agent was stopped before the breach; when it woke, its next allocation was refused `HubPaused` on chain. | [last ok](https://sepolia.etherscan.io/tx/0xe9b2d863f55901bd4c86fb15b7d2ddaae1066f7c56ba8d1086580b848c0e84f8), [refused](https://sepolia.etherscan.io/tx/0x5d72faf74634b15fcf1f9cfcef5e947530292ec58399a668aed3580e3c97d42f) |
-| **L-EXIT** (exit leg) | 61 min after the breach latched, the patient exit landed: exactly the noted tokens, in kind, to the owner, no other recipient. | [ExitDone](https://sepolia.uniscan.xyz/tx/0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71) |
+| **L-EXIT** (exit leg) | 61 min after the breach was recorded, the patient exit landed: exactly the noted tokens, in kind, to the owner, no other recipient. | [ExitDone](https://sepolia.uniscan.xyz/tx/0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71) |
 | **L-PLAN** | A standing plan deposited **2 s** after `EpochRecorded` on two epochs; after the breach the RC withheld the plan while paused. | [epoch 19098](https://sepolia.uniscan.xyz/tx/0xc62444d0970717404e6a47ef476c2bfc74265a48780c89f995ec1bbb9f45d8d9), [19099](https://sepolia.uniscan.xyz/tx/0x90287a7fba325e5d73a0dfbcba58c11f040aec868877b976a38cf26a585dfc33) |
 | **L-DYN** | Three vaults deployed by registered bundlers were subscribed from inside `react()` and bound on their Hub (4 s, 4 s, 12 s), with no redeploy and no operator step. | [X_A bound](https://sepolia.uniscan.xyz/tx/0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088) |
 | **L-CRON** | Cron subscribed in the reaction to a retired vault, ran 35 ticks, and unsubscribed right after that exit was done. Subscription count back to baseline. | [subscribe](https://lasna.reactscan.net/tx/0xf2874ed77f0457a4925e2ac1a7725e25834aee8a0ec2807b16e02502e864d968), [unsubscribe](https://lasna.reactscan.net/tx/0x6cd808c5be8686157cc26cfd0499ebe137d889ff4915d930be34b1b70bf2ae51) |

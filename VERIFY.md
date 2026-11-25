@@ -48,7 +48,7 @@ if the public one refuses.
 
 | Leg | Chain | Tx | Block | Time (UTC) |
 |---|---|---|---|---|
-| Breach latched on `X_A`'s hook | 1301 | [`0xb6a8f0fd…f26d`](https://sepolia.uniscan.xyz/tx/0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d) | 68766968 | 15:09:56 |
+| Breach recorded by `X_A`'s hook | 1301 | [`0xb6a8f0fd…f26d`](https://sepolia.uniscan.xyz/tx/0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d) | 68766968 | 15:09:56 |
 | RC reaction (curator 1, seq 50) | Lasna | [`0x5c554e64…396a`](https://lasna.reactscan.net/tx/0x5c554e647479ec1eaa39db517d79753ed1c981a2095b0c5017d92fe4de52396a) | | 15:09:56 |
 | `Applied` on the Sepolia Hub | 11155111 | [`0x7d405efb…ac63`](https://sepolia.etherscan.io/tx/0x7d405efb660322915707c12f4252754c86b42d78a747933e983824ea1085ac63) | 12210319 | 15:10:00 |
 
@@ -124,11 +124,11 @@ cast call $HUB "vaultId(address)(uint32)" 0x67ff755e233c3f550303c658ab8c55953f23
 
 | Leg | Chain | Tx | Block |
 |---|---|---|---|
-| Breach latched on `X_A` (the same breach as §1) | 1301 | [`0xb6a8f0fd…f26d`](https://sepolia.uniscan.xyz/tx/0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d) | 68766968 |
+| Breach recorded on `X_A` (the same breach as §1) | 1301 | [`0xb6a8f0fd…f26d`](https://sepolia.uniscan.xyz/tx/0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d) | 68766968 |
 | `processBreach()` (open call) | 1301 | [`0xaf139a0f…a3f6`](https://sepolia.uniscan.xyz/tx/0xaf139a0ff3573afa6bcd1215e88a51dc1c97afb3f1f6dd38c213c0f84605a3f6) | 68767059 |
 | `rcExit` delivered, `ExitDone` | 1301 | [`0x3f7bcb43…1e71`](https://sepolia.uniscan.xyz/tx/0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71) | 68770633 |
 
-The exit landed 3,665 s (61 min) after the breach latched, sent by the callback proxy. The Covenant's note says
+The exit landed 3,665 s (61 min) after the breach was recorded, sent by the callback proxy. The Covenant's note says
 36,257,242 mUSDC units (6 dp) and 12,030,473,297,643,707 mWETH wei; the receipt's token transfers move exactly
 those amounts to the owner and to no one else.
 

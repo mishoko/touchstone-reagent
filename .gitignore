@@ -4,7 +4,8 @@
 /AGENTS.md
 /.claude/
 /docs/HANDOFF.md
-/output/
+/output/*
+!/output/.gitkeep
 
 # Build artefacts
 out/
