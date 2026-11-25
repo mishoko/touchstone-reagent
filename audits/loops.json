@@ -3823,6 +3823,62 @@
    "latency_s": 12,
    "leg_callback_s": 11,
    "id": "L-CON-BB"
+  },
+  {
+   "originTx": "0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d",
+   "latchBlock": 68766968,
+   "vault": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+   "covenant": "0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f",
+   "owner": "0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213",
+   "processTx": "0xaf139a0ff3573afa6bcd1215e88a51dc1c97afb3f1f6dd38c213c0f84605a3f6",
+   "processBlock": 68767059,
+   "forfeitedShares": 0,
+   "forfeitStart": 0,
+   "dripBlocks": 3600,
+   "dripEnd": 3600,
+   "exitNotes": [
+    {
+     "tx": "0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71",
+     "block": 68770633,
+     "outcome": 1,
+     "a": 36257242,
+     "b": 12030473297643707
+    }
+   ],
+   "earlyBeforeDone": false,
+   "doneTx": "0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71",
+   "destTx": "0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71",
+   "doneBlock": 68770633,
+   "noteA": 36257242,
+   "noteB": 12030473297643707,
+   "toOwner": [
+    36257242,
+    12030473297643707
+   ],
+   "otherRecipients": [],
+   "byProxy": true,
+   "forfeitPoolAtProcess": 0,
+   "poolBurned": 0,
+   "supplyAtProcess": 1005953526478430647599536,
+   "supplyBeforeDone": 1005952649027223989396613,
+   "netSupplyDrop": 877451206658202923,
+   "covSharesBeforeDone": 5955663422473573238295,
+   "covGainShares": 5194880754628972,
+   "covGainSharesFromBurn": 0,
+   "poolAtDone": 0,
+   "foreignMintBurn": [],
+   "covGainPpm": 0,
+   "latency_s": 3665,
+   "verdict": {
+    "done": true,
+    "valueMeasured": false,
+    "afterDrip": true,
+    "toOwnerExactly": true,
+    "noOtherRecipient": true,
+    "earlyBeforeDone": false,
+    "pass": false
+   },
+   "id": "L-EXIT-partial"
   }
  ],
  "runs": {
@@ -3921,6 +3977,14 @@
    "recorded_at": "2026-11-25T15:17:43+00:00",
    "note": "L-PLAN: each X_A EpochRecorded (drive.py poke) -> the RC reaction -> its rcAllocate -> the PLAN note on the 1301 Hub: DONE before the breach, SKIPPED(PAUSED) after it (spec \u00a73.7, \u00a79.5)",
    "n": 5
+  },
+  "L-EXIT-partial": {
+   "commit": "29dddb9",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T16:12:20+00:00",
+   "note": "L-EXIT: a 1301 breach of X_A -> processBreach (the forfeit set aside; its shares recorded) -> the RC's rcExit answers (EARLY while the drip runs) -> ExitDone after the drip: the tokens to the owner only, in kind, equal to the note (spec \u00a73.5, \u00a79.5, C-04, C-12)",
+   "n": 1
   }
  },
  "stats": [

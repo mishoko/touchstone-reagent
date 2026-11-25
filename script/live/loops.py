@@ -1797,10 +1797,14 @@ def lexit():
     row['verdict'] = lexit_verdict(row)
     row['verdict']['pass'] = row['verdict']['pass'] and row['byProxy']
     doc = load()
-    save(doc, 'L-EXIT', [row], 'L-EXIT: a 1301 breach of X_A -> processBreach (the forfeit set aside; its shares '
+    key = 'L-EXIT' if row['verdict']['pass'] else 'L-EXIT-partial'  # a failing row never stands under the claim's ID
+    for k_ in ('L-EXIT', 'L-EXIT-partial'):
+        doc['loops'] = [e for e in doc.get('loops', []) if e.get('id') != k_]
+        doc.get('runs', {}).pop(k_, None)
+    save(doc, key, [row], 'L-EXIT: a 1301 breach of X_A -> processBreach (the forfeit set aside; its shares '
          'recorded) -> the RC\'s rcExit answers (EARLY while the drip runs) -> ExitDone after the drip: the tokens to '
          'the owner only, in kind, equal to the note (spec §3.5, §9.5, C-04, C-12)')
-    print('loops: L-EXIT', row['verdict'])
+    print('loops:', key, row['verdict'])
 
 
 if __name__ == '__main__':
