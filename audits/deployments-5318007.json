@@ -40,6 +40,51 @@
    "ext": "0xa9b408a944337a1bbce77c6823fad226de4c228d",
    "b6": "0xdb671db6df964f18d58d23d8324ae1faae43ef9e",
    "asserted": true
+  },
+  "register": {
+   "commit": "43d34d8",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:20:32+00:00",
+   "txs": [
+    {
+     "call": "addHub(uint256,address)",
+     "args": [
+      "1301",
+      "0xb41433C9585d230A2607f253E1EA844923e07a91"
+     ],
+     "tx": "0x82be64e4331fc510ad453bff459c8a671205eeed3fdc9a81934dc2bb83e7d2bd"
+    },
+    {
+     "call": "addFactory(uint256,address)",
+     "args": [
+      "1301",
+      "0x9d973976fc211ac7425f34f1060641339451f75c"
+     ],
+     "tx": "0xe7f64f1a9debe7977eaf6e84b351ca74af26ef59cacb439b1db2b8372c454808"
+    },
+    {
+     "call": "addHub(uint256,address)",
+     "args": [
+      "11155111",
+      "0xb41433C9585d230A2607f253E1EA844923e07a91"
+     ],
+     "tx": "0x783634adb25ba43f8949fd205a5bad3c5db741bca5b19dc84bacbb78d27e22d8"
+    },
+    {
+     "call": "addFactory(uint256,address)",
+     "args": [
+      "11155111",
+      "0x2a8f5c8b455aacdcb4aeddf41986f4a60b24a05d"
+     ],
+     "tx": "0x226a6b33b33f37610660b80f398c4a35bf18054ea4a421e950cfdba21b4281aa"
+    },
+    {
+     "call": "depositTo(address)",
+     "value": "5ether",
+     "tx": "0x0f9c72feae700014097a6eddc287360a46606ce9b7cd5b3586533d0fba268a9e"
+    }
+   ]
   }
  }
 }
