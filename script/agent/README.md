@@ -7,8 +7,8 @@ enforced by the Covenant and not by this script:
 - `agentAllocate(vault, shares, max0, max1)`: into an allowlisted vault, within B6 and the per-epoch agent cap, priced
   against `tryRef`. The Covenant chooses no recipient; the shares stay in the Covenant.
 
-The Reactive contract enforces the depositor's rules whether or not the agent is running. When the agent wakes after a
-breach on the other chain, its allocation is refused by the Hub's mirror (`HubPaused`).
+The reactive contract enforces the depositor's rules whether or not the agent is running. When the agent wakes after a
+breach on the other chain, the Hub's mirror refuses its allocation (`HubPaused`).
 
 ## Use
 
@@ -43,7 +43,7 @@ python3 script/agent/agent.py --selftest
 
 ## Limits
 
-- This is a policy runner, not a strategy: it allocates a fixed `sharesPerTick` every tick and lets the Covenant refuse.
+- It runs a fixed policy with no strategy: it allocates a fixed `sharesPerTick` every tick and lets the Covenant refuse.
 - A refusal is decoded only from the revert data `cast` prints; an unknown selector is logged as such and never sent
   as a proving refusal.
 - The `tighten` pre-check mirrors the Covenant's rule so that it can refuse before any send. The Covenant's own check
@@ -55,3 +55,6 @@ python3 script/agent/agent.py --selftest
 run logged and not sent; `--prove-refusal` sends exactly once per (chain, vault) at the floor gas limit; a passing dry
 run sent at max(1.5 x estimate, floor); looser tightens (k, maxShareBps off, an added id, b3, budget, a permutation,
 b5) refused before any send, and a stricter one sent; keyed RPC URLs redacted. Each refusal has a passing control.
+
+The log of the recorded run on Ethereum Sepolia (start, allocations, stop, wake, the refused send) is published
+verbatim as [`audits/agent-11155111.jsonl`](../../audits/agent-11155111.jsonl).

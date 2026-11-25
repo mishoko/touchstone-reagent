@@ -1,0 +1,1079 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Touchstone Reagent</title>
+<meta name="description" content="Standing orders on a vault curator's conduct, enforced on two chains by a reactive contract. Every step on this page links a real transaction.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@1&display=swap">
+<style>
+/* TOKENS:BEGIN */
+/* Touchstone Reagent shared tokens: the page inlines this block verbatim (script/site/embed.py checks it); the video copies it. */
+:root {
+  --stone: #111315; --stone-2: #1A1D20; --rule: #2A2F33; --ink: #ECE8DE; --ink-2: #9C9A93;
+  --gold: #E2B54E; --reagent: #3FE0C5; --breach: #FF5A3C; --pause: #FFB020; --exit: #7CD67A;
+  --lane-a: #F25AA8; --lane-r: #9B8CFF; --lane-b: #3D9AEF;
+  --font-display: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --ease-streak: cubic-bezier(0.215, 0.61, 0.355, 1);
+  --ease-reagent: cubic-bezier(0.87, 0, 0.13, 1);
+  --ease-snap: cubic-bezier(0.34, 1.9, 0.64, 1);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --stone: #F3F1EA; --stone-2: #FFFFFF; --rule: #D6D3C9; --ink: #16191B; --ink-2: #5A5F61;
+    --gold: #86600F; --reagent: #0B7A6C; --breach: #C2361C; --pause: #975C00; --exit: #2F7A2D;
+    --lane-a: #C2257A; --lane-r: #5B4BD6; --lane-b: #1D68B8;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --stone: #F3F1EA; --stone-2: #FFFFFF; --rule: #D6D3C9; --ink: #16191B; --ink-2: #5A5F61;
+  --gold: #86600F; --reagent: #0B7A6C; --breach: #C2361C; --pause: #975C00; --exit: #2F7A2D;
+  --lane-a: #C2257A; --lane-r: #5B4BD6; --lane-b: #1D68B8;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --stone: #111315; --stone-2: #1A1D20; --rule: #2A2F33; --ink: #ECE8DE; --ink-2: #9C9A93;
+  --gold: #E2B54E; --reagent: #3FE0C5; --breach: #FF5A3C; --pause: #FFB020; --exit: #7CD67A;
+  --lane-a: #F25AA8; --lane-r: #9B8CFF; --lane-b: #3D9AEF;
+  color-scheme: dark;
+}
+/* TOKENS:END */
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{overflow-x:clip;-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:72px}
+body{margin:0;background:var(--stone);color:var(--ink);font-family:var(--font-display);font-size:17px;line-height:1.55;font-variation-settings:"wdth" 100;-webkit-font-smoothing:antialiased}
+a{color:var(--reagent);text-decoration-thickness:1px;text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--reagent);outline-offset:3px;border-radius:4px}
+button{font:inherit;color:inherit}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:.86em}
+.muted{color:var(--ink-2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px}
+@media (min-width:640px){.wrap{padding:0 24px}}
+@media (min-width:1024px){.wrap{padding:0 40px}}
+
+/* header */
+.top{position:sticky;top:0;z-index:50;height:56px;background:color-mix(in srgb,var(--stone) 80%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--rule)}
+.top .wrap{display:flex;align-items:center;gap:16px;height:100%}
+.mark{display:flex;align-items:center;gap:10px;font-weight:800;font-variation-settings:"wdth" 80;letter-spacing:.01em;color:var(--ink);text-decoration:none;white-space:nowrap;font-size:17px}
+.mark i{width:14px;height:14px;border-radius:3px;background:linear-gradient(135deg,var(--gold) 0 50%,var(--reagent) 50% 100%);display:inline-block;transform:rotate(-8deg)}
+.nav{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;mask-image:linear-gradient(90deg,#000 88%,transparent)}
+.nav::-webkit-scrollbar{display:none}
+.nav a{color:var(--ink-2);text-decoration:none;padding:6px 10px;border-radius:999px;font-size:14px;white-space:nowrap;font-weight:600}
+.nav a:hover,.nav a.on{color:var(--ink);background:var(--stone-2)}
+.tools{display:flex;gap:6px;align-items:center}
+.icon-btn{border:1px solid var(--rule);background:var(--stone-2);border-radius:999px;height:34px;min-width:34px;padding:0 10px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);text-decoration:none}
+.icon-btn:hover{border-color:var(--ink-2)}
+.icon-btn svg{width:16px;height:16px}
+@media (max-width:639px){.mark span{display:none}.gh-label{display:none}}
+
+/* sections */
+section{padding:72px 0;border-bottom:1px solid var(--rule);position:relative}
+.kicker{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin:0 0 10px}
+.kicker b{color:var(--reagent);font-weight:500}
+h2{font-size:clamp(1.6rem,3.6vw,2.8rem);line-height:1.08;margin:0 0 14px;font-weight:800;font-variation-settings:"wdth" 75;min-height:1.1em;letter-spacing:-.005em;transition:font-variation-settings .9s var(--ease-streak)}
+.js h2.pre{font-variation-settings:"wdth" 125}
+.lede{max-width:62ch;color:var(--ink-2);margin:0 0 32px;font-size:18px}
+.lede strong{color:var(--ink);font-weight:600}
+.card{background:var(--stone-2);border:1px solid var(--rule);border-radius:14px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 18px;border-radius:999px;font-weight:700;font-size:15px;text-decoration:none;border:1px solid var(--rule);background:var(--stone-2);color:var(--ink);cursor:pointer;font-variation-settings:"wdth" 90}
+.btn.primary{background:var(--ink);color:var(--stone);border-color:var(--ink)}
+.btn:hover{transform:translateY(-1px)}
+.btn.sm{height:34px;padding:0 14px;font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;font-size:13px;font-weight:600;background:var(--stone-2);white-space:nowrap}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+.c-a{color:var(--lane-a)}.c-r{color:var(--lane-r)}.c-b{color:var(--lane-b)}
+.reveal{opacity:1}
+.js .reveal{opacity:0;transform:translateY(18px);transition:opacity .8s var(--ease-streak),transform .8s var(--ease-streak)}
+.js .reveal.in{opacity:1;transform:none}
+
+/* hero */
+.hero{padding:56px 0 64px;overflow:hidden}
+.hero-grid{display:grid;gap:40px;align-items:center;grid-template-columns:minmax(0,1fr)}
+@media (min-width:980px){.hero-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+h1{font-size:clamp(2.6rem,7vw,6.5rem);line-height:.95;margin:0 0 22px;font-weight:850;font-variation-settings:"wdth" 75;letter-spacing:-.015em}
+h1 em{display:block;font-family:var(--font-serif);font-style:italic;font-weight:400;color:var(--gold);letter-spacing:0;font-variation-settings:normal}
+.hero p.sub{font-size:clamp(1.05rem,1.6vw,1.3rem);max-width:34ch;margin:0 0 28px;color:var(--ink)}
+.hero .ctas{display:flex;gap:10px;flex-wrap:wrap}
+.lanes{padding:14px 14px 10px}
+.lanes svg{width:100%;height:auto;display:block;overflow:visible}
+.lanes text{font-family:var(--font-display);fill:var(--ink-2);font-size:13px}
+.lanes .lbl{font-weight:700;font-size:13px}
+.lanes .mono-t{font-family:var(--font-mono);font-size:12px}
+.svg-anim{transform-box:fill-box;transform-origin:center}
+.stamp text{font-weight:850;font-variation-settings:"wdth" 70;letter-spacing:.08em;font-size:17px}
+.hero-ctrl{display:flex;gap:8px;align-items:center;margin:10px 2px 4px;flex-wrap:wrap}
+.hero-steps{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px;counter-reset:s}
+.hero-steps li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;align-items:baseline;font-size:14px;opacity:.45;transition:opacity .4s}
+.hero-steps li.on{opacity:1}
+.hero-steps li::before{counter-increment:s;content:counter(s);font-family:var(--font-mono);font-size:12px;color:var(--ink-2)}
+.hero-steps a{font-family:var(--font-mono);font-size:12px;white-space:nowrap}
+.hero-cap{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.15rem,2vw,1.45rem);margin:14px 2px 0;line-height:1.3}
+.hero-cap b{font-family:var(--font-display);font-style:normal;font-weight:800;color:var(--reagent)}
+
+/* run */
+.run-grid{display:grid;gap:20px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:980px){.run-grid{grid-template-columns:minmax(0,1fr) 280px}}
+@media (max-width:979px){.run-grid .state{order:-1;position:static;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:16px}.run-grid .state h3,.run-grid .state .note{grid-column:1/-1}.st{font-size:14px}}
+.axis-card{padding:18px 18px 14px}
+.axis{position:relative;height:118px;margin:4px 8px 0;touch-action:pan-y;cursor:pointer}
+.axis .base{position:absolute;left:0;right:0;top:58px;height:2px;background:var(--rule)}
+.axis .seg-on{position:absolute;top:52px;height:14px;border-radius:7px;background:color-mix(in srgb,var(--lane-b) 22%,transparent)}
+.axis .ev{position:absolute;top:51px;width:16px;height:16px;margin-left:-8px;border-radius:50%;border:2px solid var(--stone-2);background:var(--ink-2);box-shadow:0 0 0 1px var(--rule)}
+.axis .ev.k-breach{background:var(--breach)}.axis .ev.k-pause{background:var(--pause)}.axis .ev.k-exit{background:var(--exit)}.axis .ev.k-plan{background:var(--gold)}.axis .ev.k-rc{background:var(--reagent)}.axis .ev.k-agent{background:var(--lane-b)}
+.axis .tick{position:absolute;top:47px;width:2px;height:10px;margin-left:-1px;background:var(--lane-b);border-radius:1px}
+.axis .num{position:absolute;top:28px;transform:translateX(-50%);font-family:var(--font-mono);font-size:11px;color:var(--ink-2)}
+.axis .brk{position:absolute;top:50px;transform:translateX(-50%);font-family:var(--font-mono);font-size:13px;color:var(--ink-2);background:var(--stone-2);padding:0 2px;line-height:18px;font-weight:500}
+.axis .brk small{position:absolute;top:22px;left:50%;transform:translateX(-50%);font-size:10.5px;white-space:nowrap}
+.axis .clock{position:absolute;top:96px;transform:translateX(-50%);font-family:var(--font-mono);font-size:10.5px;color:var(--ink-2);white-space:nowrap}
+.playhead{position:absolute;top:6px;bottom:0;width:2px;margin-left:-1px;background:var(--reagent);pointer-events:none}
+.playhead::after{content:"";position:absolute;top:-2px;left:-7px;width:16px;height:16px;border-radius:50%;background:var(--reagent);box-shadow:0 0 0 4px color-mix(in srgb,var(--reagent) 25%,transparent)}
+.axis:focus-visible{outline-offset:6px}
+.run-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.run-ctrl .now-t{margin-left:auto;font-family:var(--font-mono);font-size:13px;color:var(--ink-2)}
+.state{padding:16px;display:grid;gap:10px;align-content:start;align-self:start;position:sticky;top:72px}
+.state h3{margin:0 0 2px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-family:var(--font-mono);font-weight:500}
+.st{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:15px}
+.badge{font-weight:800;font-variation-settings:"wdth" 75;letter-spacing:.06em;font-size:13px;text-transform:uppercase;border:1.5px solid currentColor;border-radius:5px;padding:1px 8px;transition:color .3s,transform .35s var(--ease-snap)}
+.b-ok{color:var(--exit)}.b-pause{color:var(--pause)}.b-off{color:var(--ink-2)}.b-breach{color:var(--breach)}.b-gold{color:var(--gold)}
+.events{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:6px}
+.events details{border:1px solid var(--rule);border-radius:10px;background:var(--stone-2);transition:border-color .3s,opacity .3s}
+.events li.future details{opacity:.55}
+.events li.now details{border-color:var(--reagent)}
+.events summary{list-style:none;display:grid;grid-template-columns:86px 14px 1fr auto;gap:10px;align-items:center;padding:9px 12px;cursor:pointer;font-size:15px}
+.events summary::-webkit-details-marker{display:none}
+.events summary .t{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-2)}
+.events summary .k{width:10px;height:10px;border-radius:50%}
+.events summary .d{font-family:var(--font-mono);font-size:12px;color:var(--ink-2)}
+.events .more{padding:0 12px 12px 122px;font-size:14px;color:var(--ink-2);display:grid;gap:6px}
+@media (max-width:639px){.events summary{grid-template-columns:64px 12px 1fr}.events summary .d{display:none}.events .more{padding-left:12px}}
+.txline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.txline code{font-family:var(--font-mono);font-size:13px;color:var(--ink);overflow-wrap:anywhere}
+.copy{border:1px solid var(--rule);background:transparent;border-radius:6px;font-size:12px;padding:2px 8px;cursor:pointer;color:var(--ink-2)}
+.copy:hover{color:var(--ink)}
+.foot{font-size:14px;color:var(--ink-2);margin:14px 0 0}
+
+/* latency */
+.lat-card{padding:18px}
+.lat-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--ink-2);margin-bottom:6px}
+.lat-legend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.lat-legend .tk{display:inline-block;width:2px;height:12px;margin-right:6px;vertical-align:-2px}
+.lat-row{display:grid;gap:4px;padding:14px 0;border-top:1px solid var(--rule)}
+.lat-row:first-of-type{border-top:0}
+.lat-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
+.lat-head b{font-weight:800;font-variation-settings:"wdth" 80;font-size:16px}
+.lat-head span{font-size:14px;color:var(--ink-2)}
+.lat-row svg{width:100%;display:block;overflow:visible}
+.lat-row svg:focus{outline:none}
+.lat-row svg:focus-visible{outline:2px solid var(--reagent);outline-offset:4px}
+.lat-row circle.d{transition:opacity .7s var(--ease-streak),transform .7s var(--ease-streak);transform-box:fill-box;transform-origin:center}
+.js .lat-row:not(.in) circle.d{opacity:0;transform:translateX(-14px)}
+.lat-row circle.d.hl{stroke:var(--ink);stroke-width:2}
+.axis-t{font-family:var(--font-mono);font-size:11px;fill:var(--ink-2)}
+.tip{position:fixed;z-index:70;width:min(300px,calc(100vw - 32px));padding:12px 14px;font-size:13.5px;pointer-events:auto;box-shadow:0 12px 30px rgba(0,0,0,.25);display:none}
+.tip.show{display:block}
+.tip .r{display:flex;justify-content:space-between;gap:10px}
+.tip a{font-family:var(--font-mono);font-size:12px}
+.tip .links{display:grid;gap:3px;margin-top:8px}
+.tbl-wrap{overflow-x:auto;max-height:420px;margin-top:10px;border:1px solid var(--rule);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--rule);white-space:nowrap}
+th{position:sticky;top:0;background:var(--stone-2);font-weight:700}
+td{font-family:var(--font-mono);font-size:12px}
+details.plain>summary{cursor:pointer;color:var(--ink-2);font-size:14px;margin-top:14px}
+
+/* design */
+.design-grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+.design-below{display:grid;gap:18px}
+@media (min-width:980px){.design-below{grid-template-columns:minmax(0,1fr) 360px}}
+.stepper{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.stepper button{border:1px solid var(--rule);background:var(--stone-2);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-2)}
+.stepper button[aria-pressed="true"]{background:var(--reagent);color:var(--stone);border-color:var(--reagent)}
+.stepper button span{font-family:var(--font-mono);font-weight:500;margin-right:6px;font-size:12px}
+.diagram{padding:10px;overflow:hidden}
+.diagram svg{width:100%;height:auto;display:block}
+.diagram .zoom{transition:transform .7s var(--ease-streak);transform-origin:0 0}
+.node rect{fill:var(--stone);stroke:var(--rule);stroke-width:1.5;transition:stroke .4s,opacity .4s}
+.node{cursor:pointer;transition:opacity .4s}
+.node text{fill:var(--ink);font-family:var(--font-display);font-weight:700;text-anchor:middle;font-variation-settings:"wdth" 85}
+.node text.s{fill:var(--ink-2);font-weight:500;font-family:var(--font-mono)}
+.node.on rect{stroke:var(--reagent)}
+.node.sel rect{stroke:var(--gold);stroke-width:2.5}
+.node.dim{opacity:.45}
+.edge path{fill:none;stroke-width:2;transition:opacity .5s,stroke-dashoffset .9s var(--ease-streak)}
+.edge path.bg{stroke:var(--rule)}
+.edge path.fg{stroke:var(--reagent);stroke-dasharray:1;stroke-dashoffset:1}
+.edge.red path.fg{stroke:var(--breach)}
+.edge.gold path.fg{stroke:var(--gold)}
+.edge.on path.fg{stroke-dashoffset:0}
+.edge.dim{opacity:.25}
+.edge text{font-family:var(--font-mono);fill:var(--ink);opacity:0;transition:opacity .4s;paint-order:stroke;stroke:var(--stone-2);stroke-width:5px;stroke-linejoin:round}
+.edge.on text{opacity:1}
+.colhead{font-family:var(--font-mono);fill:var(--ink-2);text-anchor:middle;letter-spacing:.06em}
+.step-cap{font-size:17px;min-height:3.2em;margin:12px 4px 0}
+.node-card{padding:16px;align-self:start;display:grid;gap:8px;font-size:15px}
+.node-card h3{margin:0;font-size:19px;font-variation-settings:"wdth" 85}
+.motto{font-family:var(--font-serif);font-style:italic;font-size:clamp(1.2rem,2.2vw,1.6rem);margin:26px 0 0;line-height:1.3;max-width:52ch}
+
+/* rules */
+.rules-grid{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:980px){.rules-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+.pane{padding:18px;display:grid;gap:16px;align-content:start}
+.pane>.btn{justify-self:start}
+.pane h3{margin:0;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);font-family:var(--font-mono);font-weight:500}
+.ctl{display:grid;gap:6px}
+.ctl label,.ctl .l{font-weight:700;font-size:15px;display:flex;justify-content:space-between;gap:10px}
+.ctl label output{font-family:var(--font-mono);font-weight:500;color:var(--reagent)}
+.ctl .h,.pane>.h{font-size:13px;color:var(--ink-2)}
+.seg{justify-self:start;display:inline-flex;border:1px solid var(--rule);border-radius:999px;padding:3px;gap:2px;background:var(--stone)}
+.seg button{border:0;background:transparent;border-radius:999px;padding:5px 14px;cursor:pointer;font-weight:700;font-size:14px;color:var(--ink-2)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--stone)}
+input[type=range]{width:100%;accent-color:var(--reagent);height:28px}
+.hist{display:grid;gap:8px}
+.hist .row{display:grid;grid-template-columns:92px repeat(6,minmax(0,1fr));gap:5px;align-items:center}
+.hist .row>span{font-size:13px;font-weight:700}
+.cell{height:40px;border-radius:7px;border:1px solid var(--rule);background:var(--stone);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;padding:0;line-height:1.05;text-align:center;font-variation-settings:"wdth" 75;color:var(--ink-2)}
+.cell[data-v="1"]{color:var(--gold);border-color:var(--gold)}
+.cell[data-v="2"]{color:var(--breach);border-color:var(--breach);background:color-mix(in srgb,var(--breach) 10%,transparent)}
+.cell[data-v="3"]{color:var(--pause);border-color:var(--pause)}
+.cell[data-v="4"]{color:var(--lane-r);border-color:var(--lane-r)}
+.verdicts{display:grid;gap:8px}
+.vd{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--stone)}
+.vd .who{font-weight:700;font-size:15px}
+.vd .why{grid-column:1/-1;font-size:13px;color:var(--ink-2)}
+.exitline{font-size:15px;padding:10px 12px;border-radius:10px;border:1px dashed var(--rule)}
+.agent-btns{display:flex;flex-wrap:wrap;gap:6px}
+.agent-out{font-size:14px;min-height:1.5em}
+.note{font-size:13px;color:var(--ink-2)}
+
+/* tests */
+.counters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:26px}
+@media (min-width:900px){.counters{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.ctr{padding:16px 16px 14px}
+.ctr .n{font-size:clamp(2rem,5vw,3.4rem);font-weight:850;font-variation-settings:"wdth" 70;line-height:1;font-variant-numeric:tabular-nums}
+.ctr .n small{font-size:.45em;color:var(--ink-2);font-weight:700}
+.ctr .l{font-size:14px;color:var(--ink-2);margin-top:6px}
+.mgrid-wrap{padding:16px;display:grid;gap:16px}
+@media (min-width:980px){.mgrid-wrap{grid-template-columns:minmax(0,1fr) 320px}}
+.mdetail{border:1px solid var(--rule);border-radius:10px;padding:14px;font-size:14px;align-self:start;display:grid;gap:6px;background:var(--stone)}
+.mdetail b{font-family:var(--font-mono);font-weight:500}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filters button{border:1px solid var(--rule);background:var(--stone);border-radius:999px;padding:3px 10px;font-size:12.5px;cursor:pointer;color:var(--ink-2);font-weight:600}
+.filters button[aria-pressed="true"]{color:var(--stone);background:var(--ink);border-color:var(--ink)}
+.mgrid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:5px}
+@media (max-width:719px){.mgrid{grid-template-columns:repeat(8,minmax(0,1fr))}}
+.mu{aspect-ratio:1.25;border-radius:5px;border:1px solid var(--breach);background:color-mix(in srgb,var(--breach) 14%,transparent);position:relative;cursor:pointer;padding:0;overflow:hidden;transition:background .35s,border-color .35s,opacity .3s}
+.mu::before{content:"";position:absolute;left:18%;right:18%;top:50%;height:3px;margin-top:-1.5px;border-radius:2px;background:var(--breach);transition:background .35s,transform .35s var(--ease-snap)}
+.mu.k{border-color:var(--exit);background:color-mix(in srgb,var(--exit) 12%,transparent)}
+.mu.k::before{background:var(--exit);transform:rotate(-24deg) scaleX(1.15)}
+.mu.e{border-color:var(--ink-2);background:transparent}
+.mu.e::before{content:"=";background:none;color:var(--ink-2);top:0;bottom:0;left:0;right:0;height:auto;margin:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;transform:none}
+.mu.off{opacity:.12}
+.mu.area-start{box-shadow:-3px 0 0 -1px var(--ink-2)}
+.mlegend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--ink-2);margin-top:12px}
+.mlegend i{display:inline-block;width:18px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:6px;border:1px solid}
+.cols2{display:grid;gap:18px;margin-top:26px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:980px){.cols2{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
+.atk{padding:16px}
+.atk ol{list-style:none;margin:8px 0 0;padding:0;max-height:900px;overflow-y:auto;display:grid;gap:2px}
+.atk li{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:8px 4px;border-bottom:1px solid var(--rule);font-size:14px}
+.atk .pair{display:grid;gap:5px;align-content:start;padding-top:5px}
+.atk .pair i{height:5px;border-radius:3px;display:block}
+.atk .pair .r{background:linear-gradient(90deg,var(--breach) 0 45%,transparent 45% 55%,var(--breach) 55% 70%,transparent 70%);opacity:.8}
+.atk .pair .g{background:var(--gold)}
+.atk b{font-family:var(--font-mono);font-weight:500;font-size:12px;color:var(--ink-2);display:block}
+.atk .ctl-t{color:var(--ink-2);font-size:13px}
+.live{padding:16px;display:grid;gap:10px;align-content:start}
+.lv{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.lv:last-child{border-bottom:0}
+.lv .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pass{color:var(--exit);font-weight:800;font-size:12px;letter-spacing:.08em;border:1.5px solid currentColor;border-radius:5px;padding:0 6px;font-variation-settings:"wdth" 75}
+.lv .w{font-size:14px;color:var(--ink-2)}
+.lv .ls{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:12px}
+.inv{padding:16px;margin-top:18px}
+.inv ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;font-size:14px}
+@media (min-width:900px){.inv ul{grid-template-columns:1fr 1fr;column-gap:24px}}
+.inv b{font-family:var(--font-mono);font-weight:500;font-size:12.5px;color:var(--reagent);margin-right:6px}
+
+/* verify */
+.vgrid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.vgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.vcard{padding:16px;display:grid;gap:12px;align-content:start}
+.vcard h3{margin:0;font-size:18px;display:flex;align-items:center;gap:8px;font-variation-settings:"wdth" 85}
+.vcard h3 i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.addr{display:grid;gap:3px}
+.addr .n{font-size:13px;font-weight:700}
+.addr .n small{font-weight:500;color:var(--ink-2)}
+.addr .v{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.addr code{font-family:var(--font-mono);font-size:12.5px;overflow-wrap:anywhere}
+.addr .v a{font-size:13px}
+.cmd{margin-top:22px;padding:16px;display:grid;gap:10px}
+.cmd pre{margin:0;font-family:var(--font-mono);font-size:14px;background:var(--stone);border:1px solid var(--rule);border-radius:8px;padding:10px 12px;overflow-x:auto}
+
+footer{padding:48px 0 80px;color:var(--ink-2);font-size:15px}
+footer details{max-width:760px}
+footer summary{cursor:pointer;font-weight:700;color:var(--ink);font-size:17px}
+footer ul{margin:12px 0 0;padding-left:20px;display:grid;gap:6px}
+.sign{margin-top:36px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.sign em{font-family:var(--font-serif);font-size:20px;color:var(--ink)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  .js .reveal{opacity:1;transform:none}
+  .js h2.pre{font-variation-settings:"wdth" 75}
+}
+</style>
+<script>document.documentElement.classList.add("js");try{var t=localStorage.getItem("reagent-theme");if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="#loop" aria-label="Touchstone Reagent, top"><i></i><span>Touchstone Reagent</span></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#loop">Loop</a><a href="#run">Run</a><a href="#latency">Latency</a><a href="#design">Design</a><a href="#rules">Rules</a><a href="#tests">Tests</a><a href="#verify">Verify</a>
+    </nav>
+    <div class="tools">
+      <button class="icon-btn" id="theme" type="button" aria-label="Switch theme"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 1.8a6.2 6.2 0 0 1 0 12.4z" fill="currentColor"/></svg><span id="theme-l">stone</span></button>
+      <a class="icon-btn" data-href="repo" href="https://github.com/mishoko/touchstone-reagent" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg><span class="gh-label">GitHub</span></a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="loop" class="hero" aria-labelledby="h-loop">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="kicker">Touchstone Reagent · <b>Reactive Network</b></p>
+      <h1 id="h-loop">Exit on conduct, <em>not on price.</em></h1>
+      <p class="sub">A depositor's standing orders on a vault curator's conduct, enforced on two chains by a reactive contract that keeps watching while your agent sleeps.</p>
+      <div class="ctas">
+        <a class="btn primary" href="#run">Watch the loop</a>
+        <a class="btn" href="#verify">Verify on chain</a>
+      </div>
+    </div>
+    <div>
+      <div class="card lanes" id="hero-lanes">
+        <svg id="hero-svg" role="img" aria-labelledby="hero-svg-t"><title id="hero-svg-t">A breach on Unichain Sepolia travels through the reactive contract on Lasna and pauses the curator on Ethereum Sepolia; the agent's next allocation is refused.</title></svg>
+        <div class="hero-ctrl">
+          <button class="btn sm" id="hero-replay" type="button">Replay</button>
+          <button class="btn sm" id="hero-slow" type="button" aria-pressed="false">Slow ×0.25</button>
+          <button class="btn sm" id="hero-next" type="button" hidden>Next step</button>
+        </div>
+        <ol class="hero-steps" id="hero-steps"></ol>
+      </div>
+      <p class="hero-cap" id="hero-cap"></p>
+    </div>
+  </div>
+</section>
+
+<section id="run" aria-labelledby="h-run">
+  <div class="wrap">
+    <p class="kicker"><b>Live</b> · one recorded run</p>
+    <h2 id="h-run" class="pre">One run, second by second</h2>
+    <p class="lede">The agent allocates, then goes offline. The curator breaches on Unichain Sepolia. Reactive pauses it on Ethereum Sepolia, the agent's next allocation is refused, the standing plan is held, and the patient exit lands after the drip. Drag the playhead or use the arrow keys.</p>
+    <div class="run-grid">
+      <div class="card axis-card">
+        <div class="axis" id="axis" role="slider" tabindex="0" aria-label="Run timeline playhead" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="base"></div><div class="playhead" id="playhead"></div></div>
+        <div class="run-ctrl">
+          <button class="btn sm" id="run-play" type="button">Play the run</button>
+          <button class="btn sm" id="run-prev" type="button" aria-label="Previous event">←</button>
+          <button class="btn sm" id="run-next" type="button" aria-label="Next event">→</button>
+          <span class="now-t" id="run-now"></span>
+        </div>
+        <ul class="events" id="events"></ul>
+        <p class="foot" id="run-foot">Single-actor demo: we ran the curator, the depositor and the reactive contract; the breach was induced by moving the mock reference pool out of the curator's range.</p>
+      </div>
+      <aside class="card state" aria-live="polite" id="state"></aside>
+    </div>
+  </div>
+</section>
+
+<section id="latency" aria-labelledby="h-lat">
+  <div class="wrap">
+    <p class="kicker"><b>Live</b> · conduct loops</p>
+    <h2 id="h-lat" class="pre"><span data-bind="conTotal"></span> loops, each one on chain</h2>
+    <p class="lede">Each dot is one curator Action carried end to end: the origin block on one chain, the reaction on Lasna, the <strong>Applied</strong> on the destination Hub. Time is destination block time minus origin block time, read from the chains. Hover or tap a dot for its three transactions.</p>
+    <div class="card lat-card">
+      <div class="lat-legend" aria-hidden="true">
+        <span><i class="sw" style="background:var(--lane-a)"></i>to Unichain Sepolia</span>
+        <span><i class="sw" style="background:var(--lane-b)"></i>to Ethereum Sepolia</span>
+        <span><i class="tk" style="background:var(--gold)"></i>median</span>
+        <span><i class="tk" style="background:var(--ink-2)"></i>p95</span>
+      </div>
+      <div id="lat-rows"></div>
+      <p class="foot">Ethereum Sepolia makes a block about every 12 s, so a callback there waits for the next block: anywhere up to 12 s after a Unichain Sepolia origin, and at least one block (12 s) after an Ethereum Sepolia origin. Times are whole seconds; dots that share a second are spread around it. One dated batch: <span data-bind="conDate"></span>.</p>
+      <details class="plain"><summary>All loops as a table</summary><div class="tbl-wrap" id="lat-table"></div></details>
+    </div>
+  </div>
+</section>
+
+<section id="design" aria-labelledby="h-design">
+  <div class="wrap">
+    <p class="kicker"><b>Design</b> · what runs where</p>
+    <h2 id="h-design" class="pre">Observe, remember, evaluate, react</h2>
+    <p class="lede">Each chain checks what it can see, inside every allocation, with no wait. The reactive contract on Lasna holds what no single chain can see and pushes it to both. Tap a box to see its role and address.</p>
+    <div class="design-grid">
+      <div>
+        <div class="stepper" id="stepper" role="group" aria-label="Steps"></div>
+        <div class="card diagram"><svg id="arch" role="img" aria-labelledby="arch-t"><title id="arch-t">Architecture: vaults and hooks, Covenants, Hubs and callback proxies on two chains, and the reactive contract on Lasna.</title></svg></div>
+      </div>
+      <div class="design-below"><p class="step-cap" id="step-cap" aria-live="polite"></p><aside class="card node-card" id="node-card"></aside></div>
+    </div>
+    <p class="motto">AI reasons, code enforces and Reactive reacts, so the agent can sleep while the reaction logic stays active.</p>
+  </div>
+</section>
+
+<section id="rules" aria-labelledby="h-rules">
+  <div class="wrap">
+    <p class="kicker"><b>Illustration</b> · runs in your browser, not on chain</p>
+    <h2 id="h-rules" class="pre">Try the rules</h2>
+    <p class="lede">Set a depositor's rules, then write the curator's history on two chains. Four allocations try to go in. The verdicts follow the Covenant's guard at the level of the rule table.</p>
+    <div class="rules-grid">
+      <div class="card pane">
+        <h3>The owner's rules</h3>
+        <div class="ctl"><span class="l">B7 · breaches before pause (k)</span><div class="seg" id="r-k" role="group" aria-label="k"></div><span class="h">The curator's latched breaches across vaults and chains.</span></div>
+        <div class="ctl"><span class="l">B3 · pause when a vault is gone</span><div class="seg" id="r-b3" role="group" aria-label="B3"></div></div>
+        <div class="ctl"><label for="r-b4">B4 · bond floor <output id="o-b4"></output></label><input id="r-b4" type="range" min="0" max="100" step="5"><span class="h">Refuse if the curator's bond falls below this share of the bond at your first allocation.</span></div>
+        <div class="ctl"><label for="r-b6">B6 · max share of budget in one curator <output id="o-b6"></output></label><input id="r-b6" type="range" min="0" max="10000" step="250"><span class="h">Your exposure to curator X sits at 40% of the budget, split across both chains; each allocation adds 10%.</span></div>
+        <h3>Curator X's history</h3><span class="h" style="margin-top:-10px">Tap a cell to cycle: Action → breach → vault EXITED → bond burn → empty.</span>
+        <div class="hist" id="hist"></div>
+        <button class="btn sm" id="hist-reset" type="button">Clear history</button>
+      </div>
+      <div class="card pane">
+        <h3>Four allocations try to go in</h3>
+        <div class="verdicts" id="verdicts" aria-live="polite"></div>
+        <div class="exitline" id="exitline"></div>
+        <h3>The agent tries to change the rules</h3>
+        <div class="agent-btns" id="agent-btns"></div>
+        <div class="agent-out" id="agent-out" aria-live="polite"><span class="muted">Pick a change for the agent to try.</span></div>
+        <p class="note">A pure function, verdict(rules, history), mirrors the rule table: no gas, no scheduler, budgets as one number. The real guard is <a data-href="covenant-src" href="#">src/Covenant.sol</a>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tests" aria-labelledby="h-tests">
+  <div class="wrap">
+    <p class="kicker"><b>Evidence</b> · tests, attacks, mutants</p>
+    <h2 id="h-tests" class="pre">How it is tested</h2>
+    <p class="lede">Integration tests run on a real Touchstone deployment from its own factory, and we replay the Reactive side from exact LogRecords. Every attack test has a control that must win once the defence is removed, so a passing attack test shows that the defence is what stops it.</p>
+    <div class="counters" id="counters"></div>
+    <div class="card mgrid-wrap">
+      <div>
+      <h3 class="kicker" style="margin:0 0 6px">Curated mutants: each one names the test that must kill it</h3>
+      <div class="mgrid" id="mgrid"></div>
+      <div class="mlegend"><span><i style="border-color:var(--breach);background:color-mix(in srgb,var(--breach) 14%,transparent)"></i>alive</span><span><i style="border-color:var(--exit)"></i>killed</span><span><i style="border-color:var(--ink-2)"></i>equivalent (=)</span><span id="mcount"></span></div>
+      </div>
+      <div><div class="filters" id="mfilters" role="group" aria-label="Filter mutants by area or file"></div><div class="mdetail" id="mdetail" aria-live="polite"><span class="muted">Hover, focus or tap a cell: each mutant breaks one line of src/ on purpose, and the named test must fail because of it.</span></div></div>
+    </div>
+    <div class="cols2">
+      <div class="card atk"><h3 class="kicker" style="margin:0">Attack cells: the attack loses, the control wins</h3><ol id="atk"></ol></div>
+      <div class="card live"><h3 class="kicker" style="margin:0">Live runs on testnet</h3><div id="live"></div></div>
+    </div>
+    <div class="card inv"><h3 class="kicker" style="margin:0">Invariants, fuzzed at 64 runs × 64 calls each suite run</h3><ul id="inv"></ul></div>
+  </div>
+</section>
+
+<section id="verify" aria-labelledby="h-verify">
+  <div class="wrap">
+    <p class="kicker"><b>Verify</b> · addresses and links</p>
+    <h2 id="h-verify" class="pre">Check it yourself</h2>
+    <p class="lede">Every contract below is deployed and every transaction on this page is public. The Hub and the Covenant factory sit at one address on both origin chains.</p>
+    <div class="vgrid" id="vgrid"></div>
+    <div class="card cmd">
+      <strong>Run the tests</strong>
+      <pre>git clone --recursive <span data-bind="repo"></span> &amp;&amp; cd touchstone-reagent &amp;&amp; forge test</pre>
+      <span class="muted">Then read <a data-href="verify-md" href="#">VERIFY.md</a> and the raw evidence in <a data-href="loops-json" href="#">audits/loops.json</a>.</span>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <details>
+      <summary>Limits &amp; next</summary>
+      <ul id="limits">
+        <li>Conduct loops: one dated batch so far (<span data-bind="conTotal"></span> loops on <span data-bind="conDate"></span>). More dated batches would firm up the tails.</li>
+        <li>Moving a curator's budget between chains (B6) is tested only; those loops have not run live yet.</li>
+        <li>The Ethereum Sepolia exit gas cell has not been measured live.</li>
+        <li>The live exit ran with a forfeit of 0, so it shows the exit leg only. The forfeit's effect is shown by T-DRIP, a local test on a real Touchstone deployment.</li>
+        <li>Single-actor demo: we ran the curator, the depositor and the reactive contract; the breaches were induced.</li>
+        <li>Testnets only.</li>
+      </ul>
+    </details>
+    <div class="sign"><em>Exit on conduct, not on price.</em><span>Touchstone Reagent · <a data-href="repo" href="https://github.com/mishoko/touchstone-reagent" rel="noopener">source</a></span></div>
+  </div>
+</footer>
+
+<div class="card tip" id="tip" role="dialog" aria-label="Loop details"></div>
+
+<!-- DATA:BEGIN -->
+<script id="reagent-data" type="application/json">{"agentLog":{"allocations":[[1795616497,"0xe05fa8775e4795add4ef299369e4c33b6b3b1604bf39d8e4a8bd359970dbe00f",12210086],[1795616605,"0x677db202673ce029826cfb5d9e2e465bca9ca99f132ff04e2dab0db6fd1c9069",12210094],[1795616701,"0xcb71f153281efe3229bf156c725ae66f571a0a2d3c98ff61bfd03558c4533d44",12210102],[1795616797,"0x47e45a652c0f5d649cac38895e82abd4183c2310967a9385207e2a36a696e627",12210110],[1795616894,"0xe53f8d83c2c4ae351a8b5577b2f908962f3355ce80e8e5d73ace4f01451c8840",12210118],[1795616989,"0x38423eeabf07aea68ccddda165612ffa2e6127ef792ba846c7c04b610b1b4442",12210126],[1795617085,"0xe9b2d863f55901bd4c86fb15b7d2ddaae1066f7c56ba8d1086580b848c0e84f8",12210133]],"chain":11155111,"source":"audits/agent-11155111.jsonl","start":1795616480,"stop":1795617092,"stopStatus":"agent stopped","wake":1795619414,"wakeStop":1795619429},"con":{"AA":{"attempted":39,"batches":1,"date":"2026-11-25","delivered":39,"from":1301,"loops":[[3,1795603287,3,"0x7f13ffdb6745c3512598c27fea989fd7e49dac1158a1268685ba8c9891cd4c77","0xbb068e24153ccdac9df89bf09bd61ef752823c8e00d9598c3657f540806d8bd5","0x190adeb63586ec5920a1b7f2dc887ed0e79913a0e06c827a5126ddc53a217c10",68750859],[4,1795603354,2,"0x407056821ff288912ced1718b7013c39d616b4089e787a03cdb9219e62cff13d","0xfd488004607eb77188040deb865204ceafc0c091d6c2b9e64d4f3f75179ad025","0x714f0e4d41b637eb91440a720fe57a2e2f8bbd572c73e097bf370ff414bda69f",68750926],[5,1795603421,2,"0xa80257e3a75da8b7b21e4c1dd6036b79e502250e83eaa770118103adb0e4b63c","0x03523be189a754e60e1340fe8f3abfa1b370f752ae5487045b10b1a909e23fdb","0x8cf3ac1d969eb8e87d8f04216f84878f8e8f77a4143ef72e6fe124c07d2776f9",68750993],[6,1795603489,2,"0x43f684f9e2edab32e8d9b8f98b78a238258b0b71e100dee67678f40874fcae92","0x40659da1f0396bab33b0239353e8e6506040adec4a14e90162c423622783c40f","0x313c20be38ebab9e727ee908f31268112bd5d0a5cb022bf5289769d509a02ee8",68751061],[7,1795603559,2,"0xaff976a48739faabd7ff3d89ec4dcdda55f23863943353086947037ecd6318d5","0xb43e2d9edca476b9c1bf927c6359bce9da51dc19da962a8ce69bb2d93a132055","0x797b4c973144f9d678c41c1fce9626b66d6010dc52d45788b6c970fa7f4f41e2",68751131],[8,1795603627,2,"0xa8faaf7af3008e04c2e1c2dd280ccbb118656b1ac954277e560b3ab894f67bbf","0xe6340ae723fdb382315d7461a65d671045468ce03558f3f121a21aaffad93639","0x8d0a58e3ddb94bd143bfe75500b4ee207b6543b5041bd1acf85ae8097780e100",68751199],[9,1795603694,3,"0x51c985685e6225c73992637a91f977f24de3bbb839ab7016d88e5915f84b7e6a","0x1debf55155bb5de69f6c418240ac4069b9426c51210497cba6f1c282430e19bf","0xc372fe1557a5d8a337053ebbd112ed7ed0aa62992a058169a2d62ee7a912ae9b",68751266],[10,1795605424,2,"0x36a7adc6b66d294f9a1ae0c406d060bed7605def2844172ed92d2b115778035a","0xc2e7e278060c3eec9a20c6cac053d156f36582f580dc2f78649d91169222345e","0xafe156d77a515dafb55f664da4e7b731ba089e6c34c188532c9c9fab0e61e8e0",68752996],[11,1795605493,3,"0xd73555bbc836e75991efbeaa9c56e6ec9f2fa00b9804c222949217153608091f","0xb52e1619fad8aa32c7a18a70e603c85f75751bb047e1c58ab02ad439b447d660","0x46d56b7fb9bc8befb6d2587284c38bce23013ecee32e030ce1e56b8fda3bab65",68753065],[12,1795605562,2,"0x571e3c5c24e1f38c391bf55210fb3a00d83fdc36cca3384bd4bac621fb135918","0x636c20a785609fa92f7391c8bd21e4f79bd84bbfd30d5d3a0e5399e8e0afc213","0xddea71f7b663b694a1c5f11e84428526495fb31707e5e0771adb99f3704a9465",68753134],[13,1795605629,2,"0x1373cc580e8241134e9708210d4c72ea840b57d2a27592854f168787bfdbbcc1","0x234976acccb712a26b642123c2dcf46240045c42eb4958dac515da07864a9176","0x7d0754a7eed19ed886d45f13fe5ecb36b3f47f77ca36b3583651c679aa8289a7",68753201],[14,1795605696,2,"0x94e0ee8356dba7ae8beeefeb74a17142499538bb8d7cddcfdf1bfcf5d6213ede","0x913cd702005407c637e4cdb52bc40eee076a3315ea0db997dce2c8deef84f9c9","0xdd6d64f5f9e56e969ca50ecdc20cfff67dff63729f3433edb653001dd1dceff3",68753268],[15,1795605762,2,"0xf16a999e83d0a98c7e4e3586b092e6ae7a54fad96090bb3711e2feddb18f50d8","0x0e3bdf767827590be99a9d34e97f1133fa7ed7760f10f315ce923ef399f477c2","0xbd389113e46435e65c4926c3e5f8f29fd89e121c3cea33790fb0fbe318f1fd24",68753334],[16,1795605829,2,"0x55515105f4b918254c379cc5001c85427c65c9e049a6cfe3723895e6d80fa534","0x6e60dd4e82f357deab8ccf5691cbf3706f93bc517310a5b30d6302f88190a2c5","0x4f3fcf1990a182d2d4e09bf7c5182338afe39f809e91a0c2ecc2417b37d95004",68753401],[17,1795605895,3,"0x21c94a1590f12bf7fc80bfb4ad5bc57b08dce887255228cc14e118a9a039669b","0x058da33ec53ea45430deef35776288963a0a6ce29f75df0d6f979ee33d7fb65d","0x1d748da52df19f2bb63ef320cee197a55900ec726b68759953c82ef3b9f220ab",68753467],[18,1795608938,3,"0x9df566886901a39668b6146c60901592166447933174ffd8ec6ae734e0b2c6ee","0xdb9a0aca7dbbd42ecfd69a4859c904affe13728b6d2c47528036f2c819fde503","0x85f6bdf88b948128c3440bc3b162b9aa99dea3a995453a66ee07b854b79c7cb8",68756510],[19,1795609005,2,"0x6ce5029ad46085e8db9e324a9b7390449db3e5eef54f4d33514234a245864195","0x864eb231f36b66a7941f147ec62577ca43eba0c6427f021581cf1ed3b9ad0b06","0xee7b53adda68f2b82e9e744f69ceab93e5a18a566fb7a9c3d15e95a32217d8bc",68756577],[20,1795609073,3,"0x487285f0159bfcd58cb32d9a21ded90141bab823c3e555439ae2c4656a774e21","0xfa7c57a5ba3bf2f5cbb4caf3600803824cb4f881a110a0b4c179265ae955b55b","0x710bd6ffd5feadef0d4f2778132b0f57f8d9931cc514b6dfea8efb3427c67d3e",68756645],[21,1795609141,2,"0x9923f07a0e1a2e244a156a0f3b9567d76a1e6eeeab612cb01f1a1e401af98efa","0x9059502837f28e1ae80d830af70d3b1d2cb17865d072b91c2bbd51de6edbe434","0xac1766d51997bbfe72b9baddf509c0c55656ad710eadb59f0ebfe3794a997540",68756713],[22,1795609210,2,"0x7ada914e141b7c6e96e40649ed793e1b16d56bef7692a4c94cf6a089b77816d9","0xc2eb4c50b66503addcc0f7acbc4805cb9438c6ba21fdb321b5ac6efc5da70d98","0xadaa41919e12cfc85eed00f122a1768b7540f4e38286cb8844d123e79ab78b5b",68756782],[23,1795609278,2,"0x86252eb8130f474b5300ffd9309afe9650cbf3537ecb26726f665afdfb46177f","0xefc75f53ddd43626fa5a4b7fbd6fc4ff3d07a692dead9d0b921c0d310018bfcd","0x47548d0e6d09cc0027a2dcfb103b36077e99d55262fb31bcfc9121062c308243",68756850],[24,1795609346,3,"0x2a71b19265b39b5c8eb725844ac85c34ca73e449c9a47e7677cb4f32563ac5f7","0x4859e0200f6bfb1225a1737608d229ae1c04e6f0e2dbdc227958ffe99d71a1ea","0x10444d5e4a521907b686a7ab3344d470d52946353a08fcc83b8e138931b9f5b8",68756918],[25,1795609415,2,"0x937761ed86747d3863f240c883c8b743bed8b32fdf40542810dad4ff3ff11d7e","0xc7e4a3b0c124b8bcd968c764dfe6566e1446294577e031d77dac7477f1237f99","0xad02f26036d580d3d35fd22ed43767e5ef7704806556ec509611aaa7646d587d",68756987],[27,1795614305,2,"0xb215431efbfff47ca010efb21242d33095b25391dc9c83e2a9b8cfcea493ebdf","0x3dba7bd30cb270ceeccfb650726f22f90cbf394a4bc51b4e0f0cf5a09a69d282","0xef1b2194ddfcd332caa80748b466ccbc9b6b655090e1430c7ed929d8cec2e81e",68761877],[28,1795614372,3,"0x46a28fad2fbd5ab542b6d0906248a33c2cfd1cfa3e4dede6d334a6567cbe681b","0xb6369dc5deeed230a477309ce5f3c886ca636e5d7152cb83c13a11f5ca870e1f","0x386403277dd45d675d29a69b5ab31683ca4da98a3bf27489d79d75ff5cb855ec",68761944],[29,1795614438,2,"0xd222fb6416bb305d394850fac00dd4d42545be122e4f4b17ec32300ba2680f99","0x670af8483b7ec4a4001c14e14059fea7b3db6e1d351c7889966700cbd977dacb","0x105841acc9c45c718f4de318cf5a1e1120fa51df83dbad924a1b11ac9589553d",68762010],[31,1795614508,2,"0x86cf358f0f41d3c5287b38c988d84bc5e33570b08c955e2d96ce15bb5e8a0ba1","0x38fd5bb7b01b6ccd5e78f10e234a70a661747ce09f1243d087b137f2a242cbc9","0x7b8bce6befc1ab21353493498c6685527edc476e68282c6e4d44756713812078",68762080],[32,1795614578,2,"0x48261ed5502ccae2ccd0df22bb3694e4232561313928696d9d37a9cdc9924037","0x190ba193d8fe2f58f6d70eae158f335488458d442387a98bd4c4c097c9dc636f","0xcb4246f7ac5ffb4f86485898d0c6b6aa0d2a6bbc8767843bc26e0db9aa6e6663",68762150],[33,1795614646,2,"0xb48ecb3850279bab9166171cae3b178d5566a73f99692855befc72620a8e5085","0x87f0e3c2a251d70cc42082503286e9512ce50140efcad55319341ee5e615010c","0xa50a110de576fbe35673c92015417b700b2b57be6562792ef457e16e349ff631",68762218],[35,1795614715,2,"0x17700f6849bf2d40fe1e9eb8ace817057b48d71711fe5adfa3c690d64ac5a74d","0xf6c0190fe9a3aebee235fa517e068b14bdf7f0d4e11d72f18e1699477275f920","0xf8930c2621096fd265e1d64a40ffaa76963f0baa5f9e139bf915e864cac790d4",68762287],[36,1795614783,2,"0xf47408782318859309a22f3c6f68906c39b764471555ee79032c8e7ff402584b","0x0bdb8e21f439374b58eb97f5a0cb640efec01ba7f0eedb2e41445a8f3b8ba5e2","0x0a2348cdc3713befca8ac261fd9945a18da9f5aaf637e896e23ca9a7565ca283",68762355],[53,1795619955,2,"0x4625cc9acd81c6672c4cc48c9d7c2dff26d719b783f7ff5fec0de040889aa766","0x67479e2f253fa53a9feb127ee93b6d4c3a2bd5a333398954f4b1c7809489f819","0x9bece4d1426678d5aacb1d7e4112c336272e11c26e9353eac5ad5b106bd72b3a",68767527],[54,1795620024,2,"0x4935c6e7209f3cfc5b60072636911e214eda37999d887c0e57a1eb017492c588","0x438760ad34d9ae5be795ba9e52b7339990b193ecb896e8e4e67471d39f14b6aa","0xe15aec3dbf0be833a32b85feca1b10bbbe7df562869160946eb10bd8edaf248f",68767596],[56,1795620093,2,"0xfc04ed32caa4d4ff2de9709aaa3cb51bb9b3e32301e7773a250d305f5149b9f7","0x170311a883857dd95306f4e0cf0b5717f574b626efeed61574a0802dab74f265","0x31c0f167bb073842004126a8b3546b9e05b5c190a4af83c076238ee9b6667737",68767665],[57,1795620162,2,"0x10071edf94ccd59254dee690db0ebc3985f6efec503a0a09200afd7dc67d310d","0x41925eae9f69e5470e77f8ea7f391d3a329f5c73d0e89f4d4b231396e4501737","0x41835636a39662c92d9dda4f888f1a8c134aee2a8dc7efcea73b2a47a00d4c4a",68767734],[58,1795620231,2,"0x243fdeadc4e93845f0b97882f59b7fc1f34f1a2e8a5475ae58d8d59102bc041e","0x6233bf316ea197777925b64fb46cb4fb68f06d2575a4fc9cd5ae985f69d370f1","0x3982e0b5858ff7f779857c936020fdb3a1082c88a6415c64476df2af8f050b62",68767803],[59,1795620301,2,"0x2dc6a8301bc7fbbc65b9aed9f6986aa757a1fb857d0ace20f36807ad1b0ab152","0xf1a56090a026e5b3c46ea617cf048c05f7a313894a9368686c5c750fc46e1503","0x5126dae39c62a7b936f525314e96f9c16c1c13a882929e09fa0016de0baf994d",68767873],[61,1795620370,3,"0x79e55c1af7f242a3e1882e9a36765fedc6e45a7f2574f5f9b45c879816eaff0b","0xc38cbd12b318ce360e1c956095e787c8482a972b9dd41a53ba17c7ec6c042aff","0x93003cec165f3db8bf9a17c1827474bc2635bd05bd98f612411458db4e9f56ec",68767942],[62,1795620444,3,"0x7b4fcf97bd17b881a5e48bd17bb45057114b4bcba58097e58deae6e3aebd0a55","0x267407daad1cd7d8f8b93b4074e3ccb34776750c4be6eb95f4c83dbfd5f75449","0x6faadb9b2316776827720797fa2b613431a8b952fae0d6c26ed053749466a8e8",68768016]],"max":3,"median":2,"p95":3,"to":1301},"AB":{"attempted":39,"batches":1,"date":"2026-11-25","delivered":39,"from":1301,"loops":[[3,1795603287,9,"0x7f13ffdb6745c3512598c27fea989fd7e49dac1158a1268685ba8c9891cd4c77","0xbb068e24153ccdac9df89bf09bd61ef752823c8e00d9598c3657f540806d8bd5","0xbb55d2f7e964e060d798157c30122c5bd2a2e32b233a9288e76127fbaefbb4a3",68750859],[4,1795603354,14,"0x407056821ff288912ced1718b7013c39d616b4089e787a03cdb9219e62cff13d","0xfd488004607eb77188040deb865204ceafc0c091d6c2b9e64d4f3f75179ad025","0x72a7f2a676dcf311312457730be89e2db2c3e5685496854d079f8c8db0655e0c",68750926],[5,1795603421,7,"0xa80257e3a75da8b7b21e4c1dd6036b79e502250e83eaa770118103adb0e4b63c","0x03523be189a754e60e1340fe8f3abfa1b370f752ae5487045b10b1a909e23fdb","0x8edbad40ba13bc5ae340005b8429cd1d6beec50811f2c56b9e255b028fa70fbf",68750993],[6,1795603489,11,"0x43f684f9e2edab32e8d9b8f98b78a238258b0b71e100dee67678f40874fcae92","0x40659da1f0396bab33b0239353e8e6506040adec4a14e90162c423622783c40f","0x2d848972d2b36c579e64ab244611a828f4282dada8166390774fdc734f948c7b",68751061],[7,1795603559,1,"0xaff976a48739faabd7ff3d89ec4dcdda55f23863943353086947037ecd6318d5","0xb43e2d9edca476b9c1bf927c6359bce9da51dc19da962a8ce69bb2d93a132055","0x300c91bc7bc140bc57b9136b6ffaea3606ea52dacead1492289ea82ca7a9262b",68751131],[8,1795603627,5,"0xa8faaf7af3008e04c2e1c2dd280ccbb118656b1ac954277e560b3ab894f67bbf","0xe6340ae723fdb382315d7461a65d671045468ce03558f3f121a21aaffad93639","0xeb6d6485b838bda50ba45f0fe41f497a423c0aec1deabee1ece23a5fdd784bd5",68751199],[9,1795603694,10,"0x51c985685e6225c73992637a91f977f24de3bbb839ab7016d88e5915f84b7e6a","0x1debf55155bb5de69f6c418240ac4069b9426c51210497cba6f1c282430e19bf","0x0a41dc73262e8139706bc36b78eae9778eb35f1944a46b6681fc2b7a195c11a9",68751266],[10,1795605424,8,"0x36a7adc6b66d294f9a1ae0c406d060bed7605def2844172ed92d2b115778035a","0xc2e7e278060c3eec9a20c6cac053d156f36582f580dc2f78649d91169222345e","0xd52080a20bb87ba9a52ac21408fcb689d7a3be968766c41261a4bea3d1f49280",68752996],[11,1795605493,11,"0xd73555bbc836e75991efbeaa9c56e6ec9f2fa00b9804c222949217153608091f","0xb52e1619fad8aa32c7a18a70e603c85f75751bb047e1c58ab02ad439b447d660","0x6fc2cb32b8ce168a2d2d62da0b842643b69df0b36364fa658fba82b6b1765065",68753065],[12,1795605562,2,"0x571e3c5c24e1f38c391bf55210fb3a00d83fdc36cca3384bd4bac621fb135918","0x636c20a785609fa92f7391c8bd21e4f79bd84bbfd30d5d3a0e5399e8e0afc213","0x9cf71b86328db88efb657e787071088eec873809bed69862ee163ac2059e25de",68753134],[13,1795605629,7,"0x1373cc580e8241134e9708210d4c72ea840b57d2a27592854f168787bfdbbcc1","0x234976acccb712a26b642123c2dcf46240045c42eb4958dac515da07864a9176","0x5c32a8321076b2e502b1607bfb8f1c9130c842e5664174229d8a7f4b0c8479eb",68753201],[14,1795605696,24,"0x94e0ee8356dba7ae8beeefeb74a17142499538bb8d7cddcfdf1bfcf5d6213ede","0x913cd702005407c637e4cdb52bc40eee076a3315ea0db997dce2c8deef84f9c9","0xd1e18be00b0e61c8947573f4745820eee920e2f86e5547d53e9bc44617a1d575",68753268],[15,1795605762,6,"0xf16a999e83d0a98c7e4e3586b092e6ae7a54fad96090bb3711e2feddb18f50d8","0x0e3bdf767827590be99a9d34e97f1133fa7ed7760f10f315ce923ef399f477c2","0xf5d8a4c68967f2c0b2340e0320b0a5bb81023be7e07a746c888068f22720b879",68753334],[16,1795605829,11,"0x55515105f4b918254c379cc5001c85427c65c9e049a6cfe3723895e6d80fa534","0x6e60dd4e82f357deab8ccf5691cbf3706f93bc517310a5b30d6302f88190a2c5","0x871c045b6890aef126b63e726ea9fa9c94880ca61111abcac8b0b38861f98b4c",68753401],[17,1795605895,5,"0x21c94a1590f12bf7fc80bfb4ad5bc57b08dce887255228cc14e118a9a039669b","0x058da33ec53ea45430deef35776288963a0a6ce29f75df0d6f979ee33d7fb65d","0xa34dc54661cf95824755af375411351563a8203c7358e40e6b665e77037c49c3",68753467],[18,1795608938,10,"0x9df566886901a39668b6146c60901592166447933174ffd8ec6ae734e0b2c6ee","0xdb9a0aca7dbbd42ecfd69a4859c904affe13728b6d2c47528036f2c819fde503","0x654c17ea8ad72730ba5609f94cb33d24749d61f435cdb8703eee2ebc3c171f59",68756510],[19,1795609005,3,"0x6ce5029ad46085e8db9e324a9b7390449db3e5eef54f4d33514234a245864195","0x864eb231f36b66a7941f147ec62577ca43eba0c6427f021581cf1ed3b9ad0b06","0x927b189df667912751df72ec8a640802a1793cb2dadbc02e5bff2ed206273f46",68756577],[20,1795609073,7,"0x487285f0159bfcd58cb32d9a21ded90141bab823c3e555439ae2c4656a774e21","0xfa7c57a5ba3bf2f5cbb4caf3600803824cb4f881a110a0b4c179265ae955b55b","0xb68be5d8dbf37a90033f50fe7f0a42edbc03c4c4e79285fa75cf10525d244bd6",68756645],[21,1795609141,11,"0x9923f07a0e1a2e244a156a0f3b9567d76a1e6eeeab612cb01f1a1e401af98efa","0x9059502837f28e1ae80d830af70d3b1d2cb17865d072b91c2bbd51de6edbe434","0xcc589b5dc7faba1fa765c1c192b896b1ab28aecf11c30c31d3d7d81037894421",68756713],[22,1795609210,14,"0x7ada914e141b7c6e96e40649ed793e1b16d56bef7692a4c94cf6a089b77816d9","0xc2eb4c50b66503addcc0f7acbc4805cb9438c6ba21fdb321b5ac6efc5da70d98","0x1811be04cf402f5e52ef470b83e9ad607d2ae3eee8a5b49e20827ca3d3f0a44a",68756782],[23,1795609278,6,"0x86252eb8130f474b5300ffd9309afe9650cbf3537ecb26726f665afdfb46177f","0xefc75f53ddd43626fa5a4b7fbd6fc4ff3d07a692dead9d0b921c0d310018bfcd","0xba3153f4a25315af2ceb22c679e51e5be2cfd3c81cebc406aad069b469100460",68756850],[24,1795609346,10,"0x2a71b19265b39b5c8eb725844ac85c34ca73e449c9a47e7677cb4f32563ac5f7","0x4859e0200f6bfb1225a1737608d229ae1c04e6f0e2dbdc227958ffe99d71a1ea","0x0ca53f5b65ed5fbfeb01c57a219a6c6475cbf4216ee7c4ee7c77fe435ca5abbd",68756918],[25,1795609415,13,"0x937761ed86747d3863f240c883c8b743bed8b32fdf40542810dad4ff3ff11d7e","0xc7e4a3b0c124b8bcd968c764dfe6566e1446294577e031d77dac7477f1237f99","0x0c21d2071d00a625bebe8b548b13841ef7759215f0a4636bfabe50a137e04efd",68756987],[27,1795614305,7,"0xb215431efbfff47ca010efb21242d33095b25391dc9c83e2a9b8cfcea493ebdf","0x3dba7bd30cb270ceeccfb650726f22f90cbf394a4bc51b4e0f0cf5a09a69d282","0x4e183ff5b292d85ee707cb4661302693c59b5031a2a751ad924de4886db39ccb",68761877],[28,1795614372,12,"0x46a28fad2fbd5ab542b6d0906248a33c2cfd1cfa3e4dede6d334a6567cbe681b","0xb6369dc5deeed230a477309ce5f3c886ca636e5d7152cb83c13a11f5ca870e1f","0x5235bc0e45f1155fb01b4c4da95e8c43f75ec61f806a0df8e69fc8a1e7550b69",68761944],[29,1795614438,6,"0xd222fb6416bb305d394850fac00dd4d42545be122e4f4b17ec32300ba2680f99","0x670af8483b7ec4a4001c14e14059fea7b3db6e1d351c7889966700cbd977dacb","0xa6c0c14476bc9de55e0c5287021387bd41bf363db2297e30cf73c8fe25b8b078",68762010],[31,1795614508,8,"0x86cf358f0f41d3c5287b38c988d84bc5e33570b08c955e2d96ce15bb5e8a0ba1","0x38fd5bb7b01b6ccd5e78f10e234a70a661747ce09f1243d087b137f2a242cbc9","0x163a3262eff3c2ed4bc3db0527f97054c20fb5a38e59c481d1705c9cec4e27a9",68762080],[32,1795614578,10,"0x48261ed5502ccae2ccd0df22bb3694e4232561313928696d9d37a9cdc9924037","0x190ba193d8fe2f58f6d70eae158f335488458d442387a98bd4c4c097c9dc636f","0x8763b65dc3afbcdc2ef96578d0b32b0d73dbd43439d272161286256dc0ec3cbb",68762150],[33,1795614646,2,"0xb48ecb3850279bab9166171cae3b178d5566a73f99692855befc72620a8e5085","0x87f0e3c2a251d70cc42082503286e9512ce50140efcad55319341ee5e615010c","0xb196bf92fe4b297062ad325db50830679f40994514837a7d278c3162f40ff191",68762218],[35,1795614715,5,"0x17700f6849bf2d40fe1e9eb8ace817057b48d71711fe5adfa3c690d64ac5a74d","0xf6c0190fe9a3aebee235fa517e068b14bdf7f0d4e11d72f18e1699477275f920","0xf57e6c8ea91691c8c44f8e176e9646f43961420b8dac0f2ede16364abc9cd79b",68762287],[36,1795614783,21,"0xf47408782318859309a22f3c6f68906c39b764471555ee79032c8e7ff402584b","0x0bdb8e21f439374b58eb97f5a0cb640efec01ba7f0eedb2e41445a8f3b8ba5e2","0x4e19e959c286079bbb598b2310bfb31b95583621453e986305b843bd66ab9048",68762355],[53,1795619955,21,"0x4625cc9acd81c6672c4cc48c9d7c2dff26d719b783f7ff5fec0de040889aa766","0x67479e2f253fa53a9feb127ee93b6d4c3a2bd5a333398954f4b1c7809489f819","0xbf2d59bb71810d39ea2afe8c9a5645823f49f53fa993715b24f9fb0ab2b32e58",68767527],[54,1795620024,12,"0x4935c6e7209f3cfc5b60072636911e214eda37999d887c0e57a1eb017492c588","0x438760ad34d9ae5be795ba9e52b7339990b193ecb896e8e4e67471d39f14b6aa","0x3cacf90297481dc2d148122ff3877e7ecaf4ef421d1d781d6e876a0d8e492d12",68767596],[56,1795620093,3,"0xfc04ed32caa4d4ff2de9709aaa3cb51bb9b3e32301e7773a250d305f5149b9f7","0x170311a883857dd95306f4e0cf0b5717f574b626efeed61574a0802dab74f265","0x116f3df2c68ae570561e4836c15a5444f64e8f36e2ca536a75ebd381d37acb20",68767665],[57,1795620162,6,"0x10071edf94ccd59254dee690db0ebc3985f6efec503a0a09200afd7dc67d310d","0x41925eae9f69e5470e77f8ea7f391d3a329f5c73d0e89f4d4b231396e4501737","0x4a61c21732911e7cf5aba80d30537ba8dcabd1ac323a8f3974ca1e8f1bdc8701",68767734],[58,1795620231,9,"0x243fdeadc4e93845f0b97882f59b7fc1f34f1a2e8a5475ae58d8d59102bc041e","0x6233bf316ea197777925b64fb46cb4fb68f06d2575a4fc9cd5ae985f69d370f1","0x10b0ef2cb7cdf960a4898dddebcfc45497730f220a60e9b0bff9597add390dde",68767803],[59,1795620301,11,"0x2dc6a8301bc7fbbc65b9aed9f6986aa757a1fb857d0ace20f36807ad1b0ab152","0xf1a56090a026e5b3c46ea617cf048c05f7a313894a9368686c5c750fc46e1503","0xe248fca5c509b02d08470d763e45b531526a29d213d018e9650b7622a9c2cb51",68767873],[61,1795620370,14,"0x79e55c1af7f242a3e1882e9a36765fedc6e45a7f2574f5f9b45c879816eaff0b","0xc38cbd12b318ce360e1c956095e787c8482a972b9dd41a53ba17c7ec6c042aff","0x7b667977f37bad9e100148ac6c67846f73fd6cb484b0de2609d32df8b94008ef",68767942],[62,1795620444,12,"0x7b4fcf97bd17b881a5e48bd17bb45057114b4bcba58097e58deae6e3aebd0a55","0x267407daad1cd7d8f8b93b4074e3ccb34776750c4be6eb95f4c83dbfd5f75449","0xb3357f59cf3ec7240cc571bba0ee34416b0871eb31221cb4e89f4a15527079e4",68768016]],"max":24,"median":9,"p95":21,"to":11155111},"BA":{"attempted":26,"batches":1,"date":"2026-11-25","delivered":26,"from":11155111,"loops":[[26,1795614252,2,"0x953a5b59182db90cd455316114790ded87c7e4943fb9970a1e1fe97ab3f908d2","0x4ff20c42b7a5d5f57c4d7276097b4c5ef06083c1b591dcdfa653eeb054d11c23","0xbc815272241b511e021d53ca47c17114be403f8412fc548856cb6eff624b27a2",12209906],[30,1795614480,3,"0xbcb5b5e9d29a1102a91fdfa81cc60aab0c5532c9b496566b7be2b39c50b58ca9","0xb6db3384f1d814f83ff7f4e8c1ffdc85a6e9c3f2cb1a4b9e535c5a276dad1409","0x25f7b0e449d0766d58042b122757fd2412152cc5bdc8b3f531d30068c229c7e5",12209924],[34,1795614696,4,"0x59993eba572936db043bd5cbfbb91aec0e9118acbddda23f1fe194a141782f3b","0x011c56fd9a22fb29ad6febbc67c333bca8d72db3cbc4c941d1e68c4cfc580ce5","0xfb52fe343d6d765a8e811af88d5b65a1f5a132c2740f80afb229921df2231491",12209941],[37,1795615212,4,"0xe791840882cbddb36ed50e1ce3e4054767f6e1eac4f7752429c0dd5d3e1376ff","0xabc083c867592e2f5f4039cd09516c9ad79e12cd7762aabfb68ed4e43c051c48","0x5aaa4543b5d74e59e1e61ab3392f389d8af4f610a44a140ac45e43d27c29f380",12209982],[38,1795615548,3,"0x614e16cb84e843368a8f9809697635db63d377828bbc8d8ad2ea07ffeb2ca5e3","0x8776d72fda86f0af73c1d712a60d5a540bf7b0f049a976c3a0b5160fc8090399","0x87041dcf849d8e29d2498b498f67529e477deb30b8d20244874a2a9ef12bb25b",12210009],[39,1795615776,3,"0xfc0914895f344859f93413e0e0151cb2f1d1f4b859359e0b0385bd3afa4d926e","0x455d70e609eb5392b261583ac0447bef96c125544bfa5f65b856e59d19a5146a","0x4b62ef0a63f56bfaed50d6d6e5a79547b2144355d370d164e957941404154356",12210027],[40,1795615992,3,"0xda0deee931f5c622f3f9558d8ec1fa8a261e58d57b3e43b2113c052baf5fd46d","0x732949d982c27be463338d81444eeb717b47225de3b17aadfb0fd9677493e3f2","0x056a6fe24ee6f098d1031c5298af2676b9982e02b041d9d24868e773063246c8",12210045],[41,1795616208,4,"0xa41edaf213c5f3cb00779dd69b7dee1e5484519513c491d7a5c19fe1c373148d","0xcaffc36710647ba6413424281423f150a2341efb3d245ef4743c9b3bb9aa9818","0x06f01993e5a5637299ed5f69911d65f856824fa8a5cf40021311818252d71708",12210063],[42,1795617612,3,"0x00b5bbeb6351829c0c259d729917e11bed8d0bf9fb9f6ee667126461fbd51511","0xddd03c4620a4b4b1b669d03bd760f91c2ccadd0c14f44c8e415e64bbc0f357d2","0x27d5aa6cd46447c84d6a78a24447e33c9bbb4d3bf49d6006efb49fc3a00e3bcc",12210177],[43,1795617816,3,"0x05b0f51a0c611c9ed8f453223db54de609c3e2be61f3e04bd3d14621f1fbeda4","0x37bb25b62add872bb759b943838009aed9597df2601ad80f620a92276eae3128","0xf66632bccc02a9307bfeba656246f352f607b07da25df9e2b5ed45699b3bfb47",12210194],[44,1795618032,4,"0xa8eb672f1d9076002cb5dc1ee7a929dad39fd580fd9560d1ca3e84c36f8050f2","0xdd70287b6edc83cf1359908449291c7aaad3acb811b19adbc02a2ced5b083aae","0x0a790ed7b5f2a8785643fa7ef13cdd12da7b100b8dedc5353a9b448c188eaa52",12210211],[45,1795618236,3,"0xaeb621f39fbccdd49e8b452d17f21ca58d9eb150d41903898301c8f2d32e2c47","0xdb4ba8a12cc0b4f20eb7cb13be46a224fa4050699dfaa1fb61f7000f512cd98e","0x22350c5d559c091ad79f400654ed43888d1f41d3fbb4bc249d36bd6e30db8771",12210228],[46,1795618440,3,"0x3e476d1c0e486398cbea0b420279ef3db0158a102917ff66b7e768fa2a3c047b","0x4e9de2f3423cce4f3de0af2c2610354ed89702a6141164870e7e2d6ecd4cee91","0x40d9860206be19ec78e91e404d76efc02822da196e30bab3822df2fe4f8eae60",12210245],[47,1795618680,3,"0x95d6eece3a9a0dfa744112dd49fd6ab5e77b1f712937bcfb816a568752c199d9","0x06aecc6f21ed9c936117b2d8d955fd0c25806399989fb31b43895cd7d7b2468c","0x06a13d27ed806affcb382c871e7a9ea2195d032869cd51fb053b781f2e9d59ab",12210262],[48,1795618896,3,"0xf08f0cf2605d9b8c5eaa16f98409455b42a8f84992ee9ed211ffa3703d62012b","0x76d913a5a97578f5acab3ac0fd17a2bf0836080e9256d319c11f4598d7bb663f","0xa3e55230a69dbf2b9c811f343e6f752dce63ef6c9e2f48dc85569cef07e63ea4",12210280],[49,1795619112,4,"0x5dfa635f6437140da5e26af052eabc4b188b4d220831ecc2df031466f9638295","0x0b7a49e39933dca4f5b5bd5e03fbd767f6210a4dbe533e1b17ed35d0a0324f5d","0x50dbcde46cd27157f7227575cb46ed3cccc42efa6d7e1fcbbbbf4d734d4c5304",12210297],[51,1795619628,3,"0xd56870885db88f957ce82d475976a745085b7fcef40d7b6f1aec5e6914a07156","0xd60496fa6fd7fd2e2d4052f476d13fee6c9edc748c381d64ef007701abc6e418","0x96ae99a806900f96df48a41b20baffed52b9e2e933f90a90dd32c5f0532d4070",12210338],[52,1795619844,3,"0x5f6a1acac8e746479a3aee093b6d0a89074d19512782a9a49fa62d35b3f7bc98","0x5e7b28ad9fc809d59b0dace1cb0296da52f739652c93eaad3425d2f1063d18d7","0xace730feee28b9f227d1fb1430cb789ae9c4a255d9eb284f6e1702eb217ee7fd",12210356],[55,1795620084,2,"0x4e4faa7c25ab79363babd4252aae713215f50b790056be02466403b3e174e1cb","0xb5ec6944c8841c79e4f5aa95fde8fc875a875b07bbfee9a64165bd20bfd6b282","0x00c6e8c86b012c71bc4df3184ec27b452d4da8ef05d5f7b41e0359ff8c03ea8a",12210374],[60,1795620324,4,"0xe56c0254a217ce4d485ccf53fcc0e2867f1e6716229338a0287922f5fa76d82b","0x6a22124ee4863b3eb064fc3e171c80616c48140914c4ae72bbbc98cd6515ae9d","0xd902e855c9edaa974b686ddd178868a9471af8fc376e2557a216f2391ce9cb9b",12210392],[63,1795621488,3,"0x825ec0a877b907c9690361354dd08c32f919125d54b31cd48c9ff364dd85fcdb","0x42b8dfbd1b076623300170f2deccc91152f5a108b569fedb38b18f4a9d8638af","0xa302a37dcfbf8c907cb5c20b5880e94fad098b83dd1497a5baf8130a588e37fc",12210486],[64,1795621716,3,"0x4f6375743337be0334d88935c93f51e3ddcf4f1e08b0eb54a0c84fc3f1e35289","0xa96441993cac00beba18c38384e5233eada497a2671d097e3f9d4c65964a10ff","0x9c8b308236929c179b9d0369ee0ba28ad0a89667d4a6ce7ca3e46b2ab07a993c",12210504],[65,1795621944,3,"0x5cfec9bceaaed28a3558796e27bf7d97cfd189b15454f7196b584bdff7f169ea","0x33498b3c99ec09f495aeaf563d83f5f6cde1d7318973eb1dc1fffe2500f94ac4","0xcb5cdc6fd9d1636e9437924757301f8dba5d48fcf2d8606a998a9dd5d25a3492",12210522],[66,1795622160,3,"0x7430a185afe4b6d436bf40f5d7769fdc38f44730d83c16ad3e4be3843cf42995","0x83601f9ca9c5733369bc99d9d90ce3e2056c421111e6e320d66941cd19d8cdcb","0xe7111af4beb127e3e11cc41c630bb9d70c4ef39a186ac5e2afe6d98f0171a6d4",12210540],[67,1795622400,4,"0x72c88e2de279af3351e93a7ae1d6a4f47528b37a87a7e66b19ba8af61c281d2d","0xfa06e70200adc95ecc6694c6f5ee7c03d3cbfa9de6c2f32ff7f7e2421f67c611","0x870a022e91c36a5edefac6c36c12b2f61139ae14b8932485a2f51e40bb02b119",12210558],[68,1795622616,2,"0xa8047f3d710fe587d3d47fd081ec12bea58c4e54cf31a9ee92cc4df243c5cd7d","0xcc48297d3b16a46994f4b3f8ff93570cb007ad9032c18beacb5f8ea6840ab471","0xabca06746f727ec81dd5f6276a91117de010bd6a6acee4ccd078b38c72b10165",12210576]],"max":4,"median":3.0,"p95":4,"to":1301},"BB":{"attempted":26,"batches":1,"date":"2026-11-25","delivered":26,"from":11155111,"loops":[[26,1795614252,60,"0x953a5b59182db90cd455316114790ded87c7e4943fb9970a1e1fe97ab3f908d2","0x4ff20c42b7a5d5f57c4d7276097b4c5ef06083c1b591dcdfa653eeb054d11c23","0x48fbfaeb78bbed0ee0166247c3d0326004d85a06bb9f33f0f77dca2a69a34ae8",12209906],[30,1795614480,12,"0xbcb5b5e9d29a1102a91fdfa81cc60aab0c5532c9b496566b7be2b39c50b58ca9","0xb6db3384f1d814f83ff7f4e8c1ffdc85a6e9c3f2cb1a4b9e535c5a276dad1409","0x4e6ca44e46c9d95655e5991ebac146ea4b2340eaf85890ad47b19d50c63c61ba",12209924],[34,1795614696,12,"0x59993eba572936db043bd5cbfbb91aec0e9118acbddda23f1fe194a141782f3b","0x011c56fd9a22fb29ad6febbc67c333bca8d72db3cbc4c941d1e68c4cfc580ce5","0x4ae0da0368e64ed1ad90ecb23dbcaa817e7279daf6b85126f1bb879ddb2c0f12",12209941],[37,1795615212,12,"0xe791840882cbddb36ed50e1ce3e4054767f6e1eac4f7752429c0dd5d3e1376ff","0xabc083c867592e2f5f4039cd09516c9ad79e12cd7762aabfb68ed4e43c051c48","0x83edb485f1fcb38fc39c75341fbdedf51af1a1c24eee4f555a6e930a4b25e41f",12209982],[38,1795615548,24,"0x614e16cb84e843368a8f9809697635db63d377828bbc8d8ad2ea07ffeb2ca5e3","0x8776d72fda86f0af73c1d712a60d5a540bf7b0f049a976c3a0b5160fc8090399","0x7eee858a3b954aa2ee7604aaff0b3b37fd01fec6d027dc8f3f8b5282f52bef64",12210009],[39,1795615776,12,"0xfc0914895f344859f93413e0e0151cb2f1d1f4b859359e0b0385bd3afa4d926e","0x455d70e609eb5392b261583ac0447bef96c125544bfa5f65b856e59d19a5146a","0xd7e7ef271d8c47459ef428f31985718527ccdec816af3dd096c75d45c0f5d37b",12210027],[40,1795615992,12,"0xda0deee931f5c622f3f9558d8ec1fa8a261e58d57b3e43b2113c052baf5fd46d","0x732949d982c27be463338d81444eeb717b47225de3b17aadfb0fd9677493e3f2","0xfbdee93e53333d7f7d3cce6b8fd487589fb49b34550269fb16416377146947c8",12210045],[41,1795616208,36,"0xa41edaf213c5f3cb00779dd69b7dee1e5484519513c491d7a5c19fe1c373148d","0xcaffc36710647ba6413424281423f150a2341efb3d245ef4743c9b3bb9aa9818","0x49be18ab74928eafbb2827778e8c369e00cab4ba28d6be500a8b3f652b2b1d81",12210063],[42,1795617612,12,"0x00b5bbeb6351829c0c259d729917e11bed8d0bf9fb9f6ee667126461fbd51511","0xddd03c4620a4b4b1b669d03bd760f91c2ccadd0c14f44c8e415e64bbc0f357d2","0xaabb46f97faefb779ac1c9387fb77d98ba955cdf354440a7b619c83e01cf3664",12210177],[43,1795617816,12,"0x05b0f51a0c611c9ed8f453223db54de609c3e2be61f3e04bd3d14621f1fbeda4","0x37bb25b62add872bb759b943838009aed9597df2601ad80f620a92276eae3128","0x3913a1e18607192367aa45f500ceb4b3077f9154c5816bb3cfdb8c5832b429ba",12210194],[44,1795618032,12,"0xa8eb672f1d9076002cb5dc1ee7a929dad39fd580fd9560d1ca3e84c36f8050f2","0xdd70287b6edc83cf1359908449291c7aaad3acb811b19adbc02a2ced5b083aae","0xa6d734e031bf029eb44456013dc64526a4c09d811f4e4cc5c93e4d4698c2d26c",12210211],[45,1795618236,12,"0xaeb621f39fbccdd49e8b452d17f21ca58d9eb150d41903898301c8f2d32e2c47","0xdb4ba8a12cc0b4f20eb7cb13be46a224fa4050699dfaa1fb61f7000f512cd98e","0x50a35583a58e8ded52dd498afba52c633abaf5822d9e35bb4ac48e72bb11669e",12210228],[46,1795618440,12,"0x3e476d1c0e486398cbea0b420279ef3db0158a102917ff66b7e768fa2a3c047b","0x4e9de2f3423cce4f3de0af2c2610354ed89702a6141164870e7e2d6ecd4cee91","0x0f8c91bab7c98669f10ab2289e43ad7a8666e724190a0c0f49c6da8326076224",12210245],[47,1795618680,12,"0x95d6eece3a9a0dfa744112dd49fd6ab5e77b1f712937bcfb816a568752c199d9","0x06aecc6f21ed9c936117b2d8d955fd0c25806399989fb31b43895cd7d7b2468c","0xb83ea4c90a4c29a1488c74cd776661b128ae686722393aeb8d6f790ba3e61071",12210262],[48,1795618896,12,"0xf08f0cf2605d9b8c5eaa16f98409455b42a8f84992ee9ed211ffa3703d62012b","0x76d913a5a97578f5acab3ac0fd17a2bf0836080e9256d319c11f4598d7bb663f","0x8417e1c88576206734e5b9c5b51de5176ea33b09ec823304a0742b6cef9521ab",12210280],[49,1795619112,24,"0x5dfa635f6437140da5e26af052eabc4b188b4d220831ecc2df031466f9638295","0x0b7a49e39933dca4f5b5bd5e03fbd767f6210a4dbe533e1b17ed35d0a0324f5d","0xae24c6554c960f3cd22dee336174db128d94051b1d3897e8bc5f43eead8d6bca",12210297],[51,1795619628,24,"0xd56870885db88f957ce82d475976a745085b7fcef40d7b6f1aec5e6914a07156","0xd60496fa6fd7fd2e2d4052f476d13fee6c9edc748c381d64ef007701abc6e418","0xf294ca74d60aac07b589c9535303e6428d88f9e8d641e043a239bad8b1597779",12210338],[52,1795619844,12,"0x5f6a1acac8e746479a3aee093b6d0a89074d19512782a9a49fa62d35b3f7bc98","0x5e7b28ad9fc809d59b0dace1cb0296da52f739652c93eaad3425d2f1063d18d7","0xb34f2db0c542526477ed2cbc2dd6ad4be95ea817b75d4ed17840b2a273836249",12210356],[55,1795620084,12,"0x4e4faa7c25ab79363babd4252aae713215f50b790056be02466403b3e174e1cb","0xb5ec6944c8841c79e4f5aa95fde8fc875a875b07bbfee9a64165bd20bfd6b282","0xd412c9f20dc5139e16144db1b6f2fda2aa157e142ed5263e700f4aea0a95e5f2",12210374],[60,1795620324,12,"0xe56c0254a217ce4d485ccf53fcc0e2867f1e6716229338a0287922f5fa76d82b","0x6a22124ee4863b3eb064fc3e171c80616c48140914c4ae72bbbc98cd6515ae9d","0xb7b986150e3bfac637ddaacc97b6f432d54832e93cf2fe091b0eafedce0fe06f",12210392],[63,1795621488,12,"0x825ec0a877b907c9690361354dd08c32f919125d54b31cd48c9ff364dd85fcdb","0x42b8dfbd1b076623300170f2deccc91152f5a108b569fedb38b18f4a9d8638af","0x5fc25df159a7460024f1683de4e25680e13c8da586cfec72f69e567e0ae125a4",12210486],[64,1795621716,24,"0x4f6375743337be0334d88935c93f51e3ddcf4f1e08b0eb54a0c84fc3f1e35289","0xa96441993cac00beba18c38384e5233eada497a2671d097e3f9d4c65964a10ff","0xe36602e2af9fc9f9b3144400af485e16a1db2d2c9247cd1c4e42c9dea0ad7b39",12210504],[65,1795621944,12,"0x5cfec9bceaaed28a3558796e27bf7d97cfd189b15454f7196b584bdff7f169ea","0x33498b3c99ec09f495aeaf563d83f5f6cde1d7318973eb1dc1fffe2500f94ac4","0x6b858bc44d20e6a92221f5d5ec9a434bfdeb519f15bdaa63361df90e35f5209f",12210522],[66,1795622160,12,"0x7430a185afe4b6d436bf40f5d7769fdc38f44730d83c16ad3e4be3843cf42995","0x83601f9ca9c5733369bc99d9d90ce3e2056c421111e6e320d66941cd19d8cdcb","0xd8f783383e9e9cc965ab82beb0f981e4572cfe96e104858f4766c62fd068d93c",12210540],[67,1795622400,24,"0x72c88e2de279af3351e93a7ae1d6a4f47528b37a87a7e66b19ba8af61c281d2d","0xfa06e70200adc95ecc6694c6f5ee7c03d3cbfa9de6c2f32ff7f7e2421f67c611","0xfdfb0447fd748b2acbacf9478cae91cd0a5eee6aeb38a1dafa35ef241cc38c4c",12210558],[68,1795622616,24,"0xa8047f3d710fe587d3d47fd081ec12bea58c4e54cf31a9ee92cc4df243c5cd7d","0xcc48297d3b16a46994f4b3f8ff93570cb007ad9032c18beacb5f8ea6840ab471","0x5bedbe114445d14d9cdbc35cc1dc33f8196007942edec0ef336bc7a2d9b23d36",12210576]],"max":60,"median":12.0,"p95":36,"to":11155111}},"deploy":{"agent":"0xACCb871E94bC1d728A5f969928fB8680C3523492","covenant":"0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f","factory":"0xA3fE3C3756Fc204DF54A221A45405e82B19d481f","hub":"0xb41433C9585d230A2607f253E1EA844923e07a91","lasna":{"rc":"0xFbcDba49a040Ca5965377F73bB327F2F2B7DC4c9","rcb6":"0xdb671DB6Df964F18D58D23d8324aE1FAaE43EF9E","rcext":"0xA9B408A944337A1BbcE77c6823FaD226DE4c228d"},"owner":"0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213","proxy":{"11155111":"0xAa14d9Cd0f788Ca23d11805986C1d8bd035D23b4","1301":"0x775c9B990ADe401060B78D0e98684eEf8d2466C1"},"sameOnBoth":true,"vaults":{"XA":{"address":"0x308A85113ae15d4b184Dfd0b70eb397850F3Fa59","chain":1301,"curator":1},"XB":{"address":"0x67fF755e233c3F550303c658aB8C55953f231a46","chain":11155111,"curator":1},"YA":{"address":"0x50aD0a9eF6c8F87b4e926fE1AB3Ae2285CDDE362","chain":1301,"curator":2}}},"exit":{"doneBlock":68770633,"doneTx":"0x3f7bcb43675ff4a8806f82067d2c9658f66b871899fbe4d21213c9bde27c1e71","dripBlocks":3600,"latency_s":3665,"noteA":"36257242","noteB":"12030473297643707","otherRecipients":0,"owner":"0x07F30b8e65938aBC2F728878e8AFc51FfEdB8213","processBlock":68767059,"processTx":"0xaf139a0ff3573afa6bcd1215e88a51dc1c97afb3f1f6dd38c213c0f84605a3f6","verdict":{"afterDrip":true,"done":true,"noOtherRecipient":true,"toOwnerExactly":true}},"explorers":{"11155111":"https://sepolia.etherscan.io/tx/","1301":"https://sepolia.uniscan.xyz/tx/","5318007":"https://lasna.reactscan.net/tx/"},"explorersAddr":{"11155111":"https://sepolia.etherscan.io/address/","1301":"https://sepolia.uniscan.xyz/address/","5318007":"https://lasna.reactscan.net/address/"},"hero":{"agent":"0xACCb871E94bC1d728A5f969928fB8680C3523492","appliedBlock":12210319,"appliedTs":1795619400,"appliedTx":"0x7d405efb660322915707c12f4252754c86b42d78a747933e983824ea1085ac63","covenant":"0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f","destChain":11155111,"lasnaTs":1795619396,"lasnaTx":"0x5c554e647479ec1eaa39db517d79753ed1c981a2095b0c5017d92fe4de52396a","lastOkNonce":6,"lastOkTs":1795617084,"lastOkTx":"0xe9b2d863f55901bd4c86fb15b7d2ddaae1066f7c56ba8d1086580b848c0e84f8","latency_s":4,"offlinePass":true,"originBlock":68766968,"originChain":1301,"originTs":1795619396,"originTx":"0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d","pass":true,"refusedBlock":12210321,"refusedError":"HubPaused","refusedNonce":7,"refusedSelector":"0x67be7162","refusedTs":1795619424,"refusedTx":"0x5d72faf74634b15fcf1f9cfcef5e947530292ec58399a668aed3580e3c97d42f"},"liveRows":[{"id":"L-DYN","links":[["deploy XA",1301,"0x383a1ebf172c5dab9bdc2fbc2f50850bd3bda28e409c1a898e2de87eccdb2818"],["deploy YA",1301,"0x560934ed8ae1844012bc23939002ea61361f9bed33535fb4d85a7d8f30fd4649"],["deploy XB",11155111,"0x6bb6248ae51c29a34de3babd0e17f71171695fa4a20f4a1ceb590d379860cb49"],["bound XA",1301,"0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088"],["bound YA",1301,"0xf070ffd832a1a467ac9ff6fe187b312823cbbb812e5f03646237cf110ff868ba"],["bound XB",11155111,"0x56a544f0feed436d37a77a996c41b83dc360eb4c9f2c2573d9d92ce122769cfe"]],"n":3,"pass":true,"stat":{"latency":[4,4,12]},"what":"A new vault deployed by a registered curator: the RC subscribed to it from inside a reaction, and the Hub bound it to its curator"},{"id":"L-PAY","links":[["fund",1301,"0x5a1b9576fefa4f14f141a52141caebf5f4ac90c075ea0b7f1e4d6d3c5749ef5b"],["callback",1301,"0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088"]],"n":2,"pass":true,"what":"A Hub holding only a plain balance paid for its first callback; debt stayed 0"},{"id":"L-SPOOF","links":[["trigger",1301,"0xf2ec6917530102faa68d76b83a123ca80462225322b1f95b899c8c9cc6054177"],["spoof reaction",5318007,"0xe67a52d1f9afdbf164f57964b7281d277b4f7009b285e847b29b60505ee64baf"],["rejected",1301,"0x2c4b1abca71cfe3a62b0c4b00ff6a1f4c821430eeec4e9583a029f4da3b2c97f"]],"n":1,"pass":true,"what":"A third-party reactive contract called the Hub: rejected NotRc, no state written"},{"id":"L-CRON","links":[["subscribe",5318007,"0xf2874ed77f0457a4925e2ac1a7725e25834aee8a0ec2807b16e02502e864d968"],["exit done",1301,"0x163b0d5958cecf7de59f60c87938843dd9e0254e479db51da918cc1abdec6c39"],["unsubscribe",5318007,"0x6cd808c5be8686157cc26cfd0499ebe137d889ff4915d930be34b1b70bf2ae51"]],"n":1,"pass":true,"what":"The RC subscribed to Cron only while an exit was pending, and unsubscribed from a Cron reaction once it was done"},{"id":"L-PAUSE","links":[["breach",1301,"0xb6a8f0fde442f421ff07b08fe4dfa614ec4271f507843c54ecc90b5f7835f26d"],["reaction",5318007,"0x5c554e647479ec1eaa39db517d79753ed1c981a2095b0c5017d92fe4de52396a"],["paused",11155111,"0x7d405efb660322915707c12f4252754c86b42d78a747933e983824ea1085ac63"]],"n":1,"pass":true,"what":"A breach on Unichain Sepolia paused the curator on Ethereum Sepolia"},{"id":"L-OFFLINE","links":[["last ok",11155111,"0xe9b2d863f55901bd4c86fb15b7d2ddaae1066f7c56ba8d1086580b848c0e84f8"],["refused",11155111,"0x5d72faf74634b15fcf1f9cfcef5e947530292ec58399a668aed3580e3c97d42f"]],"n":1,"pass":true,"what":"The agent was offline through the breach; its next allocation was refused"},{"id":"L-PLAN","links":[["plan 19098",1301,"0xc62444d0970717404e6a47ef476c2bfc74265a48780c89f995ec1bbb9f45d8d9"],["plan 19099",1301,"0x90287a7fba325e5d73a0dfbcba58c11f040aec868877b976a38cf26a585dfc33"],["withheld 19101",5318007,"0x104dbcf8124bc202dd37687d36da670071d299b825a2279755753197e17c5a32"]],"n":5,"pass":true,"what":"Standing-plan deposits ran on the vault's epoch; after the breach the RC withheld the plan"}],"mutants":[["MU-001","auth","ReagentHub.sol","KILLED","test_A_SPOOF_PROXY__nonProxyCallbackReverts","only the chain's callback proxy delivers (A-SPOOF-PROXY)",""],["MU-002","auth","ReagentHub.sol","KILLED","test_A_SPOOF_RC__foreignRcReverts|test_A_SPOOF_WORD__zero","the first word, injected by the network, is our RC (A-SPOOF-RC, A-SPOOF-WORD)",""],["MU-003","mirror","ReagentHub.sol","KILLED","test_T_HUB_CONDUCT__monotoneMergeSeqGateNeverReverts","seq-gated: an older or duplicate snapshot changes nothing (I-IDEM, A-LATEPAUSE)",""],["MU-004","mirror","ReagentHub.sol","KILLED","test_T_HUB_CONDUCT__monotoneMergeSeqGateNeverReverts","a monotone merge: counts never fall (I-MONO)",""],["MU-005","binding","ReagentHub.sol","KILLED","test_T_HUB_CONDUCT__rcVaultIsWriteOnceAndBounded","write-once binding (A-IDSPOOF)",""],["MU-006","auth","ReagentHub.sol","KILLED","test_T_HUB_BUDGET__defaultsClampAnswersAndGates","factory membership first, before any Covenant read",""],["MU-007","b6","ReagentHub.sol","KILLED","test_A_REPLAY__olderBudgetAfterNewerIsStale","the nonce gate (A-REPLAY)",""],["MU-008","b6","ReagentHub.sol","KILLED","test_T_HUB_BUDGET__defaultsClampAnswersAndGates","a rules mismatch or an id outside ids is answered at the unchanged B",""],["MU-009","b6","ReagentHub.sol","KILLED","test_A_B6_CLAWBACK__aLowerNeverGoesBelowSpentExposure","a lower never rises above B and never cuts below spent exposure (A-B6-CLAWBACK)",""],["MU-010","gas","ReagentHub.sol","KILLED","test_A_GAS63__aShortDeliveryIsDeferred","the gas pre-check: a short delivery defers and burns no try (A-GAS63)",""],["MU-011","gas","ReagentHub.sol","KILLED","test_T_GAS_PLAN__doneAtTheFormulaLimit","the same pre-check for plan allocations (T-GAS-PLAN)",""],["MU-012","auth","ReagentHub.sol","KILLED","test_A_COV_AUTH__onlyItsHubReachesTheCallbacks","only deployed Covenants of this Hub's factory are relayed to, and only for bound vaults",""],["MU-013","auth","ReagentHub.sol","KILLED","test_A_COV_AUTH__outsidersCannotNoteOrSync","only Covenants of this Hub's factory note or sync, and only for themselves",""],["MU-014","b6","ReagentHub.sol","KILLED","test_T_HUB_BUDGET__removeLeaveReaddReadsZero","re-adding never raises: the derived min(B_stored, E) becomes the written number",""],["MU-015","b6","ReagentHub.sol","KILLED","test_A_TIGHTEN_RESPLIT__aTightenLowersThisChainAtOnce","a local rule change only lowers (I-CAP (c))",""],["MU-016","pause","ReagentHub.sol","KILLED","test_A_LATEPAUSE__aLateSnapshotDoesNotRepause|test_T_GUARD_HUB","B7 against the unpause baseline; B3 only when on",""],["MU-017","eth","ReagentHub.sol","KILLED","test_T_HUB_PAY__payFromNonProxyReverts","only the proxy asks for payment (T-HUB-PAY (a))",""],["MU-018","eth","ReagentHub.sol","KILLED","test_T_HUB_PAY__exactAmountToTheProxyOnly","exactly the amount, never a partial payment (T-HUB-PAY (b))",""],["MU-019","gas","ReagentHub.sol","KILLED","test_T_GAS_EXIT__sepoliaNeedsCoverMethodB","the per-chain table (selected by chain id, like PROXY, so T-ADDR holds)",""],["MU-020","auth","Covenant.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","the owner's functions",""],["MU-021","auth","Covenant.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","the agent's allocations",""],["MU-022","auth","Covenant.sol","KILLED","test_A_COV_AUTH__onlyItsHubReachesTheCallbacks","only this chain's Hub relays RC callbacks (A-COV-AUTH)",""],["MU-023","ledger","Covenant.sol","KILLED","test_A_DONATE__aDonationNeverBreaksLeave","the ledger, never more than held (A-DONATE: donated shares never break leave)",""],["MU-027","exit","Covenant.sol","KILLED","test_T_EXIT__staleNotAppliedAndFailed","the snapshot the RC acted on is not applied here yet",""],["MU-028","exit","Covenant.sol","KILLED","test_T_EXIT_PENDING__oneProcessBreachThenEarly","one event-triggered processBreach; all checks below see its result",""],["MU-029","exit","Covenant.sol","KILLED","test_A_STALE__atK2OnePostUnpauseBreachDoesNothing","the exit pause predicate",""],["MU-030","exit","Covenant.sol","KILLED","test_A_NOBREACH_EXIT__aForgedRecordCannotWithdrawFromAHealthyVault","the vault check: no local breach or gone since the baseline -> nothing (B2 skips it)",""],["MU-031","exit","Covenant.sol","KILLED","test_T_EXIT__earlyDuringTheDripDoneAfterInKindToTheOwner","the floor no key can move: the drip as read now (C-04)",""],["MU-032","exit","Covenant.sol","KILLED","test_T_EXIT__earlyDuringTheDripDoneAfterInKindToTheOwner","in kind to the owner only (I-OWN)",""],["MU-033","exit","","EQUIVALENT","","exit min-out as worth at the reference","For a pro-rata Touchstone withdrawal the composition received at any spot, measured at the reference, is at least the fair worth at the reference (a…"],["MU-034","plan","Covenant.sol","KILLED","test_A_PLAN_REPLAY__eEPlus1000DepositsOnce","EpochRecorded(e) names the epoch that just closed: deposit iff e < the vault's current epoch and",""],["MU-035","guard","Covenant.sol","KILLED","test_T_GUARD_BIND__unboundUnlistedFifthAndWideIdsRefused","an unbound vault is refused on every path",""],["MU-036","guard","Covenant.sol","KILLED","test_T_GUARD_BIND__unboundUnlistedFifthAndWideIdsRefused","the vault's id must be in the Rulebook's ids",""],["MU-037","guard","Covenant.sol","KILLED","test_T_GUARD_BIND__unboundUnlistedFifthAndWideIdsRefused","no fifth vault with a non-zero ledger",""],["MU-038","guard","Covenant.sol","KILLED","test_T_GUARD_MODE__refusedOutsideNormalOnEveryPath","the vault itself is NORMAL",""],["MU-039","guard","Covenant.sol","KILLED","test_T_GUARD_HUB__mirrorPausesUnpauseReopens","the Hub mirror (the cross-chain record, once delivered)",""],["MU-040","guard","Covenant.sol","KILLED","test_T_GUARD_B4__refusedBelowTheBondFloorAllowedAtIt","B4: the bond floor against the bond at the first allocation",""],["MU-041","guard","Covenant.sol","KILLED","test_T_GUARD_ARMED__agentAndPlanRefusedOwnerAllowed","agent and plan: not where an exit is armed (a breach since the baseline; before any baseline,",""],["MU-042","guard","Covenant.sol","KILLED","test_T_AGENT_ALLOC__allowlistCapReferenceNoRecipient","agent and plan: allowlisted vaults only",""],["MU-043","guard","Covenant.sol","KILLED","test_T_AGENT_ALLOC__allowlistCapReferenceNoRecipient","exposure must be measured at the reference",""],["MU-044","guard","Covenant.sol","KILLED","test_T_AGENT_ALLOC__aMovedSpotRefusesTheAgentsDeposit","agent and plan max-ins as worth at the reference within TRYREF_TOL",""],["MU-045","guard","Covenant.sol","KILLED","test_T_AGENT_ALLOC__allowlistCapReferenceNoRecipient","the per-epoch cap for agent and plan",""],["MU-046","guard","Covenant.sol","KILLED","test_T_GUARD_B6__refusedAboveBAllowedAtEquality","B6: E + x <= B",""],["MU-047","guard","Covenant.sol","KILLED","test_T_GUARD_PEND__refusedWhilePending","a pending breach on any sibling refuses (T-GUARD-PEND)",""],["MU-048","guard","Covenant.sol","KILLED","test_T_GUARD_B3__refusedAfterASiblingIsGone","B3: a sibling gone beyond its baseline",""],["MU-049","guard","Covenant.sol","KILLED","test_T_GUARD_B7__refusedAtKAllowedBelow|test_T_GUARD_SIBLING","B7 locally: the id's slot-19 breaches since the baseline (T-GUARD-B7, T-GUARD-SIBLING)",""],["MU-060","factory","CovenantFactory.sol","KILLED","test_T_COV_CREATE__create2OwnerAndAdminAllowlist","the admin alone edits the allowlist",""],["MU-061","factory","CovenantFactory.sol","KILLED","test_T_COV_CREATE__create2OwnerAndAdminAllowlist","the demo allowlist",""],["MU-070","auth","CovenantExt.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","only through a Covenant's delegatecall, never on this contract's own storage",""],["MU-071","auth","CovenantExt.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","the owner's administration",""],["MU-072","pause","CovenantExt.sol","KILLED","test_T_UNPAUSE__baselineOlderNoopNewerRepausesPendingReverts","no unpause over a pending breach",""],["MU-073","ledger","CovenantExt.sol","KILLED","test_A_SWEEP_SHARES__bookedSharesCannotBeSwept","tokens leave only to the owner",""],["MU-074","auth","CovenantExt.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","owner or agent",""],["MU-075","auth","CovenantExt.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","the agent's only rule power",""],["MU-076","tighten","CovenantExt.sol","KILLED","test_A_AGENT_LOOSEN__theAgentCannotLoosen","every field at least as strict (A-AGENT-LOOSEN)",""],["MU-077","rules","CovenantExt.sol","KILLED","test_T_GUARD_B5__aNonZeroB5IsRefused","k in 1..3; the agent cap within a tenth of the budget; B5 is cut",""],["MU-078","rules","CovenantExt.sol","KILLED","test_T_GUARD_BIND__unboundUnlistedFifthAndWideIdsRefused","|ids' u {exposed ids}| <= 4 on this chain",""],["MU-079","notes","CovenantExt.sol","KILLED","test_T_NOTE__twoRuleChangesPerRolePerInterval","at most 2 rule changes per role per interval; a third reverts, never silent",""],["MU-080","notes","CovenantExt.sol","KILLED","test_T_NOTE__aNewHoldingIsReportedInsideABusyInterval","a new holding is reported at once, <= 4 per interval",""],["MU-081","notes","CovenantExt.sol","KILLED","test_T_NOTE__rateLimitCoalescingAndFlush","one STATE per interval, the rest coalesced; never a revert (A-NOTE-REVERT)",""],["MU-082","auth","Covenant.sol","KILLED","test_T_COV_CREATE__create2OwnerAndAdminAllowlist","once only; the clone's address is the factory's CREATE2, so only the factory reaches a fresh one",""],["MU-083","auth","Covenant.sol","KILLED","test_A_COV_AUTH__outsidersCannotActAsOwnerOrAgent","only the listed admin entry points reach the extension (never note_)",""],["MU-084","deploy","Covenant.sol","KILLED","test_T_ADDR__anImplementationWithoutAnExtensionIsRefused","an extension without code would make every admin call a silent no-op",""],["MU-085","ledger","CovenantExt.sol","KILLED","test_A_SWEEP_SHARES__bookedSharesCannotBeSwept","I-SHARES (A-SWEEP-SHARES)",""],["MU-086","pause","CovenantExt.sol","KILLED","test_A_AGENT_STALE__theAgentCannotVoidAnArmedExit","only the owner leaves a pause; the agent never can (A-AGENT-STALE)",""],["MU-087","guard","VaultRead.sol","KILLED","test_T_GUARD_B4__aDueReserveIsNotCountedAsBond","slot 17 only: never the reserve a due markout may burn",""],["MU-088","exit","CovenantBase.sol","KILLED","test_A_STALE__aPreDepositBreachNeverArmsTheExit","the exit baseline at every holding's opening",""],["MU-089","ledger","Covenant.sol","KILLED","test_T_LEDGER__leavingOneVaultCutsOnlyItsOwnCost","exposure leaves from this vault's own cost basis, pro rata, rounded down",""],["MU-090","auth","Covenant.sol","KILLED","test_A_COV_AUTH__selfCallEntriesRefuseOutsiders","self-call only: an outsider would bypass I-STALE and the drip floor",""],["MU-091","auth","Covenant.sol","KILLED","test_A_COV_AUTH__selfCallEntriesRefuseOutsiders","self-call only: an outsider would bypass the plan's epoch gate",""],["MU-092","auth","CovenantExt.sol","KILLED","test_A_COV_AUTH__selfCallEntriesRefuseOutsiders","the Covenant itself is never its agent (its self-calls would pass the agent checks)",""],["MU-093","gas","ReagentHub.sol","KILLED","test_T_GAS_EXIT__aRaisedLimitReachesAPaddedCovenant","forward everything above the reserve",""],["MU-094","gas","ReagentHub.sol","KILLED","test_T_GAS_PLAN__aRaisedLimitReachesAPaddedPlan","the same for plans",""],["MU-095","plan","Covenant.sol","KILLED","test_T_PLAN__everySkipReasonAndTheGapRoll","each error maps to its PLAN reason (spec)",""],["MU-096","exit","Covenant.sol","KILLED","test_A_STALE__aSiblingGoneAtTheBaselineDoesNotPause","B3: gone beyond the baseline only (a vault gone at the unpause no longer pauses)",""],["MU-097","exit","Covenant.sol","KILLED","test_A_STALE__aVaultGoneAtItsBaselineIsNotTriggered","gone since the baseline, not before it",""],["MU-098","exit","Covenant.sol","KILLED","test_A_STALE__aVaultBoundAfterTheUnpauseIsCountedByTheMirrorOnly","a vault with no baseline of this Covenant's is counted by the Hub mirror only",""],["MU-200","rc","ReagentRC.sol","KILLED","test_R_EXT__theConstructorRefusesAnExtensionWithoutCode","the constructor refuses an extension without code",""],["MU-201","rc","ReagentRC.sol","KILLED","test_R_REG__ownerOnlyAndBounds","the registry and the gas table are the owner's",""],["MU-202","rc","ReagentRC.sol","KILLED","test_R_REG__ownerOnlyAndBounds","ids start at 1",""],["MU-203","rc","ReagentRC.sol","KILLED","test_R_REG__onlyTheTwoChainsAndBundlersNeedTheFactory","addFactory only for the two chains",""],["MU-204","rc","ReagentRC.sol","KILLED","test_R_REG__onlyTheTwoChainsAndBundlersNeedTheFactory","addBundler needs the chain's factory",""],["MU-205","rc","ReagentRC.sol","KILLED","test_R_REG__ownerOnlyAndBounds","at most 4 bundlers per id per chain",""],["MU-206","rc","ReagentRC.sol","KILLED","test_R_SETGAS__rangeFormulaToMaxOwnerOnly","setGas never below the formula",""],["MU-207","rc","ReagentRC.sol","KILLED","test_R_PAYER__onlySystemExactAmount","pay only from SYSTEM",""],["MU-209","rc","ReagentRC.sol","KILLED","test_R_SUB__reactRevertsOnlyForAWrongCaller","react only from SYSTEM",""],["MU-210","rc","ReagentRC.sol","KILLED","test_A_XCHAIN__aHubCloneOrForeignChainIsNotProcessed","the (chain, registered Hub) filter",""],["MU-211","rc","ReagentRC.sol","KILLED","test_R_DYN_FOREIGN__aDeployedForAnUnregisteredBundlerIsIgnored","only a registered bundler's vault",""],["MU-212","rc","ReagentRC.sol","KILLED","test_R_DYN__aDuplicatedDeployedChangesNothing","a duplicated Deployed changes nothing",""],["MU-213","rc","ReagentRC.sol","KILLED","test_R_BREACH_DUP__reorderedLatchesGiveTheSameRecord","the record is the max latched seq per vault",""],["MU-214","rc","ReagentRC.sol","KILLED","test_R_GONE__exitedAfterThreeBreachesSetsGoneOnce","EXITED is gone",""],["MU-215","rc","ReagentRC.sol","KILLED","test_R_ACTION__budgetThenExactUnsubscribeThenResubscribeAtTheNextEpoch","the Action budget unsubscribes",""],["MU-216","rc","ReagentRC.sol","KILLED","test_R_SUB__exactTopicsNoWildcardNoNeverList","Cron only while there is deferred work",""],["MU-230","rc","RcExt.sol","KILLED","test_R_EXT__aDirectCallToTheExtensionReverts","the extension refuses direct calls",""],["MU-231","rc","RcExt.sol","KILLED","test_R_B6SCHED__seed|test_R_B6SCHED__anOlderStateReleasedLate","a STATE older than the last one changes nothing",""],["MU-232","rc","","EQUIVALENT","","rules only from a STATE at or above the stored rulesNonce","The rules gate if (rn >= k.rulesNonce) is always true behind the STATE gate if (nn <= k.noteNonce) return; (MU-231): a Covenant's STATE carries nn =…"],["MU-233","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__relayFailedThrice","a suspension clears when the totals or the rules move past it",""],["MU-234","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__parkedThenTheHubs","unpark on a callback result after the park",""],["MU-235","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__aLaggingSnapshot","the wait releases lazily on the scan",""],["MU-236","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__relayFailedThrice|test_A_EXIT_DENY__failures","at most one send per pair per EPOCH_TICKS",""],["MU-237","rc","RcExt.sol","KILLED","test_A_CRON_PIN__aHubInDebt","park after 6 EPOCH_TICKS without progress",""],["MU-238","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__noExitForAHealthy","the vault check",""],["MU-239","rc","RcExt.sol","KILLED","test_R_E2E__|test_T_EXIT_BOUND__","B7 against the unpause baseline; B3 only when on",""],["MU-240","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__relayFailedThrice","the third try suspends",""],["MU-241","rc","RcBase.sol","KILLED","test_R_RESEND__","the rate",""],["MU-242","rc","RcExt.sol","KILLED","test_R_UNTRACKED__","a 17th Covenant is untracked",""],["MU-243","rc","RcExt.sol","KILLED","test_R_GAS__firstState","plans stored lazily from the second STATE",""],["MU-244","rc","RcB6.sol","KILLED","test_R_B6SCHED__aStaleStateBudgetNeverOverwritesANewerAnswer","the nonce gate on STATE budgets",""],["MU-245","rc","RcB6.sol","KILLED","test_R_GAS__atTheExactReservationFloorTwoPopsAndServes","a stale head costs one pop",""],["MU-246","rc","","EQUIVALENT","","the nonce gate on answers","The outer gate if (n >= x.appliedNonce) only guards writes that are each guarded more strictly or unreachable for an older answer (n < appliedNonce): the…"],["MU-247","rc","RcB6.sol","KILLED","test_R_BUDGET__","every send at or below the answered nonce is answered",""],["MU-248","rc","RcB6.sol","KILLED","test_R_B6SCHED__aRaiseRejectedByARuleChangeWaitsForItsState","rules-unsettled until the STATE arrives",""],["MU-249","rc","RcExt.sol","KILLED","test_R_B6SCHED__park|test_R_B6SCHED__seed","the entry stays listed while anything remains",""],["MU-250","rc","RcBase.sol","KILLED","test_R_COUNTERS__aMidLapMarkGetsAnotherFullLap","a re-mark extends the sweep, never restarts it",""],["MU-251","rc","","EQUIVALENT","","an unreported chain counts capRC/2","An unreported other chain (noteNonce 0) counts capRC/2 in step 1; the mutant counts 0. Neither number can owe a lower: while the other chain is unreported, no…"],["MU-252","rc","RcB6.sol","KILLED","test_R_B6SCHED__aTightenUnderARaiseInFlightLowersTheOtherChain","committed counts the unanswered sends",""],["MU-253","rc","RcB6.sol","KILLED","test_R_B6SCHED__anIdListedOnOneChain","only a listing chain is messaged",""],["MU-254","rc","","EQUIVALENT","","lowers only while the sum exceeds capRC","The early exit if (committed(c) + o <= capRC) return (false, 0) is implied by the next test: with committed(c) = max(appliedB, E, unB) ≥ appliedB, Σ ≤ capRC…"],["MU-255","rc","RcB6.sol","KILLED","test_R_B6SCHED__park","the back-off",""],["MU-256","rc","RcB6.sol","KILLED","test_R_B6SCHED__park","a lower parks after 6 EPOCH_TICKS, a raise after MOVE_RESENDS",""],["MU-257","rc","RcB6.sol","KILLED","test_R_B6SCHED__anIdListedOnOneChain|test_I_CAP__","raises and rebalances only at rest",""],["MU-258","rc","RcB6.sol","KILLED","test_R_BUDGET__","the donor keeps MIN_MOVE of its headroom",""],["MU-259","rc","RcB6.sol","KILLED","test_R_COUNTERS__aMidLapMarkGetsAnotherFullLap","unpark only on a callback result after the park",""],["MU-260","rc","RcB6.sol","KILLED","test_R_EXT__theB6Module","the B6 module only on the RC storage",""],["MU-261","rc","RcExt.sol","KILLED","test_R_EXT__theB6Module","a codeless B6 module refused",""],["MU-262","rc","RcExt.sol","KILLED","test_R_GAS__aStepOutOfGasLeavesTheCallerItsTail","an optional B6 step keeps the tail",""],["MU-263","rc","RcB6.sol","KILLED","test_R_B6SCHED__park|test_R_B6SCHED__seed","the lifecycle predicate after the sends",""],["MU-264","rc","RcExt.sol","KILLED","test_R_UNTRACKED__aStateAfterTheBreach","an untracked Covenant gets no pair state",""],["MU-265","rc","RcExt.sol","KILLED","test_R_EXIT_SCHED__aWaitingPairResends","a waiting pair resends at the rate",""],["MU-266","rc","RcExt.sol","KILLED","test_R_COUNTERS__dirtyIdsAreServedRoundRobin","round-robin over the dirty ids",""],["MU-267","rc","RcExt.sol","KILLED","test_R_COUNTERS__oneResultWakesEveryParkInTheSweepsOnlyLap","an unpark shrinks the walked list",""],["MU-268","rc","RcB6.sol","KILLED","test_R_B6SCHED__aTightenUnderAnUnanswered","the last lower target, not the run maximum",""],["MU-269","rc","RcB6.sol","KILLED","test_R_COUNTERS__aHeadThatStillOwesAfterItsSendsStaysListed","a still-owing head rotates",""],["MU-270","rc","RcB6.sol","KILLED","test_R_COUNTERS__aSweepUnparks|test_R_B6SCHED__aTightenUnderAnUnanswered","a re-sent lower carries its recomputed target",""],["MU-271","rc","","EQUIVALENT","","a head rotates only after it sent","sent != 0 in b6Lowers' rotate is unreachable as false while the head still owes: a visit admitted by _b6Opt (outer gasleft ≥ GAS_GUARD) is always admitted…"],["MU-272","rc","RcExt.sol","KILLED","test_R_GAS__theFirstFloorIsServedInFullAtTheLiveForward","the Cron floors rotate with the Cron event's phase",""],["MU-273","rc","RcExt.sol","KILLED","test_R_GAS__aLapEndIsFloorThreesItem","a lap end is the sweep step's item",""],["MU-274","rc","RcBase.sol","KILLED","test_R_GAS__theGuardCoversTheLargestMeasuredItem","GAS_GUARD from the largest measured item",""],["MU-275","rc","RcExt.sol","KILLED","test_R_COUNTERS__aHeadThatStillOwesAfterItsSendsStaysListed","SENDS_PER_REACTION = 4 optional callbacks per non-Cron reaction",""],["MU-276","rc","ReagentRC.sol","KILLED","test_R_GAS__aBacklogOfCronEventsStillRotates","the rotation phase from the Cron log's own block",""],["MU-277","rc","","EQUIVALENT","","an overflowed park is not on the walked list (no step-back)","unparked = bb.flags & F_OVER == 0 in _wakeB6 reads F_OVER only for an element of the walked b6Parked list, and _parkB6 sets F_OVER exactly when it does NOT…"],["MU-278","rc","RcB6.sol","KILLED","test_R_COUNTERS__anOverflowedParkUnparksThroughItsOwnState","an overflowed park is on no list (unpark clears only the flag)",""],["MU-279","rc","RcExt.sol","KILLED","test_R_GAS__theFirstFloorIsServedInFullAtTheLiveForward","CURSOR_FLOOR = 4 (the reservation with its 10% margin rule; 5 fits with 1.0% only)",""],["MU-280","rc","RcExt.sol","KILLED","test_R_GAS__vaultsWithoutCovenantsCostTheCursorOneStepOnce","the cursor drops a vault without Covenants",""],["MU-281","rc","RcExt.sol","KILLED","test_R_GAS__atTheExactCursorReservationEveryEvaluationExits","no second gas gate on an admitted evaluation's exit",""],["MU-282","rc","RcExt.sol","KILLED","test_R_GAS__atTheExactCursorReservationEveryEvaluationResends","an admitted evaluation's resend is not re-gated",""],["MU-283","rc","RcExt.sol","KILLED","test_R_GAS__aDroppedEmptyVaultRejoinsTheCursorAtItsFirstCovenant","a dropped vault re-joins the cursor at its first Covenant",""],["MU-284","rc","ReagentRC.sol","KILLED","test_R_GAS__firstStateAtTheBoundsWithFourPlans","a registration taking a stale cursor slot leaves a new one at the high-water mark",""]],"plan":[{"delivered":false,"epoch":19097,"lasnaTx":"0xc80406fb0626d25e378af1cf00ac47baf8802a9599df0867eba865f3ad9ee64d","latency_s":null,"noteTs":null,"noteTx":null,"originTs":1795605279,"originTx":"0xc0e16af14e86eb0864e3193ba7d5f5ee47a2009727990d1cfea3ce80be0d75ec","pausedAtOrigin":false,"withheld":true},{"delivered":true,"epoch":19098,"lasnaTx":"0x4e1b3f06904e839052f5585a8403345fb3d8a3852579ea18fb9e98eb447cf9e8","latency_s":2,"noteTs":1795608877,"noteTx":"0xc62444d0970717404e6a47ef476c2bfc74265a48780c89f995ec1bbb9f45d8d9","originTs":1795608875,"originTx":"0x88618e3ddc155ff93f4ce227d4b9222f011378298cd0228ee349a17fe991b715","pausedAtOrigin":null,"withheld":null},{"delivered":true,"epoch":19099,"lasnaTx":"0xd91a655a842b76b1748733e177cdb4e99df3663dddd0881a76f780edecc8e6ba","latency_s":2,"noteTs":1795614236,"noteTx":"0x90287a7fba325e5d73a0dfbcba58c11f040aec868877b976a38cf26a585dfc33","originTs":1795614234,"originTx":"0x8926b044564115bab04d80b250ddec4fbe73b4b8a55fbd3da7051a18fb6e1a59","pausedAtOrigin":null,"withheld":null},{"delivered":false,"epoch":19101,"lasnaTx":"0x104dbcf8124bc202dd37687d36da670071d299b825a2279755753197e17c5a32","latency_s":null,"noteTs":null,"noteTx":null,"originTs":1795619684,"originTx":"0x5904e526ff15cafecd70f6e53488c7c8a4479527cca16a846dd1153d834b331b","pausedAtOrigin":true,"withheld":true}],"repo":"https://github.com/mishoko/touchstone-reagent","runDate":"2026-11-25","tests":{"attackCells":[["A-SPOOF-PROXY","callback from a non-proxy","the check mutated away → applies","F"],["A-SPOOF-RC","callback with a foreign RC as first word","mutated → applies","F"],["A-SPOOF-WORD","callback with a zero or garbled first word","mutated → applies","F"],["A-COV-AUTH","direct rcExit on a Covenant, or a Hub relaying to a non-factory Covenant","mutated → withdraws","F"],["A-REPLAY","an older rcBudget replayed after a newer one","the nonce gate removed → B reverts upward","F"],["A-STALE","the owner unpauses (and re-allocates), then a late exit arrives (must do nothing); after unpause, a pending sub-k latch on V plus a zero-forfeit processBreach, with the old drip ended; a…","the exit pause predicate replaced by the allocate guard's (pending counts), or the pause check at delivery removed → withdraws while unpaused; the…","F"],["A-LATEPAUSE","a snapshot sent before the owner's unpause (seq above the Hub's seq at unpause, counts not above the baseline) arrives after it","unpause as a flag cleared by any later rcConduct (no baseline) → re-pauses","F"],["A-IDSPOOF","the agent allocates into curator X's vault under another id to dodge X's pause and B6","caller-supplied id instead of the Hub binding → passes","F"],["A-DONATE","1 wei of shares donated, then leave(all)","the min removed → reverts","F"],["A-NOBREACH-EXIT","an exit on a healthy vault (forged or reorged log)","check removed → withdraws","F"],["A-GAS63","delivery at gasLimit − 1","pre-check removed → a try burnt","F"],["A-AGENT-LOOSEN","the agent loosens each field, the allowlist, the cap or the floor","monotone check removed → loosens","F"],["A-AGENT-STALE","the agent tries to void an armed exit (it cannot unpause)","the agent allowed to call unpause → exit stale","F"],["A-PLAN-REPLAY","plan callbacks for e, e, e+1000","epoch gate removed → deposits each","F"],["A-SWEEP-SHARES","the owner sweeps booked vault shares (sweep(vault, ledger)) to break the ledger; and after a donation of d shares, sweep(vault, d) succeeds while sweep(vault, d + 1) reverts","the balanceOf − ledger check removed → the ledger exceeds balanceOf (I-SHARES broken)","F"],["A-NOTE-REVERT","a rate-limited note during leave","the limit reverts → leave blocked","F"],["A-TIGHTEN-RESPLIT","a tighten on one chain with skewed budgets; Σ B ≤ max(cap′, Σ E) asserted after delivery","max instead of min, or no RC lower → Σ B > cap′ at quiescence","F"],["A-EXIT-DENY","min-outs failed on three ticks in one epoch","per-epoch counting removed → abandoned","R"],["A-B6-CLAWBACK","lower below spent exposure then raise the other chain; and a tighten below E, a lower, a leave, then agent allocation","the clamp removed → Σ E > cap; max(newB, E) as a raise → the agent exceeds its tightened cap","F"],["A-EXIT-SANDWICH","spot pushed around the exit","no positive control can win against a pro-rata withdrawal: the exit at a moved spot receives at least the fair worth at the reference; the cell…","F"],["A-DEPOSIT-SANDWICH","spot pushed around a plan or agent deposit (the deposit pays the moved composition, worth more than its shares at the reference)","max-ins removed → the depositor overpays at the reference and the attacker nets > 0 on the swap back","F"],["A-NOTE-FORGE","a forged note disarms a victim's exit","emitter check removed → disarmed","R"],["A-XCHAIN","a Hub clone on another chain is processed","the chain/Hub filter removed → processed","R"],["A-DELTA","two separate breaches with k = 2","BreachProcessed.count max used → never fires","R"],["A-B6LAG","both chains allocate before any note round-trips","additive credits → ≈ 2 × cap","R"],["A-OWNER-RACE","owner lowers the cap on Y while a raise to Y is in flight","rulesNonce gate removed → Σ B > cap","R"],["A-CRON-PIN","an exit that never closes (Hub in debt, including in debt before the breach so no answer ever comes)","park removed, or an answer-started park clock → Cron stays subscribed","R"],["A-SPAM","outsider poke/Swap/Transfer traffic; an agent tighten loop (the third change in an interval reverts)","a never-list topic subscribed → the RC is billed; no rule-change cap → RC callbacks grow with the loop","R"],["A-ACTION-SPAM","an Action every cooldown","budget removed → callbacks grow without bound","R"],["A-ESCAPE","the curator re-places or moves to a fresh vault of a registered bundler","count reset → record lost","R"]],"failed":0,"invariantRuns":11,"invariants":[["I-OWN","tokens leaving a Covenant go only to owner or into a vault on the same chain."],["I-AUTH","a Hub callback with the wrong proxy, sender or first word reverts and changes nothing."],["I-IDEM","replaying any callback changes nothing beyond its first application."],["I-LEAVE","the owner's leave succeeds whenever Touchstone's withdraw would succeed for those shares."],["I-TIGHT","no agent call loosens any rule, raises a chain budget or moves the drip-end floor."],["I-SHARES","for each vault, the Covenant's ledger ≤ its balanceOf, and ledger = Σallocated − Σleft − Σexited."],["I-MONO","the Hub's conduct mirror never decreases (counts, gone, seq)."],["I-STALE","an rcExit withdraws only if, at delivery, the Covenant is paused for that curator on this chain and, for B7/B3, the vault itself shows a local breach or gone event since the Covenant's baseline for it."],["I-ETH","the Hub's ETH balance falls only through pay (to PROXY, exactly the amount asked) or sweep (into the Hub's own reserves at PROXY); no other path moves or reads it."],["I-CAP","every RC raise is sent only at rest and keeps Σ_c committed_c ≤ capRC at its send."],["I-B6SUM","E_c ≤ B_c on each chain after every allocation."]],"mutants":{"equivalent":7,"killed":141,"total":148},"passed":362,"skipped":1,"suites":73}}</script>
+<!-- DATA:END -->
+
+<script>
+"use strict";
+addEventListener("DOMContentLoaded", () => {
+const D = JSON.parse(document.getElementById("reagent-data").textContent);
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (s, r = document) => r.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+function h(tag, a, ...kids) {
+  const e = document.createElement(tag);
+  for (const k in a || {}) { if (k === "text") e.textContent = a[k]; else if (k === "html") e.innerHTML = a[k]; else if (k.startsWith("on")) e.addEventListener(k.slice(2), a[k]); else if (a[k] !== null && a[k] !== undefined && a[k] !== false) e.setAttribute(k, a[k]); }
+  for (const c of kids.flat()) if (c != null) e.append(c);
+  return e;
+}
+function s(tag, a, ...kids) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in a || {}) { if (k === "text") e.textContent = a[k]; else if (k.startsWith("on")) e.addEventListener(k.slice(2), a[k]); else if (a[k] !== null && a[k] !== undefined) e.setAttribute(k, a[k]); }
+  for (const c of kids.flat()) if (c != null) e.append(c);
+  return e;
+}
+const CH = { 1301: ["Unichain Sepolia", "a"], 11155111: ["Ethereum Sepolia", "b"], 5318007: ["Reactive Lasna", "r"] };
+const short = (x) => x ? x.slice(0, 6) + "…" + x.slice(-4) : "";
+const txUrl = (c, x) => D.explorers[c] + x;
+const adUrl = (c, x) => D.explorersAddr[c] + x;
+const utc = (t) => new Date(t * 1000).toISOString().slice(11, 19);
+const dur = (sec) => { sec = Math.round(sec); if (sec < 90) return sec + " s"; const m = Math.round(sec / 60); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + (m % 60) + " min"; };
+function units(str, dec, dp) { const v = BigInt(str), b = 10n ** BigInt(dec); const w = v / b, f = (v % b).toString().padStart(dec, "0").slice(0, dp); return w + (dp ? "." + f : ""); }
+function copyBtn(text) { return h("button", { class: "copy", type: "button", "aria-label": "Copy " + text, onclick: (e) => { try { navigator.clipboard.writeText(text); e.target.textContent = "copied"; setTimeout(() => (e.target.textContent = "copy"), 1200); } catch (_) {} } }, "copy"); }
+function txLine(chain, hash, label) {
+  return h("div", { class: "txline" }, h("span", { class: "chip c-" + CH[chain][1] }, h("i", { class: "dot" }), CH[chain][0]), label ? h("span", {}, label) : null,
+    h("code", { title: hash }, short(hash)), copyBtn(hash), h("a", { href: txUrl(chain, hash), target: "_blank", rel: "noopener" }, "explorer ↗"));
+}
+
+/* theme */
+(function () {
+  const btn = $("#theme"), lab = $("#theme-l"), root = document.documentElement;
+  const cur = () => root.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const paint = () => { lab.textContent = cur() === "light" ? "paper" : "stone"; };
+  btn.addEventListener("click", () => { root.dataset.theme = cur() === "light" ? "dark" : "light"; try { localStorage.setItem("reagent-theme", root.dataset.theme); } catch (_) {} paint(); });
+  paint();
+})();
+
+/* derived numbers + bindings */
+D.conTotal = Object.values(D.con).reduce((a, c) => a + c.delivered, 0);
+D.conDate = Object.values(D.con)[0].date || D.runDate;
+const LINKS = { repo: D.repo, "covenant-src": D.repo + "/blob/main/src/Covenant.sol", "verify-md": D.repo + "/blob/main/VERIFY.md", "loops-json": D.repo + "/blob/main/audits/loops.json" };
+document.querySelectorAll("[data-bind]").forEach((e) => { const v = e.dataset.bind.split(".").reduce((o, k) => o && o[k], D); if (v !== undefined) e.textContent = v; });
+document.querySelectorAll("[data-href]").forEach((e) => { e.href = LINKS[e.dataset.href]; });
+
+/* a small stand-in for GSAP (opacity/transform/dashoffset and plain objects), used when the CDN is unreachable */
+const MiniG = (function () {
+  const E = { "none": (t) => t, "power3.out": (t) => 1 - Math.pow(1 - t, 3), "power2.inOut": (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+    "expo.inOut": (t) => t === 0 || t === 1 ? t : t < .5 ? Math.pow(2, 20 * t - 10) / 2 : (2 - Math.pow(2, -20 * t + 10)) / 2,
+    "back.out(2)": (t) => { const c = 3; return 1 + c * Math.pow(t - 1, 3) + 2 * Math.pow(t - 1, 2); }, "sine.inOut": (t) => -(Math.cos(Math.PI * t) - 1) / 2 };
+  const TF = ["x", "y", "scale", "scaleX", "scaleY", "rotation"];
+  const st = (el) => el._mg || (el._mg = { x: 0, y: 0, scale: 1, scaleX: 1, scaleY: 1, rotation: 0, opacity: el.style && el.style.opacity !== "" ? +el.style.opacity : 1 });
+  function read(t, k) { if (!(t instanceof Element)) return t[k]; if (k === "strokeDashoffset") return parseFloat(t.style.strokeDashoffset || getComputedStyle(t).strokeDashoffset) || 0; return st(t)[k]; }
+  function write(t, k, v) {
+    if (!(t instanceof Element)) { t[k] = v; return; }
+    if (k === "strokeDashoffset") { t.style.strokeDashoffset = v; return; }
+    const m = st(t); m[k] = v;
+    if (k === "opacity") t.style.opacity = v;
+    else t.style.transform = `translate(${m.x}px,${m.y}px) rotate(${m.rotation}deg) scale(${m.scale * m.scaleX},${m.scale * m.scaleY})`;
+  }
+  const SKIP = new Set(["duration", "ease", "onUpdate", "onStart", "onComplete", "transformOrigin", "stagger", "delay"]);
+  function set(targets, vars) { [].concat(targets).forEach((t) => { for (const k in vars) if (!SKIP.has(k)) write(t, k, vars[k]); }); }
+  function timeline(opt = {}) {
+    const tw = []; let end = 0, last = 0, time = 0, scale = 1, raf = 0, playing = false;
+    const pos = (p) => p === undefined ? end : typeof p === "number" ? p : p === "<" ? last : p.startsWith("+=") ? end + +p.slice(2) : p.startsWith("-=") ? end - +p.slice(2) : end;
+    const tl = {
+      to(t, v, p) { return tl.fromTo(t, null, v, p); },
+      fromTo(t, from, v, p) { const t0 = pos(p), d = v.duration === undefined ? .5 : v.duration; [].concat(t).forEach((x) => tw.push({ t: x, t0, d, from, v, e: E[v.ease || "none"] || E["power3.out"], init: null })); last = t0; end = Math.max(end, t0 + d); return tl; },
+      set(t, v, p) { return tl.fromTo(t, null, Object.assign({}, v, { duration: 0 }), p); },
+      call(fn, args, p) { const t0 = pos(p); tw.push({ call: fn, t0, d: 0, done: false }); last = t0; end = Math.max(end, t0); return tl; },
+      duration: () => end,
+      render(nt) {
+        const back = nt < time; time = nt;
+        for (let i = tw.length - 1; i >= 0; i--) { const w = tw[i]; if (w.call) { if (back && nt < w.t0) w.done = false; continue; } if (w.init && nt < w.t0) apply(w, 0); }
+        for (const w of tw) { if (w.call) { if (!w.done && nt >= w.t0) { w.done = true; w.call(); } continue; } if (nt >= w.t0) apply(w, w.d ? Math.min(1, (nt - w.t0) / w.d) : 1); }
+      },
+      progress(p) { tl.render(p * end); return tl; },
+      timeScale(v) { scale = v; return tl; },
+      play() { if (playing) return tl; playing = true; let prev = performance.now(); const step = (n) => { const dt = (n - prev) / 1000 * scale; prev = n; tl.render(Math.min(end, time + dt)); if (time < end && playing) raf = requestAnimationFrame(step); else playing = false; }; raf = requestAnimationFrame(step); return tl; },
+      pause() { playing = false; cancelAnimationFrame(raf); return tl; },
+      restart() { tl.pause(); tw.forEach((w) => { if (w.call) w.done = false; }); tl.render(0); return tl.play(); },
+      kill() { tl.pause(); },
+    };
+    function apply(w, p) {
+      if (!w.init) { w.init = {}; for (const k in w.v) if (!SKIP.has(k)) w.init[k] = w.from && k in w.from ? w.from[k] : read(w.t, k); if (w.v.onStart) w.v.onStart(); }
+      const q = w.e(p); for (const k in w.init) write(w.t, k, w.init[k] + (w.v[k] - w.init[k]) * q); if (w.v.onUpdate) w.v.onUpdate();
+    }
+    if (!opt.paused) setTimeout(() => tl.play(), 0);
+    return tl;
+  }
+  return { timeline, set, mini: true };
+})();
+const G = () => window.gsap || MiniG;
+
+/* seeded noise for brush streaks */
+function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function streakD(x, y, w, seed) { const r = rng(seed); let d = `M${x.toFixed(1)} ${(y + (r() - .5) * 2).toFixed(1)}`; const n = Math.max(3, Math.round(w / 7)); for (let i = 1; i <= n; i++) d += ` L${(x + (w * i) / n).toFixed(1)} ${(y + (r() - .5) * 3).toFixed(1)}`; return d; }
+function streak(g, x, y, w, seed, color, cls) {
+  const grp = s("g", { class: cls || "" });
+  grp.append(s("path", { d: streakD(x, y, w, seed), stroke: color, "stroke-width": 9, "stroke-linecap": "round", fill: "none", pathLength: 1, "stroke-dasharray": 1, "stroke-dashoffset": 1, class: "st-main" }),
+    s("path", { d: streakD(x + 2, y - 3, w - 4, seed + 7), stroke: color, "stroke-width": 2.5, "stroke-linecap": "round", fill: "none", opacity: .55, pathLength: 1, "stroke-dasharray": 1, "stroke-dashoffset": 1, class: "st-main" }));
+  g.append(grp); return grp;
+}
+function lut(path, n = 64) { const L = path.getTotalLength(), pts = []; for (let i = 0; i <= n; i++) { const p = path.getPointAtLength((L * i) / n); pts.push([p.x, p.y]); } return pts; }
+function along(dot, pts, p) { const f = p * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), r = f - i; const x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * r, y = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * r; dot.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)})`); }
+let PARTICLES = 16;
+
+/* ---------------- hero: the loop (reusable by the video: buildHeroTimeline(gsap, root, data, scale)) ---------------- */
+function buildHeroScene(svg, data, W) {
+  const H = 344; svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.replaceChildren(svg.querySelector("title"));
+  const ly = [56, 170, 284], col = ["var(--lane-a)", "var(--lane-r)", "var(--lane-b)"];
+  const names = [`Unichain Sepolia · ${data.hero.originChain}`, "Reactive Lasna · 5318007", `Ethereum Sepolia · ${data.hero.destChain}`];
+  ly.forEach((y, i) => { svg.append(s("rect", { x: 0, y: y - 52, width: W, height: 104, rx: 12, fill: "var(--stone)", stroke: "var(--rule)" }), s("rect", { x: 0, y: y - 52, width: 4, height: 104, rx: 2, fill: col[i] }), s("text", { x: 16, y: y - 32, class: "lbl", fill: col[i], style: `fill:${col[i]}` , text: names[i] })); });
+  const g = {}; const X = (f) => f * W, narrow = W < 500;
+  g.good = []; for (let i = 0; i < 6; i++) g.good.push(streak(svg, X(.05 + i * .068), ly[0] + 10, X(.05), 11 + i * 3, "var(--gold)"));
+  svg.append(s("text", { x: X(.05), y: ly[0] + 36, text: "curator X conduct: Actions" }));
+  const bx = X(.5), bw = X(.1);
+  g.wash = s("rect", { x: bx - 8, y: ly[0] - 6, width: bw + 16, height: 32, rx: 8, fill: "var(--reagent)", opacity: 0, class: "svg-anim", style: "transform-origin:left center" }); svg.append(g.wash);
+  g.bad = streak(svg, bx, ly[0] + 10, bw, 91, "var(--breach)");
+  g.parts = []; const pr = rng(5);
+  for (let i = 0; i < PARTICLES; i++) { const c = s("circle", { cx: bx + pr() * bw, cy: ly[0] + 10 + (pr() - .5) * 6, r: 1.6 + pr() * 1.6, fill: "var(--breach)", opacity: 0, class: "svg-anim" }); c._dx = (pr() - .3) * 40; c._dy = -10 - pr() * 26; g.parts.push(c); svg.append(c); }
+  g.badLbl = s("text", { x: W - 14, y: ly[0] + 36, "text-anchor": "end", class: "mono-t", fill: "var(--breach)", style: "fill:var(--breach)", opacity: 0, text: (narrow ? "breach · block " : "BreachLatched · block ") + data.hero.originBlock }); svg.append(g.badLbl);
+  const rx = X(.66);
+  svg.append(s("circle", { cx: rx, cy: ly[1] + 6, r: 15, fill: "var(--stone-2)", stroke: "var(--reagent)", "stroke-width": 2 }), s("text", { x: rx + 24, y: ly[1] + 11, class: "lbl", style: "fill:var(--ink)", text: "ReagentRC" }));
+  g.react = s("text", { x: rx - 24, y: ly[1] + 11, "text-anchor": "end", class: "mono-t", style: "fill:var(--reagent)", opacity: 0, text: "react() · +" + (data.hero.lasnaTs - data.hero.originTs) + " s" }); svg.append(g.react);
+  const p1 = s("path", { d: `M${bx + bw / 2} ${ly[0] + 18} C ${bx + bw / 2} ${ly[0] + 80}, ${rx} ${ly[1] - 60}, ${rx} ${ly[1] - 9}`, fill: "none", stroke: "var(--reagent)", "stroke-width": 1.6, "stroke-dasharray": "4 5", opacity: .55 });
+  const px = X(.74), p2 = s("path", { d: `M${rx} ${ly[1] + 21} C ${rx} ${ly[1] + 70}, ${px} ${ly[2] - 70}, ${px} ${ly[2] - 22}`, fill: "none", stroke: "var(--reagent)", "stroke-width": 1.6, "stroke-dasharray": "4 5", opacity: .55 });
+  svg.append(p1, p2); g.l1 = lut(p1); g.l2 = lut(p2);
+  g.dot = s("circle", { r: 6.5, fill: "var(--reagent)", opacity: 0 }); svg.append(g.dot); along(g.dot, g.l1, 0);
+  const stamp = (x, y, w, txt, c) => { const gg = s("g", { transform: `translate(${x} ${y}) rotate(-4)` }); const inner = s("g", { class: "svg-anim stamp", opacity: 0 }); inner.append(s("rect", { x: -w / 2, y: -17, width: w, height: 34, rx: 5, fill: "var(--stone-2)", stroke: c, "stroke-width": 1.5 }), s("text", { x: 0, y: 6, "text-anchor": "middle", style: `fill:${c}`, text: txt })); gg.append(inner); svg.append(gg); return inner; };
+  const sw = narrow ? 84 : Math.max(96, X(.2));
+  g.paused = stamp(px, ly[2] - 4, sw, "PAUSED", "var(--pause)");
+  g.ctr = s("text", { x: px + sw / 2 + 10, y: ly[2] + 2, class: "mono-t", style: "fill:var(--ink);font-size:" + (narrow ? 15 : 18) + "px", opacity: 0, text: "+0 s" }); svg.append(g.ctr);
+  const ax = X(.36), ay = ly[2] + 30;
+  g.arrow = s("g", { opacity: 0, class: "svg-anim" }); g.arrow.append(s("path", { d: `M${ax} ${ay} L${X(.6)} ${ay}`, stroke: "var(--lane-b)", "stroke-width": 2.5 }), s("path", { d: `M${ax} ${ay} l12 -7 v14 z`, fill: "var(--lane-b)" }), s("text", { x: ax + 18, y: ay + 16, class: "mono-t", style: "fill:var(--ink-2)", text: (narrow ? "allocate · nonce " : "agentAllocate · nonce ") + data.hero.refusedNonce }));
+  svg.append(g.arrow);
+  g.refused = stamp(X(.19), ly[2] - 4, Math.max(100, X(.2)), "REFUSED", "var(--breach)");
+  return g;
+}
+function buildHeroTimeline(gsap, root, data, scale = .4, onStep) {
+  const g = root._scene, tl = gsap.timeline({ paused: true }), hz = data.hero;
+  const travel = (sec) => Math.min(2.4, Math.max(.35, sec * scale));
+  const step = (i) => () => onStep && onStep(i);
+  tl.call(step(0), null, 0);
+  g.good.forEach((gr, i) => gr.querySelectorAll(".st-main").forEach((p) => tl.fromTo(p, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: .7, ease: "power3.out" }, .1 + i * .2)));
+  tl.call(step(1), null, 1.8);
+  g.bad.querySelectorAll(".st-main").forEach((p) => tl.fromTo(p, { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: .6, ease: "power3.out" }, 1.8));
+  tl.fromTo(g.badLbl, { opacity: 0 }, { opacity: 1, duration: .4 }, 2.0);
+  tl.fromTo(g.wash, { opacity: 0, scaleX: 0 }, { opacity: .35, scaleX: 1, duration: .6, ease: "expo.inOut", transformOrigin: "0% 50%" }, 2.5);
+  tl.to(g.bad, { opacity: 0, duration: .45, ease: "power3.out" }, 2.95);
+  g.parts.forEach((c, i) => { tl.fromTo(c, { opacity: 0, x: 0, y: 0 }, { opacity: .9, duration: .05 }, 2.95); tl.to(c, { x: c._dx, y: c._dy, opacity: 0, duration: .9, ease: "power3.out" }, 3.0 + i * .02); });
+  tl.to(g.wash, { opacity: .12, duration: .5 }, 3.2);
+  const t1 = 3.35, d1 = travel(hz.lasnaTs - hz.originTs), d2 = travel(hz.appliedTs - hz.lasnaTs);
+  const pp = { p: 0 }, pq = { p: 0 };
+  tl.set(g.dot, { opacity: 1 }, t1);
+  tl.call(step(2), null, t1);
+  tl.fromTo(pp, { p: 0 }, { p: 1, duration: d1, ease: "expo.inOut", onUpdate: () => along(g.dot, g.l1, pp.p) }, t1);
+  tl.fromTo(g.react, { opacity: 0 }, { opacity: 1, duration: .3 }, t1 + d1 - .1);
+  tl.fromTo(pq, { p: 0 }, { p: 1, duration: d2, ease: "expo.inOut", onUpdate: () => along(g.dot, g.l2, pq.p) }, t1 + d1);
+  const tp = t1 + d1 + d2;
+  tl.to(g.dot, { opacity: 0, duration: .2 }, tp);
+  tl.call(step(3), null, tp);
+  tl.fromTo(g.paused, { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: .35, ease: "back.out(2)", transformOrigin: "50% 50%" }, tp);
+  const ctr = { v: 0 };
+  tl.set(g.ctr, { opacity: 1 }, tp + .1);
+  tl.fromTo(ctr, { v: 0 }, { v: hz.latency_s, duration: 1.6, ease: "none", onUpdate: () => { g.ctr.textContent = "+" + Math.round(ctr.v) + " s"; } }, tp + .1);
+  const ta = tp + 1.8;
+  tl.call(step(4), null, ta);
+  tl.fromTo(g.arrow, { opacity: 0, x: 220 }, { opacity: 1, x: 0, duration: .5, ease: "power3.out" }, ta);
+  tl.to(g.arrow, { x: 28, duration: .35, ease: "back.out(2)" }, ta + .5);
+  tl.fromTo(g.refused, { opacity: 0, scale: 1.6 }, { opacity: 1, scale: 1, duration: .35, ease: "back.out(2)", transformOrigin: "50% 50%" }, ta + .5);
+  tl.call(step(5), null, ta + 1.1);
+  return tl;
+}
+(function hero() {
+  const svg = $("#hero-svg"), hz = D.hero, list = $("#hero-steps");
+  const steps = [
+    ["Curator X acts on Unichain Sepolia: each Action leaves a streak on its record", null],
+    ["The breach latches on Unichain Sepolia, block " + hz.originBlock, [hz.originChain, hz.originTx]],
+    ["The reactive contract reacts on Lasna, +" + (hz.lasnaTs - hz.originTs) + " s", [5318007, hz.lasnaTx]],
+    ["The Hub on Ethereum Sepolia applies it: curator X is paused, +" + hz.latency_s + " s", [hz.destChain, hz.appliedTx]],
+    ["The agent wakes and allocates: refused, HubPaused", [hz.destChain, hz.refusedTx]],
+  ];
+  steps.forEach(([t, l]) => list.append(h("li", {}, h("span", {}, t), l ? h("a", { href: txUrl(l[0], l[1]), target: "_blank", rel: "noopener", title: l[1] }, short(l[1]) + " ↗") : h("span"))));
+  const lis = [...list.children], cap = $("#hero-cap");
+  const date = new Date(hz.originTs * 1000).toISOString().slice(0, 10);
+  const onStep = (i) => { lis.forEach((li, j) => li.classList.toggle("on", j <= Math.min(i, 4))); cap.style.opacity = i >= 5 ? 1 : 0; };
+  cap.innerHTML = ""; cap.append(h("b", { text: hz.latency_s + " s" }), " from a breach on Unichain Sepolia to a pause on Ethereum Sepolia (live, " + date + ").");
+  cap.style.transition = "opacity .6s";
+  let tl = null, slow = false, built = 0;
+  const build = () => {
+    const W = svg.clientWidth < 520 ? 380 : 640; if (W === built && tl) return; built = W;
+    svg._scene = buildHeroScene(svg, D, W);
+    if (tl) tl.kill(); tl = buildHeroTimeline(G(), svg, D, .4, onStep);
+  };
+  build();
+  const endState = () => { tl.progress(1); onStep(5); };
+  const play = () => { tl.timeScale(slow ? .25 : 1); if (tl.restart) tl.restart(); };
+  $("#hero-replay").onclick = () => { build(); play(); };
+  $("#hero-slow").onclick = (e) => { slow = !slow; e.currentTarget.setAttribute("aria-pressed", slow); play(); };
+  if (RM) {
+    const nx = $("#hero-next"); nx.hidden = false; let k = 0; const marks = [1.7, 3.3, 5.2, 7, 9.5];
+    endState();
+    nx.onclick = () => { if (k === 0) tl.progress(0); tl.pause(); const t = marks[k % marks.length]; tl.progress(Math.min(1, t / tl.duration())); k++; };
+    $("#hero-replay").onclick = () => { k = 0; endState(); };
+    return;
+  }
+  let probe = [], last = 0, slowF = 0;
+  const pf = (n) => { if (last) { if (n - last > 20) slowF++; } last = n; probe.push(n); if (probe.length < 90) requestAnimationFrame(pf); else if (slowF >= 2 && PARTICLES > 6) { PARTICLES = 6; } };
+  requestAnimationFrame(pf);
+  let started = false;
+  new IntersectionObserver((es) => { if (!started && es[0].isIntersecting) { started = true; setTimeout(play, 300); } }, { threshold: .3 }).observe(svg);
+  let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { const before = built; build(); if (built !== before) endState(); }, 150); });
+})();
+
+/* ---------------- the run, second by second ---------------- */
+(function run() {
+  const hz = D.hero, ag = D.agentLog, ex = D.exit, plans = D.plan;
+  const doneTs = hz.originTs + ex.latency_s;
+  const ev = [];
+  plans.filter((p) => p.delivered).forEach((p) => ev.push({ t: p.noteTs, k: "plan", label: `Plan deposit DONE, epoch ${p.epoch}`, d: `+${p.latency_s} s after EpochRecorded`, tx: [[1301, p.noteTx, "plan note"], [1301, p.originTx, "EpochRecorded"], [5318007, p.lasnaTx, "reaction"]], more: "The standing plan runs on the vault's own epoch, sent by the reactive contract." }));
+  if (ag) {
+    ev.push({ t: ag.start, k: "agent", label: "Agent online", d: "reference agent", tx: [], more: "The reference agent starts allocating into X_B on Ethereum Sepolia (its run log)." });
+    ev.push({ t: hz.lastOkTs, k: "agent", label: `${ag.allocations.length} agent allocations land`, d: `last nonce ${hz.lastOkNonce}`, tx: ag.allocations.map((a, i) => [ag.chain, a[1], "allocation " + (i + 1)]), more: "Each one passes the Covenant's guard." });
+    ev.push({ t: ag.stop, k: "agent", label: "Agent stopped", d: "offline", tx: [], more: "From here on the agent sends nothing until after the pause is delivered." });
+  } else {
+    ev.push({ t: hz.lastOkTs, k: "agent", label: "Agent's last allocation lands; agent stopped before the breach", d: `nonce ${hz.lastOkNonce}`, tx: [[hz.destChain, hz.lastOkTx, "last allocation"]], more: "" });
+  }
+  ev.push({ t: hz.originTs, k: "breach", label: "Breach on Unichain Sepolia", d: "BreachLatched · block " + hz.originBlock, tx: [[hz.originChain, hz.originTx, "breach"]], more: "Curator X leaves its range on vault X_A. The local guard on this chain refuses at once." });
+  ev.push({ t: hz.lasnaTs, k: "rc", label: "Reactive contract reacts on Lasna", d: "+" + (hz.lasnaTs - hz.originTs) + " s", tx: [[5318007, hz.lasnaTx, "reaction"]], more: "It updates the curator's record and sends rcConduct to Ethereum Sepolia." });
+  ev.push({ t: hz.appliedTs, k: "pause", label: "Paused on Ethereum Sepolia", d: "+" + hz.latency_s + " s", tx: [[hz.destChain, hz.appliedTx, "Applied"]], more: "The Hub's mirror now reports curator X paused for this Covenant." });
+  if (ag && ag.wake) ev.push({ t: ag.wake, k: "agent", label: "Agent wakes", d: "online", tx: [], more: "Its dry run already reports HubPaused; it sends once to prove the refusal on chain." });
+  ev.push({ t: hz.refusedTs, k: "breach", label: "Agent allocation refused: HubPaused", d: "nonce " + hz.refusedNonce, tx: [[hz.destChain, hz.refusedTx, "refused"]], more: "Reverted with selector " + hz.refusedSelector + " (HubPaused)." });
+  plans.filter((p) => p.withheld && p.pausedAtOrigin).forEach((p) => ev.push({ t: p.originTs, k: "pause", label: `Plan for epoch ${p.epoch} withheld`, d: "no callback spent", tx: [[1301, p.originTx, "EpochRecorded"], [5318007, p.lasnaTx, "reaction, no plan sent"]], more: "The reactive contract holds a due plan while the Covenant is paused." }));
+  ev.push({ t: doneTs, k: "exit", label: "Patient exit DONE", d: "+" + Math.round(ex.latency_s / 60) + " min", tx: [[1301, ex.processTx, "processBreach, block " + ex.processBlock], [1301, ex.doneTx, "ExitDone"]], more: `Exactly the owner's ${units(ex.noteA, 6, 6)} mUSDC + ${units(ex.noteB, 18, 4)} mWETH, in kind; no other recipient. It landed after the ${ex.dripBlocks}-block drip.` });
+  ev.sort((a, b) => a.t - b.t);
+  // piecewise-compressed axis: each gap gets a width by sqrt of its length, long gaps are drawn as breaks
+  const BRK = 900; let u = 0; const pos = [0];
+  for (let i = 1; i < ev.length; i++) { const g = ev[i].t - ev[i - 1].t; u += Math.min(7, 1 + Math.sqrt(Math.max(0, g)) / 4); pos.push(u); }
+  const total = u, pct = (x) => (x / total) * 100;
+  const axis = $("#axis"), head = $("#playhead");
+  const cls = (k) => "k-" + k;
+  if (ag) { const a = ev.findIndex((e) => e.t === ag.start), b = ev.findIndex((e) => e.t === ag.stop); axis.append(h("div", { class: "seg-on", style: `left:${pct(pos[a])}%;width:${pct(pos[b] - pos[a])}%`, title: "agent online" }));
+    const i0 = ev.findIndex((e) => e.t === ag.start), i1 = ev.findIndex((e) => e.t === hz.lastOkTs);
+    ag.allocations.forEach((al) => { const f = (al[0] - ev[i0].t) / Math.max(1, ev[i1].t - ev[i0].t); axis.append(h("div", { class: "tick", style: `left:${pct(pos[i0] + (pos[i1] - pos[i0]) * Math.min(1, f))}%` })); }); }
+  ev.forEach((e, i) => { axis.append(h("div", { class: "ev " + cls(e.k), style: `left:${pct(pos[i])}%`, title: e.label })); axis.append(h("div", { class: "num", style: `left:${pct(pos[i])}%`, text: i + 1 })); });
+  for (let i = 1; i < ev.length; i++) { const g = ev[i].t - ev[i - 1].t; if (g >= BRK) { const m = (pos[i] + pos[i - 1]) / 2; axis.append(h("div", { class: "brk", style: `left:${pct(m)}%` }, "//", h("small", { text: dur(g) }))); } }
+  [0, ev.findIndex((e) => e.t === hz.originTs), ev.length - 1].forEach((i) => axis.append(h("div", { class: "clock", style: `left:${Math.min(92, Math.max(6, pct(pos[i])))}%`, text: utc(ev[i].t) + " UTC" })));
+  const declutter = () => { [".brk small", ".clock"].forEach((sel) => { let lastR = -1e9; axis.querySelectorAll(sel).forEach((e) => { e.style.visibility = ""; const r = e.getBoundingClientRect(); if (r.left < lastR + 6) e.style.visibility = "hidden"; else lastR = r.right; }); }); };
+  requestAnimationFrame(declutter); let dt0; addEventListener("resize", () => { clearTimeout(dt0); dt0 = setTimeout(declutter, 150); });
+  const list = $("#events"); const rows = ev.map((e, i) => {
+    const more = h("div", { class: "more" }, e.more ? h("span", { text: e.more }) : null, e.tx.map(([c, x, l]) => txLine(c, x, l)));
+    const li = h("li", { class: "future" }, h("details", {}, h("summary", {}, h("span", { class: "t", text: utc(e.t) }), h("span", { class: "k", style: `background:var(--${{ plan: "gold", agent: "lane-b", breach: "breach", rc: "reagent", pause: "pause", exit: "exit" }[e.k]})` }), h("span", {}, h("span", { class: "muted mono", text: (i + 1) + "  " }), e.label), h("span", { class: "d", text: e.d })), more));
+    list.append(li); return li; });
+  const tAt = (x) => { if (x <= 0) return ev[0].t; for (let i = 1; i < pos.length; i++) if (x <= pos[i]) return ev[i - 1].t + (ev[i].t - ev[i - 1].t) * (x - pos[i - 1]) / (pos[i] - pos[i - 1]); return ev[ev.length - 1].t; };
+  const stEl = $("#state");
+  const badge = (txt, c) => h("span", { class: "badge " + c, text: txt });
+  let cur = -1, x = 0;
+  function render() {
+    const t = tAt(x); head.style.left = pct(x) + "%";
+    let idx = 0; for (let i = 0; i < ev.length; i++) if (pos[i] <= x + 1e-6) idx = i;
+    rows.forEach((r, i) => { r.classList.toggle("future", pos[i] > x + 1e-6); r.classList.toggle("now", i === idx); });
+    const online = ag ? (t >= ag.start && t < ag.stop) || (ag.wake && t >= ag.wake && t < (ag.wakeStop || ag.wake + 15)) : t < hz.lastOkTs;
+    stEl.replaceChildren(h("h3", { text: "State at " + utc(t) + " UTC" }),
+      h("div", { class: "st" }, "Agent", online ? badge("online", "b-ok") : badge("offline", "b-off")),
+      h("div", { class: "st" }, "Covenant on Unichain Sepolia", t >= hz.originTs ? badge("paused", "b-pause") : badge("active", "b-ok")),
+      h("div", { class: "st" }, "Covenant on Ethereum Sepolia", t >= hz.appliedTs ? badge("paused", "b-pause") : badge("active", "b-ok")),
+      h("div", { class: "st" }, "Standing plan", t >= hz.originTs ? badge("withheld", "b-pause") : badge("running", "b-gold")),
+      h("div", { class: "st" }, "Patient exit", t >= doneTs ? badge("done", "b-ok") : t >= hz.originTs ? badge("armed", "b-breach") : badge("none", "b-off")),
+      h("p", { class: "note", style: "margin:4px 0 0", text: ev[idx].label }));
+    axis.setAttribute("aria-valuenow", Math.round(pct(x)));
+    axis.setAttribute("aria-valuetext", `${ev[idx].label}, ${utc(t)} UTC`);
+    $("#run-now").textContent = utc(t) + " UTC";
+  }
+  const go = (nx) => { x = Math.max(0, Math.min(total, nx)); render(); };
+  const nearest = (dir) => { if (dir > 0) { for (let i = 0; i < pos.length; i++) if (pos[i] > x + 1e-6) return pos[i]; return total; } for (let i = pos.length - 1; i >= 0; i--) if (pos[i] < x - 1e-6) return pos[i]; return 0; };
+  const fromPointer = (e) => { const r = axis.getBoundingClientRect(); go(((e.clientX - r.left) / r.width) * total); };
+  axis.addEventListener("pointerdown", (e) => { stop(); axis.setPointerCapture(e.pointerId); fromPointer(e); const mv = (m) => fromPointer(m); const up = () => { axis.removeEventListener("pointermove", mv); axis.removeEventListener("pointerup", up); }; axis.addEventListener("pointermove", mv); axis.addEventListener("pointerup", up); });
+  axis.addEventListener("keydown", (e) => { const m = { ArrowRight: () => nearest(1), ArrowLeft: () => nearest(-1), Home: () => 0, End: () => total }[e.key]; if (m) { e.preventDefault(); stop(); go(m()); } });
+  $("#run-prev").onclick = () => { stop(); go(nearest(-1)); }; $("#run-next").onclick = () => { stop(); go(nearest(1)); };
+  let raf = 0, playing = false; const btn = $("#run-play");
+  function stop() { playing = false; cancelAnimationFrame(raf); btn.textContent = "Play the run"; }
+  btn.onclick = () => { if (playing) return stop(); if (x >= total - 1e-6) x = 0; playing = true; btn.textContent = "Pause"; let prev = performance.now(); const stp = (n) => { const dt = (n - prev) / 1000; prev = n; go(x + (dt / 20) * total); if (x < total && playing) raf = requestAnimationFrame(stp); else stop(); }; raf = requestAnimationFrame(stp); };
+  if (RM) btn.textContent = "Play the run";
+  go(total);
+})();
+
+/* ---------------- latency beeswarm ---------------- */
+(function latency() {
+  const rowsEl = $("#lat-rows"), tip = $("#tip");
+  const order = ["AA", "AB", "BA", "BB"], ticks = [1, 2, 5, 10, 20, 60];
+  const sx = (v, W, L, R) => L + (Math.log(1 + v) / Math.log(61)) * (W - L - R);
+  const built = [];
+  function swarm(c, W, rad) {
+    const L = 6, R = 10, pts = [];
+    const byV = {}; c.loops.forEach((lp) => (byV[lp[2]] = byV[lp[2]] || []).push(lp));
+    const gap = rad * 2 + 1.5;
+    for (const v in byV) { const arr = byV[v], x0 = sx(+v, W, L, R), bin = sx(+v + .5, W, L, R) - sx(Math.max(0, +v - .5), W, L, R), sp = Math.max(bin * .9, Math.sqrt(arr.length) * gap * 1.1);
+      arr.forEach((lp, i) => { const f = arr.length === 1 ? 0 : i / (arr.length - 1) - .5; pts.push({ lp, x: Math.max(L, Math.min(W - R, x0 + f * sp)) }); }); }
+    pts.sort((a, b) => a.x - b.x); const placed = [];
+    for (const p of pts) { let y = 0; for (let k = 0; k < 200; k++) { const cand = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (gap * .55); if (placed.every((q) => Math.hypot(q.x - p.x, q.y - cand) >= gap)) { y = cand; break; } } p.y = y; placed.push(p); }
+    return pts;
+  }
+  function draw() {
+    rowsEl.replaceChildren(); built.length = 0;
+    const W = Math.max(280, rowsEl.clientWidth), rad = W < 520 ? 3.8 : 5;
+    order.forEach((id) => {
+      const c = D.con[id]; if (!c) return;
+      const pts = swarm(c, W, rad); const ext = Math.max(rad * 2, ...pts.map((p) => Math.abs(p.y))) + rad + 4, H = ext * 2 + 22, cy = ext;
+      const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, height: H, tabindex: 0, role: "img", "aria-label": `${id}: ${c.delivered} of ${c.attempted} delivered, median ${c.median} s, p95 ${c.p95} s, max ${c.max} s. Use arrow keys to step through loops.` });
+      ticks.forEach((t) => { const X = sx(t, W, 6, 10); svg.append(s("line", { x1: X, x2: X, y1: 2, y2: H - 18, stroke: "var(--rule)" }), s("text", { x: X, y: H - 4, "text-anchor": "middle", class: "axis-t", text: t + " s" })); });
+      const mk = (v, col, w) => { const X = sx(v, W, 6, 10); svg.append(s("line", { x1: X, x2: X, y1: cy - ext + 2, y2: cy + ext - 2, stroke: col, "stroke-width": w })); };
+      mk(c.p95, "var(--ink-2)", 2); mk(c.median, "var(--gold)", 3);
+      const col = c.to === 1301 ? "var(--lane-a)" : "var(--lane-b)";
+      const dots = pts.sort((a, b) => a.lp[1] - b.lp[1]).map((p, i) => { const d = s("circle", { class: "d", cx: p.x.toFixed(1), cy: (cy + p.y).toFixed(1), r: rad, fill: col, stroke: "var(--stone-2)", "stroke-width": 1, style: `transition-delay:${(i * .03).toFixed(2)}s` }); d._lp = p.lp; svg.append(d); return d; });
+      const head = h("div", { class: "lat-head" }, h("b", {}, `${id} · ${CH[c.from][0]} → ${CH[c.to][0]}`), h("span", { text: `${c.delivered}/${c.attempted} delivered · median ${c.median} s · p95 ${c.p95} s · max ${c.max} s` }));
+      const row = h("div", { class: "lat-row" }, head, svg); rowsEl.append(row); built.push(row);
+      let ai = -1;
+      const show = (d, ev) => { dots.forEach((x) => x.classList.remove("hl")); d.classList.add("hl"); openTip(c, d._lp, ev || d); };
+      svg.addEventListener("pointermove", (e) => { if (e.pointerType !== "mouse") return; const t = e.target.closest("circle.d"); if (t) show(t, e); });
+      svg.addEventListener("click", (e) => { const t = e.target.closest("circle.d"); if (t) { show(t, e); tip.dataset.pin = "1"; } });
+      svg.addEventListener("pointerleave", () => { if (!tip.dataset.pin) hideTip(); });
+      svg.addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); ai = (ai + (e.key === "ArrowRight" ? 1 : -1) + dots.length) % dots.length; show(dots[ai]); tip.dataset.pin = "1"; } if (e.key === "Escape") hideTip(true); });
+      svg.addEventListener("blur", () => setTimeout(() => { if (!tip.contains(document.activeElement)) hideTip(true); }, 50));
+    });
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .3 });
+    built.forEach((r) => (RM ? r.classList.add("in") : io.observe(r)));
+  }
+  function openTip(c, lp, at) {
+    const [seq, ots, lat, otx, ltx, dtx, oblk] = lp;
+    tip.replaceChildren(h("div", { class: "r" }, h("b", { text: "Action seq " + seq }), h("span", { class: "mono", text: lat + " s" })),
+      h("div", { class: "r muted" }, h("span", { text: "origin block " + oblk }), h("span", { class: "mono", text: utc(ots) + " UTC" })),
+      h("div", { class: "links" }, h("a", { href: txUrl(c.from, otx), target: "_blank", rel: "noopener" }, "origin · " + CH[c.from][0] + " " + short(otx) + " ↗"),
+        h("a", { href: txUrl(5318007, ltx), target: "_blank", rel: "noopener" }, "reaction · Lasna " + short(ltx) + " ↗"),
+        h("a", { href: txUrl(c.to, dtx), target: "_blank", rel: "noopener" }, "Applied · " + CH[c.to][0] + " " + short(dtx) + " ↗")));
+    tip.classList.add("show");
+    const r = at.getBoundingClientRect ? at.getBoundingClientRect() : { left: at.clientX, top: at.clientY, width: 0, height: 0 };
+    const tw = tip.offsetWidth, th = tip.offsetHeight; let L = r.left + r.width / 2 - tw / 2, T = r.top - th - 12;
+    if (T < 64) T = r.top + r.height + 12; L = Math.max(16, Math.min(innerWidth - tw - 16, L));
+    tip.style.left = L + "px"; tip.style.top = T + "px";
+  }
+  function hideTip(force) { if (force) delete tip.dataset.pin; tip.classList.remove("show"); document.querySelectorAll("circle.d.hl").forEach((d) => d.classList.remove("hl")); }
+  document.addEventListener("pointerdown", (e) => { if (!tip.contains(e.target) && !e.target.closest("circle.d")) hideTip(true); });
+  addEventListener("scroll", () => { if (tip.classList.contains("show")) hideTip(true); }, { passive: true });
+  draw(); let rt, lw = innerWidth; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (innerWidth !== lw) { lw = innerWidth; draw(); } }, 150); });
+  const tb = h("table", {}, h("thead", {}, h("tr", {}, ["Path", "Seq", "Origin (UTC)", "Seconds", "Origin tx", "Lasna tx", "Destination tx"].map((t) => h("th", { scope: "col", text: t })))), h("tbody", {},
+    order.flatMap((id) => D.con[id].loops.map((lp) => h("tr", {}, h("td", { text: id }), h("td", { text: lp[0] }), h("td", { text: utc(lp[1]) }), h("td", { text: lp[2] }),
+      [[D.con[id].from, lp[3]], [5318007, lp[4]], [D.con[id].to, lp[5]]].map(([c, x]) => h("td", {}, h("a", { href: txUrl(c, x), target: "_blank", rel: "noopener" }, short(x)))))))));
+  $("#lat-table").append(tb);
+})();
+
+/* ---------------- architecture ---------------- */
+(function design() {
+  const dp = D.deploy, svg = $("#arch"), card = $("#node-card"), cap = $("#step-cap");
+  const N = {
+    owner: { t: "Owner", s: "the depositor", d: [480, 48], m: [118, 40], role: "Sets the rules on both chains and may loosen them. leave() is always open.", a: [[1301, dp.owner]] },
+    agent: { t: "Agent key", s: "AI or script", d: [720, 48], m: [302, 40], role: "May tighten rules and allocate within the caps, into the allowlist. Never chooses a recipient.", a: [[11155111, dp.agent]] },
+    covA: { t: "Covenant", s: "Unichain Sepolia", d: [200, 175], m: [70, 150], role: "Holds the owner's vault shares. Every allocate path runs the local guard; tokens leave only to the owner or into a vault.", a: [[1301, dp.covenant]] },
+    covB: { t: "Covenant", s: "Ethereum Sepolia", d: [1000, 175], m: [350, 150], role: "The same Covenant address on the second chain, with the same rules.", a: [[11155111, dp.covenant]] },
+    hubA: { t: "ReagentHub", s: "same on both chains", d: [200, 300], m: [70, 268], role: "Ownerless and immutable. Accepts callbacks only from this chain's proxy carrying the RC's id, mirrors the curator's record, relays exits and plan deposits.", a: [[1301, dp.hub]] },
+    hubB: { t: "ReagentHub", s: "same on both chains", d: [1000, 300], m: [350, 268], role: "One address on both chains (CREATE2). On this chain it is the mirror that refused the agent in the live run.", a: [[11155111, dp.hub]] },
+    pxA: { t: "Callback proxy", s: "Unichain Sepolia", d: [200, 425], m: [70, 386], role: "Reactive's proxy on this chain. It delivers the RC's callbacks and bills the Hub.", a: [[1301, dp.proxy["1301"]]] },
+    pxB: { t: "Callback proxy", s: "Ethereum Sepolia", d: [1000, 425], m: [350, 386], role: "Reactive's proxy on this chain. It delivers the RC's callbacks and bills the Hub.", a: [[11155111, dp.proxy["11155111"]]] },
+    vA: { t: "Vault + hook", s: "Touchstone X_A", d: [200, 560], m: [70, 510], role: "The curator's Touchstone vault. Its hook latches breaches; the RC reads its logs: Action, BreachLatched, EpochRecorded, Retired.", a: [[1301, dp.vaults.XA.address]] },
+    vB: { t: "Vault + hook", s: "Touchstone X_B", d: [1000, 560], m: [350, 510], role: "Curator X's vault on the second chain, bound to the same curator id.", a: [[11155111, dp.vaults.XB.address]] },
+    rc: { t: "ReagentRC", s: "Lasna", d: [600, 250], m: [210, 236], role: "The reactive contract. Subscribes to vault and Hub logs on both chains, keeps the cross-chain record, decides what to send.", a: [[5318007, dp.lasna.rc]] },
+    ext: { t: "RcExt", s: "reaction logic", d: [600, 380], m: [210, 352], role: "Reaction logic, reached only by delegatecall from inside react(). A direct call reverts.", a: [[5318007, dp.lasna.rcext]] },
+    b6: { t: "RcB6", s: "budget split", d: [600, 500], m: [210, 468], role: "Moves each chain's budget lower-before-raise so the sum never passes the cap.", a: [[5318007, dp.lasna.rcb6]] },
+  };
+  const E = [
+    ["vA", "rc", [0], "Action · BreachLatched · EpochRecorded"], ["vB", "rc", [0], "the same logs"],
+    ["covA", "hubA", [1], "note"], ["covB", "hubB", [1], "note"], ["hubA", "rc", [1], "Note · Applied"], ["hubB", "rc", [1], "Note · Applied"],
+    ["rc", "ext", [1, 2], "delegatecall"], ["ext", "b6", [2], "B6 split"],
+    ["rc", "pxA", [3, 5], "rcConduct · rcExit · …"], ["rc", "pxB", [3], "rcConduct · rcBudget · …"], ["pxA", "hubA", [3, 5], ""], ["pxB", "hubB", [3], ""],
+    ["hubA", "covA", [4, 5], "paused?"], ["hubB", "covB", [4], "paused?"], ["agent", "covB", [4], "agentAllocate ✕", "red"], ["owner", "covA", [], "setRules"],
+    ["covA", "vA", [5], "withdraw", null, "left"], ["covA", "owner", [5], "tokens, in kind", "gold"],
+  ];
+  const STEPS = [
+    ["Observe", "The reactive contract subscribes to the curator's vault logs on both chains: every Action, every latched breach, every epoch."],
+    ["Remember", "It keeps what no single chain can see: the curator's breach record across vaults and chains, and each depositor's exposure per curator."],
+    ["Evaluate", "Each reaction checks the depositor's rules against that record. The budget split across chains runs in RcB6."],
+    ["React", "It sends callbacks through each chain's callback proxy to the Hub, which mirrors the record."],
+    ["Refuse", "Every allocate path asks the Hub first. Paused means refused, for the owner, the agent and the plan alike."],
+    ["Exit", "After the forfeit drip, the Hub relays the exit and the Covenant withdraws, in kind, to the owner only."],
+  ];
+  const stepper = $("#stepper"); const sb = STEPS.map(([t], i) => { const b = h("button", { type: "button", "aria-pressed": "false", onclick: () => setStep(i, true) }, h("span", { text: i + 1 }), t); stepper.append(b); return b; });
+  let mode = "", nodesEl = {}, edgesEl = [], cur = 0, sel = null, zoomG;
+  function anchor(a, b, w, hh) { const dx = b[0] - a[0], dy = b[1] - a[1]; if (Math.abs(dx) > Math.abs(dy) * 1.25) return [[a[0] + Math.sign(dx) * w / 2, a[1]], "h"]; return [[a[0], a[1] + Math.sign(dy) * hh / 2], "v"]; }
+  function build() {
+    const m = innerWidth < 640 ? "m" : "d"; if (m === mode) return; mode = m;
+    const W = m === "d" ? 1200 : 420, H = m === "d" ? 620 : 560, w = m === "d" ? 220 : 124, hh = m === "d" ? 64 : 54, fs = m === "d" ? 19 : 14, ss = m === "d" ? 13 : 10;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.replaceChildren(svg.querySelector("title")); zoomG = s("g", { class: "zoom" }); svg.append(zoomG);
+    const heads = m === "d" ? [[200, 124, "UNICHAIN SEPOLIA · 1301"], [600, 196, "REACTIVE LASNA"], [1000, 124, "ETHEREUM SEPOLIA · 11155111"]] : [[70, 100, "UNICHAIN"], [210, 186, "LASNA"], [350, 100, "ETH SEPOLIA"]];
+    heads.forEach(([x, y, t]) => zoomG.append(s("text", { x, y, class: "colhead", "font-size": ss, text: t })));
+    const P = (k) => N[k][m];
+    edgesEl = E.map(([a, b, st, lab, c, side]) => {
+      const pa = P(a), pb = P(b); let A, B, c1, c2;
+      if (side === "left") { const off = m === "d" ? 64 : (pa[0] - w / 2) - 2; A = [pa[0] - w / 2, pa[1]]; B = [pb[0] - w / 2, pb[1]]; c1 = [A[0] - off, A[1]]; c2 = [B[0] - off, B[1]]; }
+      else { const [A0, ka] = anchor(pa, pb, w, hh), [B0, kb] = anchor(pb, pa, w, hh); A = A0; B = B0; const k = .45; c1 = ka === "h" ? [A[0] + (B[0] - A[0]) * k, A[1]] : [A[0], A[1] + (B[1] - A[1]) * k]; c2 = kb === "h" ? [B[0] + (A[0] - B[0]) * k, B[1]] : [B[0], B[1] + (A[1] - B[1]) * k]; }
+      const d = `M${A[0]} ${A[1]} C${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${B[0]} ${B[1]}`;
+      const g = s("g", { class: "edge" + (c ? " " + c : "") }); g.append(s("path", { class: "bg", d }), s("path", { class: "fg", d, pathLength: 1 }));
+      if (lab && m === "d") { const mx = side ? A[0] - 62 : (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2; g.append(s("text", { x: mx, y: side ? my : my - 6, "text-anchor": "middle", "font-size": 13, transform: side ? `rotate(-90 ${mx} ${my})` : null, text: lab })); }
+      g._st = st; g._ab = [a, b]; zoomG.append(g); return g;
+    });
+    nodesEl = {};
+    for (const k in N) { const [x, y] = P(k), n = N[k]; const g = s("g", { class: "node", tabindex: 0, role: "button", "aria-label": n.t + ", " + n.s }); g.append(s("rect", { x: x - w / 2, y: y - hh / 2, width: w, height: hh, rx: 10 }), s("text", { x, y: y - 2, "font-size": fs, text: n.t }), s("text", { class: "s", x, y: y + fs - 1, "font-size": ss, text: n.s }));
+      g.addEventListener("click", () => select(k)); g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(k); } }); zoomG.append(g); nodesEl[k] = g; }
+    sel = null; setStep(cur); showCard(null);
+  }
+  function setStep(i, user) {
+    cur = i; sb.forEach((b, j) => b.setAttribute("aria-pressed", j === i)); cap.textContent = STEPS[i][1];
+    const live = new Set(); edgesEl.forEach((g) => { const on = g._st.includes(i); g.classList.toggle("on", on); g.classList.toggle("dim", !on); if (on) g._ab.forEach((k) => live.add(k)); });
+    for (const k in nodesEl) { nodesEl[k].classList.toggle("on", live.has(k)); nodesEl[k].classList.toggle("dim", !live.has(k) && sel !== k); }
+  }
+  function select(k) {
+    if (sel === k) { sel = null; zoomG.style.transform = ""; for (const n in nodesEl) nodesEl[n].classList.remove("sel"); setStep(cur); showCard(null); return; }
+    sel = k; for (const n in nodesEl) nodesEl[n].classList.toggle("sel", n === k);
+    const [x, y] = N[k][mode], vb = svg.viewBox.baseVal, z = 1.5; const tx = Math.max(vb.width * (1 - z), Math.min(0, vb.width / 2 - x * z)), ty = Math.max(vb.height * (1 - z), Math.min(0, vb.height / 2 - y * z));
+    if (!RM) zoomG.style.transform = `translate(${tx}px,${ty}px) scale(${z})`;
+    setStep(cur); showCard(k);
+  }
+  function showCard(k) {
+    if (!k) { card.replaceChildren(h("h3", { text: "Tap a box" }), h("p", { class: "muted", style: "margin:0", text: "Each box is a deployed contract or a key. Its card shows what it does and where it lives." }), h("p", { class: "note", style: "margin:0", text: "Hub and Covenant factory: CREATE2, one address on both origin chains." })); return; }
+    const n = N[k]; card.replaceChildren(h("h3", { text: n.t }), h("span", { class: "muted mono", text: n.s }), h("p", { style: "margin:0", text: n.role }),
+      ...n.a.map(([c, a]) => h("div", { class: "addr" }, h("div", { class: "v" }, h("code", { text: a }), copyBtn(a), h("a", { href: adUrl(c, a), target: "_blank", rel: "noopener" }, CH[c][0] + " ↗")))),
+      h("button", { class: "btn sm", type: "button", onclick: () => select(k) }, "Zoom out"));
+  }
+  build(); let rt; addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(build, 150); });
+  const wire = () => {
+    if (window.gsap && window.ScrollTrigger && !RM && innerWidth >= 980) {
+      gsap.registerPlugin(ScrollTrigger);
+      ScrollTrigger.create({ trigger: "#design .diagram", start: "top 75%", end: "bottom 25%", scrub: .6, onUpdate: (st) => { const i = Math.min(5, Math.floor(st.progress * 6)); if (i !== cur) setStep(i); } });
+    } else if (!RM) {
+      let auto = 0, timer = 0; new IntersectionObserver((es) => { if (es[0].isIntersecting && !timer) timer = setInterval(() => { setStep(++auto % 6); if (auto >= 11) clearInterval(timer); }, 2400); }, { threshold: .5 }).observe(svg);
+      stepper.addEventListener("click", () => clearInterval(timer));
+    }
+  };
+  wire();
+})();
+
+/* ---------------- rules playground ---------------- */
+function verdict(rules, hist) {
+  // hist: {A:[...], B:[...]} cells: 0 empty, 1 Action, 2 breach, 3 vault EXITED, 4 bond burn
+  const cnt = (c, v) => hist[c].filter((x) => x === v).length;
+  const breaches = cnt("A", 2) + cnt("B", 2), gone = { A: cnt("A", 3) > 0, B: cnt("B", 3) > 0 };
+  const bond = { A: Math.max(0, 100 - 30 * cnt("A", 4)), B: Math.max(0, 100 - 30 * cnt("B", 4)) };
+  const b7 = breaches >= rules.k, b3 = rules.b3 && (gone.A || gone.B), paused = b7 || b3;
+  const exposure = 40, step = 10, cap = rules.b6 / 100;
+  const tries = [["Owner allocates", "A", "owner"], ["Agent allocates", "A", "agent"], ["Standing plan deposits", "A", "plan"], ["Agent allocates", "B", "agent"]];
+  const out = tries.map(([who, c, kind]) => {
+    const local = cnt(c, 2) > 0 || gone[c];
+    let why = null;
+    if (gone[c]) why = "B3 vault gone: the vault is EXITED";
+    else if (b7 && cnt(c, 2) >= rules.k) why = "k reached on this chain: the local guard refuses";
+    else if (b3) why = "B3 vault gone on the other chain: Hub paused";
+    else if (b7) why = local ? "k reached: the local guard refuses" : "Hub paused: the record arrived from the other chain";
+    else if (bond[c] < rules.b4) why = `B4 bond below floor: ${bond[c]}% left, floor ${rules.b4}%`;
+    else if (exposure + step > cap) why = `B6 over budget: ${exposure + step}% would pass the ${cap}% cap`;
+    else if (kind !== "owner" && cnt(c, 2) > 0) why = "the vault has a breach: agent and plan stay out";
+    return { who, chain: c, ok: !why, why };
+  });
+  const exits = []; if (b7) ["A", "B"].forEach((c) => { if (cnt(c, 2) > 0) exits.push(c); }); if (b3) ["A", "B"].forEach((c) => { if (gone[c] && !exits.includes(c)) exits.push(c); });
+  return { paused, breaches, out, exits };
+}
+(function rules() {
+  const R = { k: 1, b3: true, b4: 50, b6: 6000 }; const H0 = () => ({ A: [1, 1, 1, 2, 0, 0], B: [1, 1, 0, 0, 0, 0] }); let HS = H0();
+  const NAMES = ["empty", "Action", "breach", "vault EXITED", "bond burn"], SHORT = ["·", "Action", "breach", "EXITED", "burn"];
+  const seg = (el, opts, get, set) => { el.replaceChildren(...opts.map(([v, l]) => h("button", { type: "button", "aria-pressed": String(get() === v), onclick: () => { set(v); paint(); } }, l))); };
+  const hist = $("#hist");
+  function paintHist() { hist.replaceChildren(...["A", "B"].map((c) => h("div", { class: "row" }, h("span", { class: c === "A" ? "c-a" : "c-b", text: c === "A" ? "Unichain" : "Eth Sepolia" }), HS[c].map((v, i) => h("button", { class: "cell", type: "button", "data-v": v, "aria-label": `${c === "A" ? "Unichain Sepolia" : "Ethereum Sepolia"} slot ${i + 1}: ${NAMES[v]}. Tap to change.`, onclick: () => { HS[c][i] = (HS[c][i] + 1) % 5; paint(); } }, SHORT[v]))))); }
+  function paint() {
+    seg($("#r-k"), [[1, "1"], [2, "2"], [3, "3"]], () => R.k, (v) => (R.k = v)); seg($("#r-b3"), [[true, "on"], [false, "off"]], () => R.b3, (v) => (R.b3 = v));
+    $("#r-b4").value = R.b4; $("#o-b4").textContent = R.b4 + "%"; $("#r-b6").value = R.b6; $("#o-b6").textContent = R.b6.toLocaleString("en-US") + " bps";
+    paintHist(); const j = verdict(R, HS);
+    $("#verdicts").replaceChildren(...j.out.map((o) => h("div", { class: "vd" }, h("span", { class: "who" }, o.who, " ", h("span", { class: "chip " + (o.chain === "A" ? "c-a" : "c-b") }, h("i", { class: "dot" }), o.chain === "A" ? "Unichain Sepolia" : "Ethereum Sepolia")), h("span", { class: "badge " + (o.ok ? "b-ok" : "b-breach"), text: o.ok ? "allowed" : "refused" }), o.why ? h("span", { class: "why", text: o.why }) : null)));
+    $("#exitline").textContent = j.exits.length ? `A patient exit arms from curator X's breached vault on ${j.exits.map((c) => (c === "A" ? "Unichain Sepolia" : "Ethereum Sepolia")).join(" and ")}. It runs after the forfeit drip, in kind, to the owner only.` : `No exit arms. Latched breaches: ${j.breaches} of k = ${R.k}.`;
+  }
+  $("#r-b4").addEventListener("input", (e) => { R.b4 = +e.target.value; paint(); }); $("#r-b6").addEventListener("input", (e) => { R.b6 = +e.target.value; paint(); });
+  $("#hist-reset").onclick = () => { HS = { A: [0, 0, 0, 0, 0, 0], B: [0, 0, 0, 0, 0, 0] }; paint(); };
+  const out = $("#agent-out");
+  const tries = [
+    ["k − 1", () => R.k > 1 ? (R.k--, true) : null, true], ["k + 1", () => false, false], ["B3 off", () => false, false], ["B3 on", () => (R.b3 ? null : (R.b3 = true, true)), true],
+    ["B4 floor + 10", () => R.b4 < 100 ? (R.b4 = Math.min(100, R.b4 + 10), true) : null, true], ["B4 floor − 10", () => false, false],
+    ["B6 − 1,000", () => R.b6 > 0 ? (R.b6 = Math.max(0, R.b6 - 1000), true) : null, true], ["B6 + 1,000", () => false, false],
+  ];
+  $("#agent-btns").append(...tries.map(([l, f, tight]) => h("button", { class: "btn sm", type: "button", onclick: () => { const r = f(); out.innerHTML = ""; if (r === true) { out.append(h("span", { class: "badge b-ok", text: "accepted" }), " Tightening is allowed: " + l + "."); paint(); } else if (r === null) out.append(h("span", { class: "badge b-off", text: "no change" }), " Already as strict as it goes."); else out.append(h("span", { class: "badge b-breach", text: "refused" }), " The agent may only tighten (I-TIGHT)."); } }, "Agent: " + l)));
+  paint();
+})();
+
+/* ---------------- tests ---------------- */
+(function tests() {
+  const T = D.tests, mu = T.mutants, killable = mu.total - mu.equivalent;
+  const C = [[T.passed, "", `forge tests passing · ${T.failed} failed, ${T.skipped} skipped`], [T.invariants.length, "", "invariants, fuzzed 64 runs × 64 calls"], [T.attackCells.length, "", "attack cells, each beside its control"], [mu.killed, "/" + killable, `killable mutants killed · ${mu.equivalent} equivalent`]];
+  const box = $("#counters"); const nums = C.map(([n, suf, l]) => { const v = h("span", { text: RM ? n : 0 }); box.append(h("div", { class: "card ctr" }, h("div", { class: "n" }, v, suf ? h("small", { text: suf }) : null), h("div", { class: "l", text: l }))); return [v, n]; });
+  let counted = false; const count = () => { if (counted) return; counted = true; const t0 = performance.now(); const f = (n) => { const p = Math.min(1, (n - t0) / 1200), q = 1 - Math.pow(1 - p, 3); nums.forEach(([el, v]) => (el.textContent = Math.round(v * q))); if (p < 1) requestAnimationFrame(f); }; requestAnimationFrame(f); };
+  if (!RM) new IntersectionObserver((es) => { if (es[0].isIntersecting) count(); }, { threshold: .4 }).observe(box);
+  // mutant grid
+  const grid = $("#mgrid"), tip = $("#tip"); const rows = D.mutants.slice().sort((a, b) => a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[0] < b[0] ? -1 : 1);
+  let lastArea = ""; const cells = rows.map((m, i) => { const b = h("button", { class: "mu" + (m[1] !== lastArea ? " area-start" : ""), type: "button", "aria-label": `${m[0]} ${m[3].toLowerCase()}: ${m[5]}` }); lastArea = m[1]; b._m = m; b._i = i; grid.append(b); return b; });
+  $("#mcount").textContent = `${mu.killed} killed, ${mu.equivalent} equivalent, ${mu.total} in all`;
+  const flip = () => { const areas = [...new Set(rows.map((r) => r[1]))]; cells.forEach((c) => { const d = RM ? 0 : areas.indexOf(c._m[1]) * 90 + (c._i % 12) * 12; setTimeout(() => c.classList.add(c._m[3] === "KILLED" ? "k" : "e"), d); }); };
+  if (RM) flip(); else new IntersectionObserver((es, o) => { if (es[0].isIntersecting) { flip(); o.disconnect(); } }, { threshold: .25 }).observe(grid);
+  const mdet = $("#mdetail");
+  const show = (c, touch) => { const m = c._m; const body = () => [h("div", { class: "r", style: "display:flex;justify-content:space-between;gap:8px" }, h("b", { text: m[0] }), h("span", { class: "badge " + (m[3] === "KILLED" ? "b-ok" : "b-off"), text: m[3].toLowerCase() })), h("div", { class: "muted mono", text: [m[1], m[2]].filter(Boolean).join(" · ") }), h("p", { style: "margin:6px 0", text: m[5] }), m[3] === "KILLED" ? h("div", { class: "mono", style: "font-size:11.5px;overflow-wrap:anywhere", text: "killed by " + m[4] }) : h("div", { class: "muted", style: "font-size:12.5px", text: m[6] })];
+    mdet.replaceChildren(...body()); if (!touch) return; tip.replaceChildren(h("div", { class: "r" }, h("b", { text: m[0] }), h("span", { class: "badge " + (m[3] === "KILLED" ? "b-ok" : "b-off"), text: m[3].toLowerCase() })), h("div", { class: "muted mono", text: [m[1], m[2]].filter(Boolean).join(" · ") }), h("p", { style: "margin:6px 0", text: m[5] }), m[3] === "KILLED" ? h("div", { class: "mono", style: "font-size:11.5px;overflow-wrap:anywhere", text: "killed by " + m[4] }) : h("div", { class: "muted", style: "font-size:12.5px", text: m[6] }));
+    tip.classList.add("show"); const r = c.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight; let T = r.top - th - 10; if (T < 64) T = r.bottom + 10; tip.style.left = Math.max(16, Math.min(innerWidth - tw - 16, r.left + r.width / 2 - tw / 2)) + "px"; tip.style.top = T + "px"; };
+  grid.addEventListener("pointerover", (e) => { const c = e.target.closest(".mu"); if (c && e.pointerType === "mouse") show(c); });
+  grid.addEventListener("pointerleave", () => tip.classList.remove("show"));
+  grid.addEventListener("focusin", (e) => { const c = e.target.closest(".mu"); if (c) show(c); }); grid.addEventListener("focusout", () => tip.classList.remove("show"));
+  grid.addEventListener("click", (e) => { const c = e.target.closest(".mu"); if (c) show(c, innerWidth < 980); });
+  const fl = $("#mfilters"); let fa = null;
+  const areas = [...new Set(rows.map((r) => r[1]))], files = [...new Set(rows.map((r) => r[2]).filter(Boolean))].sort();
+  const fb = (label, pred) => h("button", { type: "button", "aria-pressed": "false", onclick: (e) => { const on = fa !== label; fa = on ? label : null; fl.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", "false")); if (on) e.currentTarget.setAttribute("aria-pressed", "true"); cells.forEach((c) => c.classList.toggle("off", on && !pred(c._m))); } }, label);
+  fl.append(...areas.map((a) => fb(a, (m) => m[1] === a)), ...files.map((f) => fb(f, (m) => m[2] === f)));
+  // attacks
+  $("#atk").append(...T.attackCells.map(([id, atk, pc, kind]) => h("li", {}, h("span", { class: "pair", "aria-hidden": "true" }, h("i", { class: "r" }), h("i", { class: "g" })), h("div", {}, h("b", { text: id + (kind === "R" ? " · reactive replay" : "") }), h("span", { text: atk + " → loses." }), h("div", { class: "ctl-t", text: "Control: " + pc }))) ));
+  // live rows
+  const lv = $("#live"); const lnk = ([l, c, x]) => h("a", { href: txUrl(c, x), target: "_blank", rel: "noopener", title: x }, l + " ↗");
+  D.liveRows.filter((r) => r.pass).forEach((r) => lv.append(h("div", { class: "lv" }, h("div", { class: "h" }, h("span", { class: "pass", text: "PASS" }), h("b", { text: r.id })), h("span", { class: "w", text: r.what + "." }), h("div", { class: "ls" }, r.links.map(lnk)))));
+  const con = Object.values(D.con); lv.append(h("div", { class: "lv" }, h("div", { class: "h" }, h("span", { class: "chip", text: `delivered ${con.reduce((a, c) => a + c.delivered, 0)}/${con.reduce((a, c) => a + c.attempted, 0)}` }), h("b", { text: "L-CON" })), h("span", { class: "w", text: "Conduct loops on four paths, one dated batch. See the latency section." })));
+  const ex = D.exit; if (ex.verdict.done && ex.verdict.toOwnerExactly && ex.verdict.noOtherRecipient) lv.append(h("div", { class: "lv" }, h("div", { class: "h" }, h("span", { class: "chip", text: "exit leg" }), h("b", { text: "L-EXIT" })), h("span", { class: "w", text: "The exit leg: DONE after the drip, exact, to the owner only." }), h("div", { class: "ls" }, lnk(["processBreach", 1301, ex.processTx]), lnk(["ExitDone", 1301, ex.doneTx]))));
+  $("#inv").append(...T.invariants.map(([id, t]) => h("li", {}, h("b", { text: id }), t.charAt(0).toUpperCase() + t.slice(1))));
+})();
+
+/* ---------------- verify ---------------- */
+(function verify() {
+  const dp = D.deploy, g = $("#vgrid");
+  const A = (name, c, a, note) => h("div", { class: "addr" }, h("div", { class: "n" }, name, note ? h("small", { text: " · " + note }) : null), h("div", { class: "v" }, h("code", { text: a }), copyBtn(a), h("a", { href: adUrl(c, a), target: "_blank", rel: "noopener" }, "explorer ↗")));
+  const same = dp.sameOnBoth ? "CREATE2, one address on both chains" : null;
+  g.append(
+    h("div", { class: "card vcard" }, h("h3", {}, h("i", { style: "background:var(--lane-r)" }), "Reactive Lasna · 5318007"), A("ReagentRC", 5318007, dp.lasna.rc), A("RcExt", 5318007, dp.lasna.rcext, "delegatecall only"), A("RcB6", 5318007, dp.lasna.rcb6, "budget split")),
+    h("div", { class: "card vcard" }, h("h3", {}, h("i", { style: "background:var(--lane-a)" }), "Unichain Sepolia · 1301"), A("ReagentHub", 1301, dp.hub, same), A("CovenantFactory", 1301, dp.factory, same), A("Covenant used in the run", 1301, dp.covenant), A("Vault X_A", 1301, dp.vaults.XA.address, "curator X"), A("Vault Y_A", 1301, dp.vaults.YA.address, "curator Y"), A("Callback proxy", 1301, dp.proxy["1301"], "Reactive")),
+    h("div", { class: "card vcard" }, h("h3", {}, h("i", { style: "background:var(--lane-b)" }), "Ethereum Sepolia · 11155111"), A("ReagentHub", 11155111, dp.hub, same), A("CovenantFactory", 11155111, dp.factory, same), A("Covenant used in the run", 11155111, dp.covenant), A("Vault X_B", 11155111, dp.vaults.XB.address, "curator X"), A("Callback proxy", 11155111, dp.proxy["11155111"], "Reactive"), A("Agent key", 11155111, dp.agent)));
+})();
+
+/* ---------------- reveal + nav ---------------- */
+(function reveal() {
+  const hs = document.querySelectorAll("h2.pre"), cards = document.querySelectorAll("section .card, .lede");
+  cards.forEach((c) => { if (!c.closest(".hero")) c.classList.add("reveal"); });
+  if (RM || !("IntersectionObserver" in window)) { hs.forEach((x) => x.classList.remove("pre")); cards.forEach((c) => c.classList.add("in")); return; }
+  const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.remove("pre"); e.target.classList.add("in"); io.unobserve(e.target); } }), { threshold: .12, rootMargin: "0px 0px -6% 0px" });
+  hs.forEach((x) => io.observe(x)); cards.forEach((c) => io.observe(c));
+  const links = [...document.querySelectorAll(".nav a")]; const secs = links.map((a) => $(a.getAttribute("href")));
+  const so = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) links.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id)); }), { rootMargin: "-45% 0px -50% 0px" });
+  secs.forEach((x) => x && so.observe(x));
+})();
+window.buildHeroTimeline = buildHeroTimeline; window.buildHeroScene = buildHeroScene; window.verdict = verdict;
+});
+</script>
+</body>
+</html>
