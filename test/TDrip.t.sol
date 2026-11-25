@@ -52,13 +52,27 @@ contract TDripTest is ReagentEnv {
         return (token0.balanceOf(who), token1.balanceOf(who));
     }
 
-    function test_T_DRIP__patientMinusImmediateIsTheHoldersShareOfTheBurnedForfeit() public {
+    /// @dev One run: breach, the twin's immediate payout, the Covenant's patient exit after the drip. With `noBurn`
+    ///      the forfeit pool is zeroed at the breach (the no-burn twin): same breach, same wait, nothing to burn.
+    ///      Returns the supply after the twin's withdrawal (s1) and the supply the drip left, before the patient
+    ///      withdrawal (sd).
+    function _run(bool noBurn)
+        internal
+        returns (uint256 patient, uint256 immediate, uint256 s1, uint256 sd, uint256 pool)
+    {
         _breachNow();
+        pool = _forfeitPool(X);
+        assertGt(pool, 0, "the breach forfeited unvested pay");
+        if (noBurn) {
+            bytes32 slot = bytes32(uint256(SLOT_BOND));
+            vm.store(X.vault, slot, bytes32(uint256(vm.load(X.vault, slot)) & type(uint128).max));
+            assertEq(_forfeitPool(X), 0, "the no-burn twin: pool zeroed");
+        }
         // the immediate payout: the twin's same shares, withdrawn at the breach block
         vm.prank(twin);
         (uint256 i0, uint256 i1) = IVaultEntries(X.vault).withdraw(SH, 0, 0, twin);
-        uint256 immediate = i0 + i1;
-        uint256 s1 = _supply();
+        immediate = i0 + i1;
+        s1 = _supply();
         // the patient exit: the Hub mirror paused, the reference back, the drip waited out, then one rcExit
         (uint32 b, uint32 g,, uint64 s) = hub.conduct(IDX);
         _conduct(IDX, b + 1, g);
@@ -72,17 +86,46 @@ contract TDripTest is ReagentEnv {
         (uint8 o,,) = _exitOutcome(d);
         assertEq(o, Outcome.DONE, "the patient exit ran after the drip");
         (uint256 p0, uint256 p1) = _bal(alice);
-        uint256 patient = (p0 - a0) + (p1 - a1);
+        patient = (p0 - a0) + (p1 - a1);
         // the supply the drip left (the exit's own prologue applies the burn, then the withdrawal removes SH)
-        uint256 sd = _supply() + SH;
-        assertLt(sd, s1, "the drip burned forfeit shares");
-        uint256 burned = s1 - sd;
-        uint256 expected = immediate * burned / sd; // SH/Sd × B × (immediate / SH)
+        sd = _supply() + SH;
+        assertEq(_forfeitPool(X), 0, "the pool is spent (or was zeroed)");
+    }
+
+    /// @notice T-DRIP with its burn tied to the forfeit (s7-close r1 m-03): the same run with and without the forfeit
+    ///         pool. Everything else (the breach, the curator's pay minted during the wait, the exit) is identical,
+    ///         so the two supplies differ by exactly the pool's shares, and the patient exit's gain over its no-burn
+    ///         twin is the holder's share of that burn at the reference.
+    function test_T_DRIP__patientMinusImmediateIsTheHoldersShareOfTheBurnedForfeit() public {
+        uint256 snap = vm.snapshotState();
+        (uint256 patient, uint256 immediate, uint256 s1, uint256 sd, uint256 pool) = _run(false);
+        vm.revertToState(snap);
+        (uint256 patientNb, uint256 immediateNb, uint256 s1Nb, uint256 sdNb, uint256 poolNb) = _run(true);
+        assertEq(pool, poolNb, "the same breach forfeits the same pool");
+        assertEq(s1, s1Nb, "the same supply at the breach");
+        assertEq(immediate, immediateNb, "the same immediate payout");
+        // to 1e-6: the curator's pay minted over the wait is priced against the supply, so the twins' mints differ
+        // by a hair (measured 2.7e-7 relative)
+        assertApproxEqRel(sdNb - sd, pool, 1e12, "the drip burned the forfeit pool's shares");
+        assertGt(patient, patientNb, "the burn is the patient exit's gain");
+        assertApproxEqRel(patient - patientNb, patientNb * pool / sd, 1e12, "gain = the holder's share of the burned pool");
+        // and against the immediate exit: the net supply change over the wait (the burn less the pay minted)
+        uint256 burnedNet = s1 - sd;
         assertGt(patient, immediate, "the patient exit is worth more");
-        assertApproxEqRel(patient - immediate, expected, 1e12, "patient - immediate = the holder's share of the burn");
-        emit log_named_uint("immediate (token1 at the reference)", immediate);
-        emit log_named_uint("patient", patient);
-        emit log_named_uint("burned shares", burned);
+        assertApproxEqRel(patient - immediate, immediate * burnedNet / sd, 1e12, "patient - immediate = the holder's share");
+        emit log_named_uint("forfeit pool (shares)", pool);
+        emit log_named_uint("net supply drop over the drip", burnedNet);
+        emit log_named_uint("patient - no-burn twin", patient - patientNb);
+        emit log_named_uint("patient - immediate", patient - immediate);
+    }
+
+    /// @notice The no-burn twin as the control (s7-close r1 m-03): with the forfeit pool zeroed at the breach the
+    ///         same wait and exit do NOT beat the immediate exit (the curator's pay still dilutes): the patient exit's
+    ///         gain comes from the burned forfeit alone.
+    function test_T_DRIP__PC_noForfeitBurnedNoGain() public {
+        (uint256 patient, uint256 immediate, uint256 s1, uint256 sd,) = _run(true);
+        assertLe(patient, immediate, "no burn: the patient exit gains nothing over the immediate one");
+        assertGe(sd, s1, "no burn: the supply did not fall over the wait");
     }
 
     /// @notice The control: the same holder leaving at the breach block (I-LEAVE, always available) gets the twin's

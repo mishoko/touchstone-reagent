@@ -40,6 +40,20 @@ contract RDeployRecordTest is Test {
             vm.parseJsonString(pin, ".modules.RcB6.runtimeMaskedSha"),
             "RcB6 live = pin"
         );
+        // the RC's own live runtime (read by `rc.py runtime` after `check --post`): the code recorded at the deploy,
+        // and, immutables masked, the reviewed-build pin (s7-close r1 m-01)
+        assertEq(vm.parseJsonAddress(l, ".steps.rc_runtime.address"), RESERVED, "the runtime read is the RC's");
+        assertEq(
+            vm.parseJsonString(l, ".steps.rc_runtime.runtimeSha"),
+            vm.parseJsonString(l, ".steps.rc.runtimeSha"),
+            "the live RC code is the code recorded at the deploy"
+        );
+        assertEq(
+            vm.parseJsonString(l, ".steps.rc_runtime.runtimeMaskedSha"),
+            vm.parseJsonString(pin, ".modules.ReagentRC.runtimeMaskedSha"),
+            "ReagentRC live = pin"
+        );
+        assertEq(vm.parseJsonAddress(l, ".steps.rc_runtime.owner"), OWNER, "OWNER read live");
     }
 
     function test_R_DEPLOY__bothLiveHubsNameTheRcAndTheRecordedNeeds() public {
@@ -58,6 +72,12 @@ contract RDeployRecordTest is Test {
             vm.chainId(ids[i]);
             (uint256 e, uint256 p) = new ReagentHub(RESERVED).needs();
             string memory c = vm.toString(ids[i]);
+            // the LIVE Hub's needs() as read at its deploy (`880000 [8.8e5] 1290000 [1.29e6]`): equal to the local
+            // code's and to the gas-need rows, so a Hub deployed from other code fails here (s7-close r1 m-02)
+            string[] memory w = vm.split(vm.parseJsonString(d, ".steps.reagent.reads['ReagentHub.needs()']"), " ");
+            assertEq(w.length, 4, "the recorded needs() read has its two values");
+            assertEq(vm.parseUint(w[0]), e, "the live Hub's exit NEED = the code's");
+            assertEq(vm.parseUint(w[2]), p, "the live Hub's plan NEED = the code's");
             assertEq(e, vm.parseJsonUint(g, string.concat(".kinds.rcExit.chains['", c, "'].need")), "exit NEED");
             assertEq(p, vm.parseJsonUint(g, string.concat(".kinds.rcAllocate.chains['", c, "'].need")), "plan NEED");
         }
