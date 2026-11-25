@@ -528,6 +528,76 @@
      "rederived": "drive.py rederive"
     }
    ]
+  },
+  "lcon_XB_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "d1056eb",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T13:44:08+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "action_XB",
+     "tx": "0x953a5b59182db90cd455316114790ded87c7e4943fb9970a1e1fe97ab3f908d2",
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12209906,
+     "gasUsed": 1839517,
+     "logIndex": 82
+    },
+    {
+     "label": "action_XB",
+     "tx": "0xbcb5b5e9d29a1102a91fdfa81cc60aab0c5532c9b496566b7be2b39c50b58ca9",
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12209924,
+     "gasUsed": 642711,
+     "logIndex": 185
+    },
+    {
+     "label": "action_XB",
+     "tx": "0x59993eba572936db043bd5cbfbb91aec0e9118acbddda23f1fe194a141782f3b",
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12209941,
+     "gasUsed": 684661,
+     "logIndex": 456
+    },
+    {
+     "label": "action_XB",
+     "tx": "0x3f11ea7d79eef149cdbfaafb8ce86a48b1c48181bab4ca87eea464a10d5767e8",
+     "status": "FAILED",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12209960,
+     "gasUsed": 709437,
+     "logIndex": null
+    }
+   ]
   }
  }
 }

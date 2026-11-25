@@ -179,6 +179,38 @@
      "to": "0x8888888888888888888888888888888888888888"
     }
    ]
+  },
+  "topup_s8": {
+   "commit": "d1056eb",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T13:39:35+00:00",
+   "source": "receipts",
+   "note": "s8: 0.15 Sepolia ETH to the Reactive faucet (15 lREACT to the deployer on Lasna), 12 lREACT into the RC's reserves (owner go in-session; reserves 2.36 -> 14.36)",
+   "txs": [
+    {
+     "label": "faucet_request",
+     "chain": 11155111,
+     "tx": "0xc709a804a8e5646297b5deb88df8ca0c3684c902e6262494728772c5d79caa51",
+     "block": 12209869,
+     "gasUsed": 25428,
+     "status": "ok",
+     "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+     "to": "0x9b9bb25f1a81078c544c829c5eb7822d747cf434",
+     "value": "150000000000000000"
+    },
+    {
+     "label": "depositTo_RC",
+     "chain": 5318007,
+     "tx": "0x65e99e9266332f8840f40475dd7da5227bfe9179f5c33cb8b1686005e0bb6d58",
+     "block": 9220911,
+     "gasUsed": 34695,
+     "status": "ok",
+     "from": "0x07f30b8e65938abc2f728878e8afc51ffedb8213",
+     "to": "0x8888888888888888888888888888888888888888",
+     "value": "12000000000000000000"
+    }
+   ]
   }
  }
 }

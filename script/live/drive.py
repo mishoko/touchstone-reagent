@@ -225,6 +225,13 @@ def expected_logs(r, expect):
             and all(len(l['topics']) > i and int(l['topics'][i], 16) == int(w, 16) for i, w in need.items())]
 
 
+GAS_MARGIN = (3, 2)  # gas limit = 1.5 x the node's estimate (s8)
+
+
+def gas_limit(estimate):
+    return int(str(estimate).split()[0]) * GAS_MARGIN[0] // GAS_MARGIN[1]
+
+
 def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_max=1):
     """The eth_call dry run of the exact call (a revert raises: nothing is sent); then (unless dry) an async send
     whose hash is recorded as `pending` BEFORE waiting, so a landed tx is never lost to a receipt timeout (r1 m-01);
@@ -233,9 +240,13 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_
     cast('call', '--from', me, to, sig, *args, rpc=rpc(ch))
     if dry:
         return None, True
-    h = _run(['cast', 'send', '--async', *wallet(), '--rpc-url', rpc(ch), to, sig, *args]).split()[-1]
+    # an explicit gas limit with a margin: the node's bare estimate ran a Sepolia Action out of gas live (s8: limit
+    # 742,263, used 709,437, status 0; the same call costs 0.68M-1.84M as the vault's state moves, TRAPS s8)
+    lim = gas_limit(cast('estimate', '--from', me, to, sig, *args, rpc=rpc(ch)))
+    h = _run(['cast', 'send', '--async', *wallet(), '--rpc-url', rpc(ch), '--gas-limit', str(lim), to, sig,
+              *args]).split()[-1]
     record(ch, step, label, {'tx': h, 'status': 'pending', 'to': to.lower(), 'function': sig.split('(')[0],
-                             **(extra or {})})
+                             'gasLimit': lim, **(extra or {})})
     r = receipt(ch, h)
     if r is None:
         refuse(f'{h}: no receipt after 2 min (recorded as pending in {step}): check it before anything else')
@@ -729,9 +740,10 @@ def selftest():
             json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
             saved4 = {k: g[k] for k in ('_run', 'receipt', 'cast', 'wallet')}
             g['ROOT'] = td
-            g['cast'] = lambda *a, rpc: 'true'
+            g['cast'] = lambda *a, rpc: '100000' if a[0] == 'estimate' else 'true'
             g['wallet'] = lambda: []
-            g['_run'] = lambda args: '0x' + 'cc' * 32
+            sent = []
+            g['_run'] = lambda args, _s=sent: _s.append(args) or '0x' + 'cc' * 32
             g['receipt'] = lambda ch, tx, tries=30: {'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': []}
             ep = lambda i: {'address': '0x' + '33' * 20, 'topics': [T_EPOCH, '0x1'], 'logIndex': hex(i)}  # noqa: E731
             for logs_, nmax, want_st, want_li, label in (([], 2, 'FAILED', None, 'a poke with no EpochRecorded is FAILED'),
@@ -748,6 +760,11 @@ def selftest():
                 good_ = t_['status'] == want_st and t_.get('logIndex') == want_li
                 print(('selftest ok: ' if good_ else 'selftest FAIL: ') + label)
                 fails += not good_
+            # s8: every live send carries --gas-limit 1.5 x the estimate (100000 -> 150000) and records it
+            a_ = sent[-1] if sent else []
+            lim_ok = '--gas-limit' in a_ and a_[a_.index('--gas-limit') + 1] == '150000' and t_.get('gasLimit') == 150000
+            print(('selftest ok: ' if lim_ok else 'selftest FAIL: ') + 'a send carries the 1.5 x estimate gas limit')
+            fails += not lim_ok
             cv = '0x' + '44' * 20
             note_ = lambda cov, kind: {'address': '0x' + '55' * 20, 'topics': [T_NOTE, '0x0', '0x' + cov[2:].rjust(64, '0'), hex(kind)], 'logIndex': '0x0'}  # noqa: E731
             r_ = {'logs': [note_('0x' + '66' * 20, 1), note_(cv, 2)]}

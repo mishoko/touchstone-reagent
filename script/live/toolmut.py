@@ -81,9 +81,20 @@ MUTANTS = [
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 
+# Hand mutants of script/live/drive.py, each of which `drive.py --selftest` must kill (s8: the gas margin; the s7-close
+# r1 M-02/M-03 rules)
+DRIVE_MUTANTS = [
+    ('drive: the send carries no gas limit', "*wallet(), '--rpc-url', rpc(ch), '--gas-limit', str(lim), to, sig,",
+     "*wallet(), '--rpc-url', rpc(ch), to, sig,", None),
+    ('drive: no margin over the estimate', 'GAS_MARGIN = (3, 2)', 'GAS_MARGIN = (1, 1)', None),
+    ('drive: the gap-record bound ignored', '    if 1 < len(mine) <= n_max:', '    if 1 < len(mine):', None),
+    ('drive: ok without the expected log', '    ok = ok and len(mine) == 1  #', '    ok = ok or len(mine) == 1  #', None),
+]
+
 
 def main():
     src = open(os.path.join(ROOT, 'script', 'live', 'loops.py')).read()
+    dsrc = open(os.path.join(ROOT, 'script', 'live', 'drive.py')).read()
     bad = 0
     with tempfile.TemporaryDirectory() as t:
         os.makedirs(os.path.join(t, 'script', 'live'))
@@ -92,13 +103,17 @@ def main():
         for d in ('audits', 'src'):
             shutil.copytree(os.path.join(ROOT, d), os.path.join(t, d))
         env = {k: v for k, v in os.environ.items() if 'RPC' not in k}
-        for name, a, b, equiv in MUTANTS:
-            if src.count(a) != 1:
-                print(f'toolmut: ANCHOR LOST ({src.count(a)}): {name}')
+        for name, a, b, equiv in MUTANTS + DRIVE_MUTANTS:
+            fname = 'drive.py' if name.startswith('drive:') else 'loops.py'
+            text = dsrc if fname == 'drive.py' else src
+            if text.count(a) != 1:
+                print(f'toolmut: ANCHOR LOST ({text.count(a)}): {name}')
                 bad += 1
                 continue
-            open(os.path.join(t, 'script', 'live', 'loops.py'), 'w').write(src.replace(a, b))
-            r = subprocess.run([sys.executable, os.path.join(t, 'script', 'live', 'loops.py'), '--selftest'],
+            for f_, t_ in (('loops.py', src), ('drive.py', dsrc)):
+                open(os.path.join(t, 'script', 'live', f_), 'w').write(t_)
+            open(os.path.join(t, 'script', 'live', fname), 'w').write(text.replace(a, b))
+            r = subprocess.run([sys.executable, os.path.join(t, 'script', 'live', fname), '--selftest'],
                                capture_output=True, text=True, env=env)
             killed = r.returncode != 0
             if killed:
