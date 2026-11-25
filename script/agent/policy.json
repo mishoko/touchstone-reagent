@@ -1,0 +1,12 @@
+{
+ "intervalSec": 60,
+ "entries": [
+  {
+   "chain": "11155111",
+   "covenant": "0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f",
+   "vault": "0x67ff755e233c3f550303c658ab8c55953f231a46",
+   "sharesPerTick": "1000000000000000000"
+  }
+ ],
+ "tighten": null
+}
