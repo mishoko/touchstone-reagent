@@ -1390,6 +1390,11 @@ def selftest():
                          ([rd, {**rs, 'byProxy': False}], 'a note not delivered by the proxy'),
                          ([{**rd, 'delivered': False}, rs], 'an undelivered DONE')):
         ok(not lplan_verdict(rows_, 100)['pass'], f'plan: {label} fails')
+    rw = dict(withheld=True, planSet=True, pausedAtOrigin=True, reactionChecked=True, originBlock=150)
+    ok(lplan_verdict([rd, rw], 100)['pass'], 'plan: control: DONE before, a plan withheld while paused after, passes')
+    for over, label in (({'pausedAtOrigin': False}, 'withheld while not paused'), ({'planSet': False}, 'no plan set'),
+                        ({'originBlock': 90}, 'withheld before the breach'), ({'reactionChecked': None}, 'an unchecked reaction')):
+        ok(not lplan_verdict([rd, {**rw, **over}], 100)['pass'], f'plan: {label} fails')
     # callback_requests counts only this RC's requests (a foreign RC's request log in the same tx is ignored)
     def req(rc_addr):
         data = '0x' + ''.join(w.rjust(64, '0') for w in ('0', '0', '0', '0', hex(1301)[2:], 'ab' * 20, hex(1686304)[2:],
@@ -1620,7 +1625,13 @@ def lplan_verdict(rows, latch_block):
     d = [r for r in rows if r.get('delivered') and r.get('byProxy')]
     done = any(r['outcome'] == PLAN_DONE and r['noteBlock'] < latch_block for r in d)
     skip = any(r['outcome'] == PLAN_SKIPPED and r['reason'] == SKIP_PAUSED and r['noteBlock'] > latch_block for r in d)
-    return {'doneBeforeBreach': done, 'skippedPausedAfter': skip, 'pass': done and skip}
+    # the deployed RC withholds a due plan while the Covenant is paused or its exit pair is pending (RcExt.onEpoch;
+    # spec §3.7): the skip's other form is a checked reaction with NO plan callback, the plan still set and the
+    # Covenant paused at the origin block (s8)
+    withheld = any(r.get('withheld') is True and r.get('planSet') is True and r.get('pausedAtOrigin') is True
+                   and r.get('reactionChecked') is True and r['originBlock'] > latch_block for r in rows)
+    return {'doneBeforeBreach': done, 'skippedPausedAfter': skip, 'withheldWhilePaused': withheld,
+            'pass': done and (skip or withheld)}
 
 
 def lplan():
@@ -1648,9 +1659,15 @@ def lplan():
             check_reaction(ch, lx, p['tx'], li, vault, topic0=T_EPOCH)
             plans = [q for q in callback_requests(lx) if q['payload'][:8] == SEL_PLAN and q['dest'] == ch
                      and int(q['payload'][8 + 64:8 + 128], 16) == int(COVENANT, 16)]  # s8-hero r1 m-06: our Covenant
-            row.update(lasnaTx=lx, planSent=len(plans))
+            row.update(lasnaTx=lx, planSent=len(plans), reactionChecked=True)
             if not plans:
-                rows.append({**row, 'delivered': False, 'why': 'the reaction sent no plan callback'})
+                plan_set = int(cast('call', '--block', str(ob), COVENANT, 'plan(address)(uint128)', vault,
+                                    rpc=rpc(ch)).split()[0]) > 0
+                vid = int(cast('call', hub(ch), 'vaultId(address)(uint32)', vault, rpc=rpc(ch)).split()[0])
+                rows.append({**row, 'delivered': False, 'withheld': True, 'planSet': plan_set,
+                             'pausedAtOrigin': paused_at(ch, ob, vid),
+                             'why': 'the reaction sent no plan callback (the RC withholds it while paused or an exit is '
+                                    'pending; RcExt.onEpoch)'})
                 continue
             a = [plans[0]['payload'][8 + 64 * i:8 + 64 * (i + 1)] for i in range(4)]
             cov, pv, pe = '0x' + a[1][-40:], '0x' + a[2][-40:], int(a[3], 16)
