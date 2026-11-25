@@ -247,7 +247,7 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None):
 
 # label (or its prefix) -> the log a landed send of that kind must carry (the same as each send's `expect`)
 NO_LOG = 'none'  # a label whose call emits nothing: its status alone decides
-EXPECT = {'setAllowed': NO_LOG, 'setPlan': T_NOTE, 'action': T_ACTION, 'poke': T_EPOCH, 'factory': T_ALLOWED, 'covenant': T_CREATED, 'setRules': T_NOTE,
+EXPECT = {'setAllowed': NO_LOG, 'setPlan': NO_LOG, 'flush': T_NOTE, 'action': T_ACTION, 'poke': T_EPOCH, 'factory': T_ALLOWED, 'covenant': T_CREATED, 'setRules': T_NOTE,
           'fund': T_TRANSFER, 'allocate': T_NOTE, 'retire': T_RETIRED, 'spoof': T_TRANSFER}
 
 
@@ -417,10 +417,21 @@ def cov_plan(name, amount, dry):
         if dry:
             print('drive: dry run: setAllowed does not revert (setPlan is dry-run after it lands)')
             return
-    send(ch, c, 'setPlan(address,uint128)', v['vault'], str(amount), expect=(hub_, T_NOTE), dry=dry, step=step,
+    # the plan's STATE note may be coalesced by the Covenant's NOTE_INTERVAL (PB-10: seen live on 11155111 right after
+    # an allocate), so the landed state is checked by reading it back; `cov-flush` brings the STATE to the RC later
+    send(ch, c, 'setPlan(address,uint128)', v['vault'], str(amount), expect=None, dry=dry, step=step,
          label=f'setPlan_{name}',
          post=lambda: int(cast('call', c, 'plan(address)(uint128)', v['vault'], rpc=rpc(ch)).split()[0]) == int(amount))
     print(f'drive: plan {amount} into {name} {"(dry: does not revert)" if dry else "landed"}')
+
+
+def cov_flush(ch, dry):
+    """The owner's `flush()`: one STATE note now (it reverts TooSoon inside NOTE_INTERVAL of the last), so the RC learns
+    a plan or rule whose own note was coalesced."""
+    _, hub_ = reagent(ch)
+    c, step = covenant(ch), f'lcron_{ch}_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    send(ch, c, 'flush()', expect=(hub_, T_NOTE), dry=dry, step=step, label='flush')
+    print(f'drive: flush {"(dry: does not revert)" if dry else "landed"}')
 
 
 RETIRABLE = ('YA',)  # owner decision s7: only Y_A (curator 2) is retired; X_A / X_B carry the L-CON paths
@@ -799,6 +810,8 @@ def main(argv):
         cov_fund(name, opt('--t0', 0), opt('--t1', 0), '--dry' in argv)
     elif cmd == 'cov-alloc':
         cov_alloc(name, opt('--shares', 0), '--dry' in argv)
+    elif cmd == 'cov-flush':
+        cov_flush(name, '--dry' in argv)
     elif cmd == 'cov-plan':
         cov_plan(name, opt('--amount', 10**16), '--dry' in argv)
     elif cmd == 'retire':

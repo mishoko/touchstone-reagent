@@ -443,6 +443,66 @@
      "block": 12209111,
      "gasUsed": 1008548,
      "logIndex": 97
+    },
+    {
+     "label": "fund_covenant",
+     "tx": "0x3cfb0a8efbb82d0b4d47bbe424bc77bcaa2024d1591fcbaba180c6bcae55ddb0",
+     "status": "ok",
+     "to": "0xdde7e4f51fa544dd3f23e60e8c258fa6868ebcfe",
+     "function": "transfer",
+     "block": 12209263,
+     "gasUsed": 140480,
+     "logIndex": 135
+    },
+    {
+     "label": "fund_covenant",
+     "tx": "0x129defa03c54664724347825585601d010c48529403969b364d4a4f18813a934",
+     "status": "ok",
+     "to": "0xe47c05e3c8013221508eae78628dfcf623dc93fb",
+     "function": "transfer",
+     "block": 12209264,
+     "gasUsed": 140504,
+     "logIndex": 78
+    },
+    {
+     "label": "allocate_XB",
+     "tx": "0xa732f227cf0a1f42b0d47aa33cc2d2f1085bb1d3271713561f681f33663383c7",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "allocate",
+     "block": 12209266,
+     "gasUsed": 3338510,
+     "logIndex": 59
+    },
+    {
+     "label": "setAllowed_XB",
+     "tx": "0x5982fa680cee1706d24534b350e7049e6da9b5465f1c840498a97d05c79d1358",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setAllowed",
+     "block": 12209267,
+     "gasUsed": 135708,
+     "logIndex": null
+    },
+    {
+     "label": "setPlan_XB",
+     "tx": "0xa85ba3e63335cd950cda8cbda939d8b77f605957c7432a50cbebcc5ef3c15f4e",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "setPlan",
+     "block": 12209268,
+     "gasUsed": 369277,
+     "logIndex": null
+    },
+    {
+     "label": "flush",
+     "tx": "0x5277d1068256901e3c0fbda84fc4b57998bb8d9dee7b30e8e1a9e87f2ecfa629",
+     "status": "ok",
+     "to": "0xb02b6081546c23ca2191d3ce0647b64f5ef4d15f",
+     "function": "flush",
+     "block": 12209296,
+     "gasUsed": 154508,
+     "logIndex": 129
     }
    ]
   }

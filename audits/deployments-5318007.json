@@ -161,6 +161,24 @@
      "value": "500000000000000000"
     }
    ]
+  },
+  "topup_s7": {
+   "source": "receipts",
+   "commit": "30ec51a",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T11:31:45+00:00",
+   "note": "s7: 2 lREACT into the RC's reserves (owner go (d), reserves at 2.56)",
+   "txs": [
+    {
+     "label": "depositTo_RC",
+     "tx": "0x1707c3e2e6e0090e2ebee247a23f06e39548a50b0a0a804656f790f4ddb12a58",
+     "block": 9213912,
+     "gasUsed": 34695,
+     "status": "ok",
+     "to": "0x8888888888888888888888888888888888888888"
+    }
+   ]
   }
  }
 }
