@@ -442,6 +442,108 @@
      "to": "0xb41433c9585d230a2607f253e1ea844923e07a91"
     }
    ]
+  },
+  "ldyn_vault_XA": {
+   "script": "TsDeploy.s.sol",
+   "commit": "965ae60",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:42:46+00:00",
+   "note": "s6 L-DYN: vault X_A (curator 1) through its RC-registered bundler",
+   "txs": [
+    {
+     "type": "CALL",
+     "tx": "0x4a790676fe80e35f0e479076f3ed4cabdd54dfb531e0f6ee7590302ca76ae5b2",
+     "block": 68740127,
+     "gasUsed": 51272,
+     "status": "ok",
+     "function": "transfer(address,uint256)",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64"
+    },
+    {
+     "type": "CALL",
+     "tx": "0xfe7388e71c21e475c778923c5edf4c0158625219fa73b46b8d62c22d2271961c",
+     "block": 68740128,
+     "gasUsed": 51308,
+     "status": "ok",
+     "function": "transfer(address,uint256)",
+     "to": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x383a1ebf172c5dab9bdc2fbc2f50850bd3bda28e409c1a898e2de87eccdb2818",
+     "block": 68740130,
+     "gasUsed": 12540936,
+     "status": "ok",
+     "function": "deployAndPlace((bytes,bytes,bytes,(address,address,address,address,uint24,int24,uint160,(address,uint32,int24,uint32,uint32,uint16,uint160,uint32,uint32,uint32,uint32,uint32,uint32,uint64,uint64,uint128,uint128,uint64,uint32,uint64,uint64,uint16,int24,int24,int24,uint64,uint32,uint8,uint128)),bytes32,bytes32,(uint256,uint256,address,uint256,uint256)),int24,int24,(bool,bool,uint128),uint256)",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "created": [
+      {
+       "contract": "TouchstoneVaultExtension",
+       "address": "0x8fff4f316078e73ff984907d17414cae1b75c817"
+      },
+      {
+       "contract": "TouchstoneVault",
+       "address": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59"
+      },
+      {
+       "contract": "TouchstoneHook",
+       "address": "0x377e71f90808b343ae78a5ebbd9e97e9b68ae0a0"
+      }
+     ]
+    }
+   ]
+  },
+  "ldyn_vault_YA": {
+   "script": "TsDeploy.s.sol",
+   "commit": "965ae60",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:43:34+00:00",
+   "note": "s6 L-DYN: vault Y_A (curator 2) through its RC-registered bundler",
+   "txs": [
+    {
+     "type": "CALL",
+     "tx": "0xacbf850523602ee08833d5f64538e8b1b32d8c02b37c8d7de8b950554ff758d3",
+     "block": 68740182,
+     "gasUsed": 51272,
+     "status": "ok",
+     "function": "transfer(address,uint256)",
+     "to": "0x1afe15c3dc3d1a023f2ecfa20a417b22f2c49e64"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x29805bad7daa1a1a16f7dae2bacbc7c2e45fa4c03c76356e7b8e8011d5185136",
+     "block": 68740184,
+     "gasUsed": 51308,
+     "status": "ok",
+     "function": "transfer(address,uint256)",
+     "to": "0x88c16a89daffbdad2438cffb87cabbde8c28e64d"
+    },
+    {
+     "type": "CALL",
+     "tx": "0x560934ed8ae1844012bc23939002ea61361f9bed33535fb4d85a7d8f30fd4649",
+     "block": 68740186,
+     "gasUsed": 12540936,
+     "status": "ok",
+     "function": "deployAndPlace((bytes,bytes,bytes,(address,address,address,address,uint24,int24,uint160,(address,uint32,int24,uint32,uint32,uint16,uint160,uint32,uint32,uint32,uint32,uint32,uint32,uint64,uint64,uint128,uint128,uint64,uint32,uint64,uint64,uint16,int24,int24,int24,uint64,uint32,uint8,uint128)),bytes32,bytes32,(uint256,uint256,address,uint256,uint256)),int24,int24,(bool,bool,uint128),uint256)",
+     "to": "0xa6ebf9196905ddf5174403a932d75654d5d02a5d",
+     "created": [
+      {
+       "contract": "TouchstoneVaultExtension",
+       "address": "0xc429a66d98bfb5a2871c638965b2504480d1b5be"
+      },
+      {
+       "contract": "TouchstoneVault",
+       "address": "0x50ad0a9ef6c8f87b4e926fe1ab3ae2285cdde362"
+      },
+      {
+       "contract": "TouchstoneHook",
+       "address": "0x9e62c2f1a24f3d18ad1307b885cb7cf4a882e0a0"
+      }
+     ]
+    }
+   ]
   }
  }
 }

@@ -370,6 +370,40 @@
      "to": "0xb41433c9585d230a2607f253e1ea844923e07a91"
     }
    ]
+  },
+  "ldyn_vault_XB": {
+   "source": "receipts",
+   "commit": "965ae60",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:45:01+00:00",
+   "note": "s6 L-DYN: vault X_B (curator 1) 0x67fF\u20261a46 through its RC-registered bundler; calldata from the TsDeploy dry run (BUNDLER), sent by cast with an explicit 90M limit (Glamsterdam; forge estimated 17.3M)",
+   "txs": [
+    {
+     "label": "seed_transfer0",
+     "tx": "0x9bf34c7054c8f806a78a37eda7787860fd70aec5fb5269c3ead873f3d956d62b",
+     "block": 12208172,
+     "gasUsed": 140492,
+     "status": "ok",
+     "to": "0xdde7e4f51fa544dd3f23e60e8c258fa6868ebcfe"
+    },
+    {
+     "label": "seed_transfer1",
+     "tx": "0xedb647de5533ea911bc7f98f525437cec174c69f6cc7861cc0fb4182bc899128",
+     "block": 12208173,
+     "gasUsed": 140528,
+     "status": "ok",
+     "to": "0xe47c05e3c8013221508eae78628dfcf623dc93fb"
+    },
+    {
+     "label": "deployAndPlace",
+     "tx": "0x6bb6248ae51c29a34de3babd0e17f71171695fa4a20f4a1ceb590d379860cb49",
+     "block": 12208175,
+     "gasUsed": 82782954,
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0"
+    }
+   ]
   }
  }
 }
