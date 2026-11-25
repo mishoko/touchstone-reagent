@@ -665,14 +665,17 @@ def latch_record(v, step, frm):
         if l['transactionHash'] not in txs:
             txs.append(l['transactionHash'])
     steps = json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps']
-    known = {t['tx'] for t in steps.get(step, {}).get('txs', [])}
+    # s8-hero r2 n-02: a tx recorded in ANY lbreach step of this vault is updated in place (its label kept), never
+    # recorded twice (a rerun, or a rerun on another UTC day)
+    pre = step.rsplit('_', 1)[0] + '_'
+    known = {t['tx']: k for k, st in steps.items() if k.startswith(pre) for t in st['txs']}
     for h in txs:
         r = receipt(ch, h)
         n = sum(1 for l in r['logs'] if l['topics'] and l['topics'][0] == T_LATCHED
                 and l['address'].lower() == v['hook'].lower())
         fields = {'breachLatched': n, 'block': int(r['blockNumber'], 16), 'status': 'ok' if int(r['status'], 16) == 1 else 'FAILED'}
         if h in known:
-            record_update(ch, step, h, {**fields, 'label': 'refresh'})
+            record_update(ch, known[h], h, fields)
         else:
             record(ch, step, 'latch', {'tx': h, 'to': (r.get('to') or '').lower(), 'function': 'n/a (found by its log)',
                                        **fields})
@@ -1074,6 +1077,11 @@ def selftest():
                                                                                   ('latch', '0xpoke', 1)]
             print(('selftest ok: ' if ok9 else 'selftest FAIL: ') + f'a latch in a foreign tx is recorded by its log {tx9}')
             fails += not ok9
+            latch_record({'chain': '1301', 'hook': hk}, 'lb_u', 5)  # a rerun under another step (another day)
+            d9 = json.load(open(os.path.join(td9, 'audits', 'deployments-1301.json')))['steps']
+            ok9b = 'lb_u' not in d9 and [t['label'] for t in d9['lb_t']['txs']] == ['refresh', 'latch']
+            print(('selftest ok: ' if ok9b else 'selftest FAIL: ') + 'a latch-record rerun on another day records nothing twice, keeps labels')
+            fails += not ok9b
             g.update(saved9)
         # s8-hero r1 m-02: an abnormal stop after the reference went out brings it back
         saved10 = {k: g[k] for k in ('placed_range', 'obs', 'drive_ref', 'send', '_hold', 'ref_back')}

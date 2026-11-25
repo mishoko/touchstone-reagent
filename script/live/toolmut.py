@@ -90,6 +90,8 @@ MUTANTS = [
     ('hero: the proving send not indexed', "AGENT_SENDS = ('allocate', 'prove-refusal')", "AGENT_SENDS = ('allocate',)", None),
     ('hero: the curator binding dropped', "sameCurator=r.get('refusedVaultId') is not None and r.get('refusedVaultId') == r.get('curator'),", 'sameCurator=True,', None),
     ('exit: the value not required', "valueMeasured=(r.get('forfeitPoolAtProcess') or 0) > 0 and (r.get('poolBurned') or 0) > 0", 'valueMeasured=True or (r.get("x") or 0) > 0', None),
+    ('exit: a short slot hex', "    return '0x%064x' % n", "    return hex(n)", None),
+    ('exit: foreign mints ignored', "and r.get('poolAtDone') == 0 and r.get('foreignMintBurn') == [],", "and r.get('poolAtDone') == 0,", None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 

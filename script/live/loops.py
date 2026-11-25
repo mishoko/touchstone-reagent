@@ -1403,15 +1403,37 @@ def selftest():
        'plan: callback_requests keeps this RC\'s request only (a foreign RC\'s is ignored)')
     # ---- s8 L-EXIT verdict
     ge = dict(doneTx='0x1', doneBlock=200, dripEnd=150, toOwner=[5, 7], noteA=5, noteB=7, otherRecipients=[],
-              forfeitPoolAtProcess=10, poolBurned=10, covGainShares=3, netSupplyDrop=8)
+              forfeitPoolAtProcess=10, poolBurned=10, covGainShares=3, netSupplyDrop=8, poolAtDone=0, foreignMintBurn=[])
     ok(lexit_verdict(ge)['pass'], 'exit: control: DONE after the drip, tokens to the owner only = the note')
     for over, label in (({'doneTx': None}, 'no DONE'), ({'doneBlock': 140}, 'DONE before the drip end'),
                         ({'toOwner': [5, 6]}, 'the owner got less than the note'),
                         ({'toOwner': [0, 0], 'noteA': 0, 'noteB': 0}, 'a DONE(0, 0)'),
                         ({'otherRecipients': ['0xbad']}, 'another recipient'),
                         ({'forfeitPoolAtProcess': 0}, 'no forfeit set aside'), ({'poolBurned': 0}, 'no pool burned'),
-                        ({'netSupplyDrop': 0}, 'no net supply drop'), ({'covGainShares': None}, 'no gain measured')):
+                        ({'netSupplyDrop': 0}, 'no net supply drop'), ({'covGainShares': None}, 'no gain measured'),
+                        ({'poolAtDone': 3}, 'the forfeit not fully burned at DONE'),
+                        ({'foreignMintBurn': ['0xt']}, 'a third party minted or burned X_A shares in the window')):
         ok(not lexit_verdict({**ge, **over})['pass'], f'exit: {label} fails')
+    # s8-hero r2 N-01: every bytes32 slot argument is a full 32-byte word (cast refuses 0x11)
+    seen_ = []
+    saved_c3, saved_r3 = g['cast'], g['rpc']
+    g['rpc'] = lambda ch: 'http://selftest.invalid'
+
+    def strict(*a, rpc):
+        for x in a:
+            if isinstance(x, str) and x.startswith('0x') and 'extsload(bytes32)' in ' '.join(map(str, a)) \
+                    and x not in (a[3], a[4]) and len(x) != 66:
+                raise SystemExit(f'parser error: invalid string length ({x})')
+        seen_.append(a)
+        return '0x' + '0' * 22 + '00e10' + '0' * 5 + '1' * 5 + '0' * 27
+    g['cast'] = strict
+    try:
+        drip_window('1301', '0x' + '12' * 20, 5)
+        ok(True, 'exit: drip_window passes a 32-byte slot word')
+    except SystemExit as e:
+        ok(False, f'exit: drip_window passes a 32-byte slot word ({e})')
+    g['cast'], g['rpc'] = saved_c3, saved_r3
+    ok(slot_arg(17) == '0x' + '0' * 62 + '11', 'exit: slot_arg(17) is the 32-byte word 0x…11')
     print(f'loops selftest: {n_ok[0]} cells passed,', 'OK' if not fails else f'FAIL ({len(fails)})')
     return not fails
 
@@ -1660,8 +1682,17 @@ EXIT_DONE, EXIT_EARLY = 1, 2
 SLOT_DRIP = 18  # Touchstone Bank: forfeitTotal u128 @0, forfeitStart u40 @16, dripBlocks u40 @21 (test/base/TsEnv.sol)
 
 
+def slot_arg(n):
+    """A storage slot as a bytes32 argument: cast refuses a short hex such as 0x11 (s8-hero r2 N-01)."""
+    return '0x%064x' % n
+
+
+def vault_slot(ch, vault, n, block):
+    return int(cast('call', '--block', str(block), vault, 'extsload(bytes32)(bytes32)', slot_arg(n), rpc=rpc(ch)), 16)
+
+
 def drip_window(ch, vault, block):
-    w = int(cast('call', '--block', str(block), vault, 'extsload(bytes32)(bytes32)', hex(SLOT_DRIP), rpc=rpc(ch)), 16)
+    w = vault_slot(ch, vault, SLOT_DRIP, block)
     return (w >> 128) & (2**40 - 1), (w >> 168) & (2**40 - 1)
 
 
@@ -1671,7 +1702,8 @@ def lexit_verdict(r):
     Covenant's gain from the net supply drop."""
     v = dict(done=bool(r.get('doneTx')),
              valueMeasured=(r.get('forfeitPoolAtProcess') or 0) > 0 and (r.get('poolBurned') or 0) > 0
-             and r.get('covGainShares') is not None and (r.get('netSupplyDrop') or 0) > 0,
+             and r.get('covGainShares') is not None and (r.get('netSupplyDrop') or 0) > 0
+             and r.get('poolAtDone') == 0 and r.get('foreignMintBurn') == [],
              afterDrip=r.get('doneBlock') is not None and r.get('dripEnd') is not None and r['doneBlock'] >= r['dripEnd'],
              toOwnerExactly=r.get('toOwner') is not None and r['toOwner'] == [r.get('noteA'), r.get('noteB')]
              and r['toOwner'] != [0, 0],
@@ -1704,11 +1736,16 @@ def lexit():
     d = done[0]
     start, drip = drip_window(ch, vault, d['block'])  # the state the Covenant checked (m-04)
     sup = lambda b: int(cast('call', '--block', str(b), vault, 'totalSupply()(uint256)', rpc=rpc(ch)).split()[0])  # noqa: E731
-    pool = lambda b: int(cast('call', '--block', str(b), vault, 'extsload(bytes32)(bytes32)', hex(17), rpc=rpc(ch)), 16) >> 128  # noqa: E731
+    pool_at = lambda b: vault_slot(ch, vault, 17, b) >> 128  # noqa: E731  (Bank: bondShares u128 @0, forfeitPool @16)
     cov_sh = int(cast('call', '--block', str(d['block'] - 1), vault, 'balanceOf(address)(uint256)', COVENANT,
                       rpc=rpc(ch)).split()[0])
     s_pb, s_pre = sup(pb), sup(d['block'] - 1)
-    p_pb, p_pre = pool(pb), pool(d['block'] - 1)
+    p_pb, p_pre, p_done = pool_at(pb), pool_at(d['block'] - 1), pool_at(d['block'])
+    # n-01: third-party mints/burns of X_A shares in [pb, DONE) would confound the net measure: flag them
+    tr_, _ = logs_chunked(ch, vault, pb, d['block'] - 1, T_TRANSFER)
+    zero = '0x' + '0' * 64
+    foreign = [l['transactionHash'] for l in tr_ if (l['topics'][1] == zero or l['topics'][2] == zero)
+               and int(l['topics'][2 if l['topics'][1] == zero else 1], 16) not in (int(vault, 16), int(COVENANT, 16))]
     r = json.loads(cast('receipt', '--json', d['tx'], rpc=rpc(ch)))
     hook = cast('call', vault, 'HOOK()(address)', rpc=rpc(ch))
     pool = cast('call', hook, 'REF_POOL()(address)', rpc=rpc(ch))
@@ -1736,6 +1773,8 @@ def lexit():
            'forfeitPoolAtProcess': p_pb, 'poolBurned': p_pb - p_pre, 'supplyAtProcess': s_pb,
            'supplyBeforeDone': s_pre, 'netSupplyDrop': s_pb - s_pre, 'covSharesBeforeDone': cov_sh,
            'covGainShares': cov_sh * (s_pb - s_pre) // s_pre if s_pre else None,
+           'covGainSharesFromBurn': cov_sh * (p_pb - p_done) // s_pre if s_pre else None,
+           'poolAtDone': p_done, 'foreignMintBurn': foreign,
            'covGainPpm': (s_pb - s_pre) * 10**6 // s_pre if s_pre else None,
            'latency_s': ts(ch, d['block']) - ts(ch, lb)}
     row['verdict'] = lexit_verdict(row)
