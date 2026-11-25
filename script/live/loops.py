@@ -649,22 +649,80 @@ def lgas():
 
 # ------------------------------------------------------------------ L-SPOOF (spec §9.5, OQ-18, PB-12)
 
-SPOOF_WINDOW_S = 1800
+SPOOF_WINDOW_BLOCKS = 1800  # 1301 blocks (~1 s each) searched after the 1301 block at the Lasna reaction's time
+NOT_RC = '0x1cac49a3'  # ReagentHub.NotRc()
+OPERATOR_1301 = '0xf9f61c1d3325e2d4abb55dd9e0db84f7a0d914b0'  # the 1301 deliveries' sender (L-PAY / L-CON receipts)
 DEBUG_1301 = 'https://unichain-sepolia.drpc.org'  # debug_traceTransaction (callTracer) on 1301
-NOT_RC = '0x1cac49a3'  # ReagentHub.NotRc()  # the delivery is searched for this long after the Lasna reaction
+
+
+def mcp_trace_rc(ch, origin_tx, log_index, rc_addr):
+    sys.path.insert(0, os.path.join(ROOT, 'script', 'rnk'))
+    from rmcp import call  # noqa: E402
+    tr = call('trace_origin_event', {'originChainId': int(ch), 'txHash': origin_tx, 'logIndex': log_index,
+                                     'rc': rc_addr, 'maxScanBlocks': 900})
+    if not isinstance(tr, dict) or not tr.get('verdict') or not isinstance(tr.get('data'), dict):
+        raise SystemExit(f'loops: the MCP trace of {origin_tx}#{log_index} failed or returned no data: refusing')
+    return tr
+
+
+def spoof_delivery(spoof, b0):
+    """The 1301 delivery of SpoofRC's callback: from the operator, to the callback proxy, its calldata carrying the
+    rcConduct payload whose first word is SpoofRC (the injected word: `SEL_CONDUCT ++ word`, not a bare substring, so a
+    decoy tx with the address elsewhere is skipped; s7 lspoof r1 m-03)."""
+    proxy, needle = CH['1301']['proxy'].lower(), SEL_CONDUCT + spoof[2:].lower().rjust(64, '0')
+    for b in range(b0, b0 + SPOOF_WINDOW_BLOCKS):
+        blk = json.loads(cast('rpc', 'eth_getBlockByNumber', hex(b), 'true', rpc=rpc('1301')) or 'null')
+        if not blk:
+            raise SystemExit(f'loops: 1301 block {b} not served yet; re-run later')
+        for x in blk['transactions']:
+            if ((x.get('to') or '').lower() == proxy and (x.get('from') or '').lower() == OPERATOR_1301
+                    and needle in x['input'].lower()):
+                return x, blk
+    raise SystemExit(f'loops: no 1301 delivery carrying the spoof RC within {SPOOF_WINDOW_BLOCKS} blocks')
+
+
+def hub_frames(tx, h):
+    ct = json.loads(cast('rpc', 'debug_traceTransaction', tx, '{"tracer":"callTracer"}', rpc=DEBUG_1301))
+    out = []
+
+    def walk(f):
+        if (f.get('to') or '').lower() == h.lower() and f.get('type') == 'CALL' and f['input'][2:10] == SEL_CONDUCT:
+            out.append(f)
+        for c in f.get('calls', []):
+            walk(c)
+    walk(ct)
+    return out
+
+
+def spoof_verdict(row, frames, word, blk_txs, h, found_hash):
+    """`pass` = the Hub rejected it: exactly one Hub rcConduct frame, carrying SpoofRC as word 0, reverted with
+    NotRc(); no Hub log; conduct(99) read and all zero. `charged` is published only when the delivery is the block's
+    only tx touching the Hub or the proxy (else the balance step is not this delivery's alone; lspoof r1 m-01)."""
+    row['hubFrame'] = {'error': frames[0].get('error'), 'output': frames[0].get('output')} if len(frames) == 1 else None
+    row['word0IsSpoofRC'] = len(frames) == 1 and frames[0]['input'][10:74].lower() == word
+    row['rejectedNotRc'] = len(frames) == 1 and bool(frames[0].get('error')) and \
+        (frames[0].get('output') or '')[:10] == NOT_RC
+    c99 = row.get('conduct99')
+    row['pass'] = (row['hubLogs'] == 0 and bool(c99) and all(v == 0 for v in c99) and row['word0IsSpoofRC']
+                   and row['rejectedNotRc'])
+    proxy = CH['1301']['proxy'].lower()
+    others = [x for x in blk_txs if x['hash'] != found_hash and (x.get('to') or '').lower() in (proxy, h.lower())]
+    row['otherHubOrProxyTxsInBlock'] = len(others)
+    row['chargeAttributable'] = not others
+    delta = (row['hubBalanceBefore'] - row['hubBalanceAfter']) + (row['reservesBefore'] - row['reservesAfter']) \
+        + (row['debtAfter'] - row['debtBefore'])
+    row['charged'] = delta if row['chargeAttributable'] else None
+    row['billed'] = (delta > 0) if row['chargeAttributable'] else None
+    return row
 
 
 def lspoof():
-    """The third-party RC's (script/live/SpoofRC.sol, deployed from the owner key: `lspoof` in deployments-5318007)
-    single `rcConduct` to the 1301 Hub: the trigger (the `lspoof_<date>` step on 1301) → SpoofRC's reaction on Lasna
-    (the MCP trace for that RC, checked against the reaction's own LogRecord) → the 1301 delivery, found as the tx to
-    the callback proxy whose calldata carries the injected first word = SpoofRC (the proxy writes it). Recorded: the
-    delivery's status, whether the Hub emitted anything (it must not: `callback(rc)` rejects a foreign RC), the Hub's
-    `conduct(99)` (must stay 0), and the Hub's balance, reserves and debt at the blocks before and after (the charge,
-    OQ-18)."""
+    """The third-party RC's (script/live/SpoofRC.sol, from the owner key; `lspoof` in deployments-5318007) single
+    rcConduct to the 1301 Hub: trigger (`lspoof_<date>` on 1301) → SpoofRC's reaction on Lasna (MCP, checked against
+    its LogRecord) → the 1301 delivery → the verdict and the charge (OQ-18, PB-12)."""
     sp = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))['steps'].get('lspoof')
-    if not sp:
-        raise SystemExit('loops: no lspoof step: the spoof RC is not deployed')
+    if not sp or sp['txs'][0].get('status') != 'ok':
+        raise SystemExit('loops: no landed lspoof step: the spoof RC is not deployed')
     spoof = sp['txs'][0]['address']
     trig = [t for step, s in deployments('1301').items() if step.startswith('lspoof_') for t in s['txs']
             if t.get('status') == 'ok']
@@ -677,75 +735,35 @@ def lspoof():
         raise SystemExit(f'loops: no reaction of the spoof RC yet ({tr["verdict"]}); re-run later')
     t = json.loads(cast('tx', '--json', lx, rpc=LASNA))
     w = words(t['input'][10:])
-    if (t.get('to') or '').lower() != SYSTEM or w[0] != spoof[2:].lower().rjust(64, '0') or w[12] != otx[2:].lower():
+    word = spoof[2:].lower().rjust(64, '0')
+    if (t.get('to') or '').lower() != SYSTEM or w[0] != word or w[12] != otx[2:].lower():
         raise SystemExit(f'loops: {lx} is not the spoof RC\'s reaction to {otx}')
-    lts = int(t['blockTimestamp'], 16)
-    b0 = int(cast('find-block', str(lts), rpc=rpc('1301'))) - 2
-    h, proxy, word = hub('1301'), CH['1301']['proxy'].lower(), spoof[2:].lower().rjust(64, '0')
-    found = None
-    for b in range(b0, b0 + SPOOF_WINDOW_S):
-        blk = json.loads(cast('rpc', 'eth_getBlockByNumber', hex(b), 'true', rpc=rpc('1301')) or 'null')
-        if not blk:
-            raise SystemExit(f'loops: 1301 block {b} not served yet; re-run later')
-        for x in blk['transactions']:
-            if (x.get('to') or '').lower() == proxy and word in x['input'].lower():
-                found = x
-                break
-        if found:
-            break
-    if not found:
-        raise SystemExit(f'loops: no 1301 delivery carrying the spoof RC within {SPOOF_WINDOW_S} blocks')
-    db = int(found['blockNumber'], 16)
+    b0 = int(cast('find-block', str(int(t['blockTimestamp'], 16)), rpc=rpc('1301'))) - 2
+    found, blk = spoof_delivery(spoof, b0)
+    db, h = int(found['blockNumber'], 16), hub('1301')
     r = json.loads(cast('receipt', '--json', found['hash'], rpc=rpc('1301')))
-    pc = lambda sig, blk: int(cast('call', '--block', str(blk), CH['1301']['proxy'], sig, h, rpc=rpc('1301')).split()[0])  # noqa: E731
-    bal = lambda blk: int(cast('balance', h, '--block', str(blk), rpc=rpc('1301')))  # noqa: E731
-    hub_logs = [l for l in r['logs'] if l['address'].lower() == h.lower()]
+    pc = lambda sig, b: int(cast('call', '--block', str(b), CH['1301']['proxy'], sig, h, rpc=rpc('1301')).split()[0])  # noqa: E731
+    bal = lambda b: int(cast('balance', '--block', str(b), h, rpc=rpc('1301')))  # noqa: E731
     c99 = cast('call', h, 'conduct(uint32)(uint32,uint32,uint32,uint64)', '99', rpc=rpc('1301')).split()
     row = {'spoofRC': spoof, 'originTx': otx, 'lasnaTx': lx, 'destTx': found['hash'], 'destBlock': db,
-           'destStatus': int(r['status'], 16), 'destGasUsed': int(r['gasUsed'], 16), 'hubLogs': len(hub_logs),
+           'destStatus': int(r['status'], 16), 'destGasUsed': int(r['gasUsed'], 16),
+           'hubLogs': sum(1 for l in r['logs'] if l['address'].lower() == h.lower()),
            'proxyLogs': [{'topic0': l['topics'][0], 'data': l['data']} for l in r['logs']
-                         if l['address'].lower() == proxy],
-           'conduct99': [int(x) for x in c99[:4]] if c99 else None,
+                         if l['address'].lower() == CH['1301']['proxy'].lower()],
+           'conduct99': [int(x) for x in c99[:4]] if len(c99) >= 4 else None,
            'hubBalanceBefore': bal(db - 1), 'hubBalanceAfter': bal(db),
            'debtBefore': pc('debts(address)(uint256)', db - 1), 'debtAfter': pc('debts(address)(uint256)', db),
-           'reservesBefore': pc('reserves(address)(uint256)', db - 1), 'reservesAfter': pc('reserves(address)(uint256)', db)}
-    row['charged'] = (row['hubBalanceBefore'] - row['hubBalanceAfter']) + (row['reservesBefore'] - row['reservesAfter']) \
-        + (row['debtAfter'] - row['debtBefore'])
-    others = [x for x in json.loads(cast('rpc', 'eth_getBlockByNumber', hex(db), 'true', rpc=rpc('1301')))['transactions']
-              if x['hash'] != found['hash'] and (x.get('to') or '').lower() == proxy]
-    row['otherDeliveriesInBlock'] = len(others)  # a nonzero count makes the balance step not this delivery's alone
-    # the Hub frame's revert data from a callTracer (drpc serves debug_ on 1301; parity traces omit revert data)
-    ct = json.loads(cast('rpc', 'debug_traceTransaction', found['hash'], '{"tracer":"callTracer"}', rpc=DEBUG_1301))
-    hf = []
-
-    def walk(f):
-        if (f.get('to') or '').lower() == h.lower() and f.get('type') == 'CALL' and f['input'][2:10] == SEL_CONDUCT:
-            hf.append(f)
-        for c in f.get('calls', []):
-            walk(c)
-    walk(ct)
-    row['hubFrame'] = {'error': hf[0].get('error'), 'output': hf[0].get('output')} if len(hf) == 1 else None
-    row['word0IsSpoofRC'] = len(hf) == 1 and hf[0]['input'][10:74] == word
-    row['rejectedNotRc'] = len(hf) == 1 and bool(hf[0].get('error')) and (hf[0].get('output') or '')[:10] == NOT_RC
-    snap = trig[0].get('hubSnapshot')
-    if snap:  # the driver's snapshot at the trigger: nothing may have changed the Hub's funds before the delivery
-        row['snapshotAtTrigger'] = snap
-    row['pass'] = (row['hubLogs'] == 0 and all(v == 0 for v in (row['conduct99'] or [0])) and row['word0IsSpoofRC']
-                   and row['rejectedNotRc'])
+           'reservesBefore': pc('reserves(address)(uint256)', db - 1), 'reservesAfter': pc('reserves(address)(uint256)', db),
+           'snapshotAtTrigger': trig[0].get('hubSnapshot')}
+    row = spoof_verdict(row, hub_frames(found['hash'], h), word, blk['transactions'], h, found['hash'])
     doc = load()
-    save(doc, 'L-SPOOF', [row], 'a third-party RC\'s rcConduct to the 1301 Hub: rejected (no Hub log, conduct(99) '
-         'unchanged), and what the proxy charged the Hub for it (OQ-18, PB-12)')
-    print('loops: L-SPOOF', {k: row[k] for k in ('destStatus', 'hubLogs', 'charged', 'otherDeliveriesInBlock', 'pass')})
+    note = ('a third-party RC\'s rcConduct to the 1301 Hub: ' + ('rejected (NotRc, word 0 = the third party, no Hub log, '
+            'conduct(99) zero)' if row['pass'] else 'NOT shown rejected: see the row') + '; the charge ' +
+            (f'{row["charged"]} wei (billed: {row["billed"]})' if row['chargeAttributable'] else 'not attributable '
+             '(other Hub/proxy txs in the block)') + ' (OQ-18, PB-12)')
+    save(doc, 'L-SPOOF', [row], note)
+    print('loops: L-SPOOF', {k: row[k] for k in ('destStatus', 'rejectedNotRc', 'charged', 'billed', 'pass')})
 
-
-def mcp_trace_rc(ch, origin_tx, log_index, rc_addr):
-    sys.path.insert(0, os.path.join(ROOT, 'script', 'rnk'))
-    from rmcp import call  # noqa: E402
-    tr = call('trace_origin_event', {'originChainId': int(ch), 'txHash': origin_tx, 'logIndex': log_index,
-                                     'rc': rc_addr, 'maxScanBlocks': 900})
-    if not isinstance(tr, dict) or not tr.get('verdict') or not isinstance(tr.get('data'), dict):
-        raise SystemExit(f'loops: the MCP trace of {origin_tx}#{log_index} failed or returned no data: refusing')
-    return tr
 
 # ------------------------------------------------------------------ selftest (offline: the seams replaced; s7 r1 M-03)
 
@@ -754,7 +772,7 @@ def selftest():
     fails = []
     names = ('cast', 'lcon_origins', 'mcp_trace', 'lasna_scan', 'check_reaction', 'first_applied', 'ts', 'hub',
              'logs_chunked', 'load', 'deployments', 'rpc', 'callback_outcome', 'lasna_scan', 'cron_reactions',
-             'lasna_block_at', 'gas_set_logs', 'hub_entry')
+             'lasna_block_at', 'gas_set_logs', 'hub_entry', 'spoof_delivery')
     saved = {k: g[k] for k in names}
     g['rpc'] = lambda ch: 'http://selftest.invalid'  # no network: every chain read goes through a replaced seam
 
@@ -997,6 +1015,38 @@ def selftest():
            'lgas_rows: a DEFERRED exit fails its row and the next DONE exit fills the cell')
         ok(lgas_key(rows_, {'pass': True})[1] == [f'{c}/{k}' for c in CH for k in KINDS if (c, k) != ('1301', 'exit')],
            'lgas_key: the filled exit cell is not listed missing')
+        # S. L-SPOOF (lspoof r1 M-01): the delivery search and the verdict
+        SP_ = '0x' + '5a' * 20
+        wordS = SP_[2:].rjust(64, '0')
+        dlv = {'hash': '0xdlv', 'to': CH['1301']['proxy'], 'from': OPERATOR_1301, 'input': '0x8d1f0fa1' + '00' * 64 + SEL_CONDUCT + wordS,
+               'blockNumber': hex(0x201)}
+        decoy = {**dlv, 'hash': '0xdecoy', 'from': '0x' + '66' * 20}
+        bare = {**dlv, 'hash': '0xbare', 'input': '0x' + wordS}
+        sblocks = {0x200: {'transactions': [decoy, bare]}, 0x201: {'transactions': [decoy, dlv]}}
+        g['cast'] = lambda *a, rpc: json.dumps(sblocks.get(int(a[2], 16)))
+        ok(saved['spoof_delivery'](SP_, 0x200)[0]['hash'] == '0xdlv',
+           'the spoof delivery: from the operator, the rcConduct payload\'s first word (decoys skipped)')
+        base_row = lambda: {'hubLogs': 0, 'conduct99': [0, 0, 0, 0], 'hubBalanceBefore': 100, 'hubBalanceAfter': 90,  # noqa: E731
+                            'reservesBefore': 0, 'reservesAfter': 0, 'debtBefore': 0, 'debtAfter': 0}
+        fr = lambda out, err='execution reverted', w0=wordS: {'input': '0x' + SEL_CONDUCT + w0, 'error': err, 'output': out}  # noqa: E731
+        v = spoof_verdict(base_row(), [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')
+        ok(v['pass'] and v['charged'] == 10 and v['billed'], 'control: NotRc, word 0 = SpoofRC, charge attributable -> pass, 10 wei billed')
+        for frames, label in (([fr('0x' + 'ab' * 4)], 'another revert (NotProxy-like) is not a NotRc rejection'),
+                              ([fr(NOT_RC, err=None)], 'a Hub frame that did not revert'),
+                              ([fr(NOT_RC, w0=RC[2:].lower().rjust(64, '0'))], 'word 0 = the real RC'),
+                              ([fr(NOT_RC), fr(NOT_RC)], 'two Hub frames'), ([], 'no Hub frame')):
+            ok(spoof_verdict(base_row(), frames, wordS, [dlv], H, '0xdlv')['pass'] is False, f'L-SPOOF fails: {label}')
+        ok(spoof_verdict({**base_row(), 'hubLogs': 1}, [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')['pass'] is False, 'L-SPOOF fails: a Hub log')
+        ok(spoof_verdict({**base_row(), 'conduct99': [0, 0, 0, 1]}, [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')['pass'] is False,
+           'L-SPOOF fails: conduct(99) moved')
+        ok(spoof_verdict({**base_row(), 'conduct99': None}, [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')['pass'] is False,
+           'L-SPOOF fails: conduct(99) not read')
+        v = spoof_verdict(base_row(), [fr(NOT_RC)], wordS, [dlv, {'hash': '0xo', 'to': CH['1301']['proxy']}], H, '0xdlv')
+        ok(v['charged'] is None and v['billed'] is None and v['pass'], 'another proxy tx in the block: the charge is not attributed')
+        v = spoof_verdict({**base_row(), 'hubBalanceAfter': 100, 'reservesBefore': 50, 'reservesAfter': 40}, [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')
+        ok(v['charged'] == 10, 'the charge from reserves counts')
+        v = spoof_verdict({**base_row(), 'hubBalanceAfter': 100, 'debtAfter': 7}, [fr(NOT_RC)], wordS, [dlv], H, '0xdlv')
+        ok(v['charged'] == 7 and v['billed'], 'a charge left as debt counts')
         # H. lcon_origins: only X_A / X_B paths; pending refuses
         g['deployments'] = lambda ch: {'lcon_YA_20261125': {'txs': [{'tx': otx, 'status': 'ok'}]}} if ch == '1301' else {}
         refuses(lambda: saved['lcon_origins'](), 'has no L-CON path', 'a Y_A step folded into L-CON-AA (r1 m-04)')

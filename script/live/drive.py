@@ -426,12 +426,37 @@ DEAD = '0x000000000000000000000000000000000000dEaD'
 T_SPOOFED = '0x4b0a55ddffba14bae97855025ebc9b10d98f19d584131d8fc461896fed8f7b4c'  # SpoofRC.Spoofed(uint256,address,uint32,uint64)
 
 
+LASNA_DEP = os.path.join(ROOT, 'audits', 'deployments-5318007.json')
+
+
+def _lasna_receipt(tx, tries=30):
+    for _ in range(tries):
+        r = subprocess.run(['cast', 'receipt', '--json', '--rpc-url', LASNA, tx], capture_output=True, text=True)
+        if r.returncode == 0 and r.stdout.strip():
+            return json.loads(r.stdout)
+        time.sleep(4)
+    return None
+
+
+def _lspoof(doc=None):
+    return (doc or json.load(open(LASNA_DEP)))['steps'].get('lspoof')
+
+
+def _save_lspoof(step):
+    doc = json.load(open(LASNA_DEP))
+    doc['steps']['lspoof'] = step
+    open(LASNA_DEP, 'w').write(json.dumps(doc, indent=1) + '\n')
+
+
 def spoof_deploy(fund, dry):
-    """SpoofRC on Lasna from the OWNER key (never the RC deployer, F-007), funded with `fund` wei of lREACT as
-    reserves through the system contract's depositTo; recorded in audits/deployments-5318007.json step `lspoof`."""
+    """SpoofRC on Lasna from the OWNER key (never the RC deployer, F-007). The creation is sent async and recorded as
+    `pending` with its predicted CREATE address BEFORE waiting (lspoof r1 m-02: a landed, subscribed SpoofRC is never
+    unrecorded); then `spoof_fund` deposits its reserves."""
     me = signer()
     if me.lower() == RC_DEPLOYER.lower():
         refuse('the signer is the RC deployer (F-007)')
+    if _lspoof():
+        refuse('lspoof already recorded: the spoof RC exists (spoof-fund resumes its deposit)')
     a = json.load(open(os.path.join(ROOT, 'out', 'SpoofRC.sol', 'SpoofRC.json')))
     _, hub_ = reagent('1301')
     token = tokens('1301')[0]
@@ -440,34 +465,64 @@ def spoof_deploy(fund, dry):
     if dry:
         print(f'drive: dry run: SpoofRC creation estimates {est} gas on Lasna (token {token}, hub {hub_})')
         return
-    doc = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))
-    if 'lspoof' in doc['steps']:
-        refuse('lspoof already recorded: the spoof RC exists')
-    r = json.loads(_run(['cast', 'send', '--json', *wallet(), '--rpc-url', LASNA, '--gas-limit', str(est * 3 // 2),
-                         '--create', code]))
-    ok = int(r['status'], 16) == 1
-    rec = {'from': me, 'tx': r['transactionHash'], 'status': 'ok' if ok else 'FAILED', 'address': r.get('contractAddress'),
-           'gasUsed': int(r['gasUsed'], 16), 'token': token, 'hub': hub_}
-    doc['steps']['lspoof'] = {'source': 'receipts (script/live/drive.py)', **stamp(),
-                              'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
-                              'note': 'L-SPOOF: a third-party RC (script/live/SpoofRC.sol) from the owner key', 'txs': [rec]}
-    open(os.path.join(ROOT, 'audits', 'deployments-5318007.json'), 'w').write(json.dumps(doc, indent=1) + '\n')
+    n = int(cast('nonce', '--block', 'pending', me, rpc=LASNA))
+    predicted = cast('compute-address', '--nonce', str(n), me, rpc=LASNA).split()[-1]
+    h = _run(['cast', 'send', '--async', *wallet(), '--rpc-url', LASNA, '--nonce', str(n), '--gas-limit',
+              str(est * 3 // 2), '--create', code]).split()[-1]
+    step = {'source': 'receipts (script/live/drive.py)', **stamp(),
+            'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+            'note': 'L-SPOOF: a third-party RC (script/live/SpoofRC.sol) from the owner key',
+            'txs': [{'label': 'create', 'from': me, 'tx': h, 'status': 'pending', 'address': predicted, 'token': token,
+                     'hub': hub_}]}
+    _save_lspoof(step)
+    r = _lasna_receipt(h)
+    if r is None:
+        refuse(f'{h}: no receipt (recorded pending with the predicted address {predicted})')
+    ok = int(r['status'], 16) == 1 and (r.get('contractAddress') or '').lower() == predicted.lower()
+    step['txs'][0].update(status='ok' if ok else 'FAILED', gasUsed=int(r['gasUsed'], 16))
+    _save_lspoof(step)
     if not ok:
-        refuse(f'SpoofRC creation failed: {r["transactionHash"]}')
-    d = json.loads(_run(['cast', 'send', '--json', *wallet(), '--rpc-url', LASNA, '--value', str(fund),
-                         '0x8888888888888888888888888888888888888888', 'depositTo(address)', rec['address']]))
-    rec2 = {'label': 'depositTo', 'tx': d['transactionHash'], 'status': 'ok' if int(d['status'], 16) == 1 else 'FAILED',
-            'value': str(fund)}
-    doc['steps']['lspoof']['txs'].append(rec2)
-    open(os.path.join(ROOT, 'audits', 'deployments-5318007.json'), 'w').write(json.dumps(doc, indent=1) + '\n')
-    print(f'drive: SpoofRC {rec["address"]} funded ({rec2["status"]})')
+        refuse(f'SpoofRC creation failed or landed off {predicted}: {h}')
+    print(f'drive: SpoofRC {predicted} created')
+    spoof_fund(fund, False)
+
+
+def spoof_fund(fund, dry):
+    """lREACT reserves for SpoofRC (the system contract's depositTo): dry-run by estimate; refused once a deposit
+    landed; a FAILED deposit refuses (lspoof r1 m-02)."""
+    step = _lspoof()
+    if not step or step['txs'][0].get('status') != 'ok':
+        refuse('no landed SpoofRC creation recorded')
+    if any(t.get('label') == 'depositTo' and t.get('status') in ('ok', 'pending') for t in step['txs']):
+        refuse('a SpoofRC deposit is already recorded')
+    spoof, me = step['txs'][0]['address'], signer()
+    args = ['--value', str(fund), '0x8888888888888888888888888888888888888888', 'depositTo(address)', spoof]
+    cast('estimate', '--from', me, *args, rpc=LASNA)
+    if dry:
+        print('drive: dry run: the deposit does not revert')
+        return
+    h = _run(['cast', 'send', '--async', *wallet(), '--rpc-url', LASNA, *args]).split()[-1]
+    step['txs'].append({'label': 'depositTo', 'tx': h, 'status': 'pending', 'value': str(fund)})
+    _save_lspoof(step)
+    r = _lasna_receipt(h)
+    ok = r is not None and int(r['status'], 16) == 1
+    step['txs'][-1]['status'] = 'ok' if ok else ('pending' if r is None else 'FAILED')
+    _save_lspoof(step)
+    if not ok:
+        refuse(f'the SpoofRC deposit {h} did not land ({step["txs"][-1]["status"]})')
+    print(f'drive: SpoofRC funded {fund} wei')
 
 
 def spoof_trigger(dry):
     """One unit of mUSDC from the owner to 0x…dEaD on 1301: the only log SpoofRC subscribes to."""
-    doc = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))
-    if 'lspoof' not in doc['steps'] and not dry:
-        refuse('no SpoofRC recorded: deploy it first')
+    st = _lspoof()
+    if not dry and (not st or st['txs'][0].get('status') != 'ok'
+                    or not any(t.get('label') == 'depositTo' and t.get('status') == 'ok' for t in st['txs'])):
+        refuse('the SpoofRC creation and its deposit must both have landed first')
+    prior = [t for k, v in json.load(open(os.path.join(ROOT, 'audits', 'deployments-1301.json')))['steps'].items()
+             if k.startswith('lspoof_') for t in v['txs'] if t.get('status') != 'FAILED']
+    if prior:
+        refuse('a spoof trigger is already recorded (SpoofRC is one-shot)')
     token = tokens('1301')[0]
     step = f'lspoof_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
     _, hub_ = reagent('1301')
@@ -532,6 +587,64 @@ def selftest():
             except Refused as e:
                 print(f'selftest ok: retire {nm} is refused' if must in str(e) else f'selftest FAIL: {e}')
                 fails += 0 if must in str(e) else 1
+        # L-SPOOF refusals (lspoof r1 M-01)
+        g['signer'] = lambda: RC_DEPLOYER
+        for fn, must, label in ((lambda: spoof_deploy(1, True), 'RC deployer', 'spoof-deploy from the RC deployer key'),):
+            try:
+                fn()
+                print('selftest FAIL (not refused):', label)
+                fails += 1
+            except Refused as e:
+                print(f'selftest ok: {label} is refused' if must in str(e) else f'selftest FAIL: {label}: {e}')
+                fails += 0 if must in str(e) else 1
+        g['signer'] = lambda: '0x' + 'aa' * 20
+        saved3 = {k: g[k] for k in ('_lspoof',)}
+        for lsp, must, label in (({'txs': [{'status': 'ok'}]}, 'already recorded', 'a second spoof-deploy'),):
+            g['_lspoof'] = lambda doc=None, _l=lsp: _l
+            try:
+                spoof_deploy(1, True)
+                print('selftest FAIL (not refused):', label)
+                fails += 1
+            except Refused as e:
+                print(f'selftest ok: {label} is refused' if must in str(e) else f'selftest FAIL: {label}: {e}')
+                fails += 0 if must in str(e) else 1
+        for lsp, must, label in ((None, 'must both have landed', 'a trigger before the creation'),
+                                 ({'txs': [{'status': 'ok'}]}, 'must both have landed', 'a trigger before the deposit'),
+                                 ({'txs': [{'status': 'ok'}, {'label': 'depositTo', 'status': 'FAILED'}]}, 'must both have landed',
+                                  'a trigger after a FAILED deposit')):
+            g['_lspoof'] = lambda doc=None, _l=lsp: _l
+            try:
+                spoof_trigger(False)
+                print('selftest FAIL (not refused):', label)
+                fails += 1
+            except Refused as e:
+                print(f'selftest ok: {label} is refused' if must in str(e) else f'selftest FAIL: {label}: {e}')
+                fails += 0 if must in str(e) else 1
+        try:
+            g['_lspoof'] = lambda doc=None: {'txs': [{'status': 'ok'}, {'label': 'depositTo', 'status': 'ok'}]}
+            spoof_fund(1, True)
+            print('selftest FAIL (not refused): a second deposit')
+            fails += 1
+        except Refused as e:
+            print('selftest ok: a second deposit is refused' if 'already recorded' in str(e) else f'selftest FAIL: {e}')
+            fails += 0 if 'already recorded' in str(e) else 1
+        import tempfile as _tf2
+        with _tf2.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, 'audits'))
+            json.dump({'steps': {'lspoof_20261125': {'txs': [{'tx': '0x1', 'status': 'ok'}]}}},
+                      open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
+            g['ROOT'] = td
+            g['_lspoof'] = lambda doc=None: {'txs': [{'status': 'ok'}, {'label': 'depositTo', 'status': 'ok'}]}
+            try:
+                spoof_trigger(False)
+                print('selftest FAIL (not refused): a second spoof trigger')
+                fails += 1
+            except Refused as e:
+                print('selftest ok: a second spoof trigger is refused' if 'one-shot' in str(e) else f'selftest FAIL: {e}')
+                fails += 0 if 'one-shot' in str(e) else 1
+            finally:
+                g['ROOT'] = saved_root
+        g.update(saved3)
         saved2 = {k: g[k] for k in ('resolve', 'preflight', 'covenant')}
         g['resolve'] = lambda nm: {**v, 'name': nm}
         g['preflight'] = lambda *a, **k: 0
@@ -639,6 +752,8 @@ def main(argv):
         retire(name, '--dry' in argv, '--yes-irreversible' in argv)
     elif cmd == 'spoof-deploy':
         spoof_deploy(opt('--fund', 5 * 10**17), '--dry' in argv) if name in ('', 'lasna') else refuse('spoof-deploy lasna')
+    elif cmd == 'spoof-fund':
+        spoof_fund(opt('--fund', 5 * 10**17), '--dry' in argv)
     elif cmd == 'spoof-trigger':
         spoof_trigger('--dry' in argv)
     elif cmd == 'resolve':

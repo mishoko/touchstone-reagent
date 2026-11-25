@@ -58,6 +58,14 @@ MUTANTS = [
             if len(w) > 13 and (w[12], w[13], w[0]) == tail:""", None),
     ('lasna_scan: stops AT t0 + 4 h', "if int(blk['timestamp'], 16) > t0 + TIMEOUT_S:", "if int(blk['timestamp'], 16) >= t0 + TIMEOUT_S:", None),
     ('the callback leg measured from the origin', "'leg_callback_s': t1 - rx['ts']}", "'leg_callback_s': t1 - t0}", None),
+    # lspoof r1 M-01
+    ('L-SPOOF: the NotRc requirement dropped', "and row['word0IsSpoofRC']\n                   and row['rejectedNotRc'])", "and row['word0IsSpoofRC'])", None),
+    ('L-SPOOF: the word-0 requirement dropped', "and row['word0IsSpoofRC']\n                   and row['rejectedNotRc'])", "\n                   and row['rejectedNotRc'])", None),
+    ('L-SPOOF: any proxy tx is the delivery', "                    and needle in x['input'].lower()):", "                    ):", None),
+    ('L-SPOOF: the operator check dropped', "and (x.get('from') or '').lower() == OPERATOR_1301", '', None),
+    ('L-SPOOF: the charge always attributed', "row['chargeAttributable'] = not others", "row['chargeAttributable'] = True", None),
+    ('L-SPOOF: debt left out of the charge', "        + (row['debtAfter'] - row['debtBefore'])\n    row['charged']", "\n    row['charged']", None),
+    ('L-SPOOF: an unread conduct(99) passes', "row['hubLogs'] == 0 and bool(c99) and all(v == 0 for v in c99)", "row['hubLogs'] == 0 and all(v == 0 for v in (c99 or []))", None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 
