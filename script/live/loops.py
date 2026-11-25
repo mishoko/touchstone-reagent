@@ -236,6 +236,16 @@ def mcp_trace(ch, origin_tx, log_index):
     return tr
 
 
+# The MCP's verdicts for a log no subscription carried, as recorded on 2026-11-25 for an unsubscribed 1301 Transfer
+# (0x4a79…b2 log 0): verdict FILTER_MISMATCH, finding SEQUENCED_NOT_CARRIED (s7 loops r3 m-03).
+NOT_CARRIED = ('FILTER_MISMATCH', 'SEQUENCED_NOT_CARRIED')
+
+
+def not_carried(tr):
+    vs = [tr.get('verdict')] + [f.get('verdict') for f in tr.get('findings', []) if isinstance(f, dict)]
+    return any(v in NOT_CARRIED for v in vs)
+
+
 def check_reaction(ch, lasna_tx, origin_tx, log_index, emitter):
     """The Lasna tx's own input (the system's call carrying `react(LogRecord)`) must name this RC, chain, emitter,
     Action topic, origin tx and log index: the attribution rests on Lasna data. Returns the reaction and the rcConduct
@@ -362,7 +372,7 @@ def lcon_rows(now):
         tr = mcp_trace(ch, otx, li)
         lx = ((tr['data'].get('reaction') or {}).get('tx'))
         scanned = None
-        if not lx and any(w in tr['verdict'].upper() for w in ('SUBSCRI', 'FILTER', 'NOT_CARRIED')):
+        if not lx and not_carried(tr):
             raise SystemExit(f'loops: {otx}: the MCP says the log was not carried ({tr["verdict"]}): no attempted '
                              'loop (the subscription was not in effect at the origin); investigate')
         if not lx:
@@ -622,11 +632,13 @@ def lgas():
         i = sys.argv.index('--cron')
         rng = (int(sys.argv[i + 1]), int(sys.argv[i + 2]))
     rows, cron = lgas_rows(rng)
-    if cron:
-        rows.append(cron)
-    key, missing = lgas_key(rows[:-1] if cron else rows, cron)
+    key, missing = lgas_key(rows, cron)
+    failing = [r for r in rows if not r.get('pass')]
+    rows = [r for r in rows if r.get('pass')] + ([cron] if cron else [])
     doc = load()
-    doc['loops'] = [e for e in doc.get('loops', []) if e.get('id') not in ('L-GAS', 'L-GAS-partial')]
+    doc['loops'] = [e for e in doc.get('loops', []) if e.get('id') not in ('L-GAS', 'L-GAS-partial', 'L-GAS-failing')]
+    if failing:  # kept as evidence under their own key, never inside the claimed ID (s7 loops r3 m-01)
+        save(doc, 'L-GAS-failing', failing, 'deliveries that failed their L-GAS cell (kept, not claimed)')
     save(doc, key, rows, 'one delivery per (chain, kind) at exactly its gasLimit; the Hub entry gas from a parity '
          f'trace; F = gasLimit - entry*64/63 (spec §5.6, OQ-19); missing or failing: {missing or "none"}')
     for r in rows:
@@ -635,6 +647,106 @@ def lgas():
     if cron and not cron['pass']:
         raise SystemExit('loops: L-GAS: the live Cron forward FAILS the 10% margin rule: STOP and escalate (handoff §6 2)')
 
+# ------------------------------------------------------------------ L-SPOOF (spec §9.5, OQ-18, PB-12)
+
+SPOOF_WINDOW_S = 1800
+DEBUG_1301 = 'https://unichain-sepolia.drpc.org'  # debug_traceTransaction (callTracer) on 1301
+NOT_RC = '0x1cac49a3'  # ReagentHub.NotRc()  # the delivery is searched for this long after the Lasna reaction
+
+
+def lspoof():
+    """The third-party RC's (script/live/SpoofRC.sol, deployed from the owner key: `lspoof` in deployments-5318007)
+    single `rcConduct` to the 1301 Hub: the trigger (the `lspoof_<date>` step on 1301) → SpoofRC's reaction on Lasna
+    (the MCP trace for that RC, checked against the reaction's own LogRecord) → the 1301 delivery, found as the tx to
+    the callback proxy whose calldata carries the injected first word = SpoofRC (the proxy writes it). Recorded: the
+    delivery's status, whether the Hub emitted anything (it must not: `callback(rc)` rejects a foreign RC), the Hub's
+    `conduct(99)` (must stay 0), and the Hub's balance, reserves and debt at the blocks before and after (the charge,
+    OQ-18)."""
+    sp = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))['steps'].get('lspoof')
+    if not sp:
+        raise SystemExit('loops: no lspoof step: the spoof RC is not deployed')
+    spoof = sp['txs'][0]['address']
+    trig = [t for step, s in deployments('1301').items() if step.startswith('lspoof_') for t in s['txs']
+            if t.get('status') == 'ok']
+    if len(trig) != 1:
+        raise SystemExit(f'loops: {len(trig)} spoof triggers recorded (want exactly one)')
+    otx = trig[0]['tx']
+    tr = mcp_trace_rc('1301', otx, trig[0]['logIndex'], spoof)
+    lx = (tr['data'].get('reaction') or {}).get('tx')
+    if not lx:
+        raise SystemExit(f'loops: no reaction of the spoof RC yet ({tr["verdict"]}); re-run later')
+    t = json.loads(cast('tx', '--json', lx, rpc=LASNA))
+    w = words(t['input'][10:])
+    if (t.get('to') or '').lower() != SYSTEM or w[0] != spoof[2:].lower().rjust(64, '0') or w[12] != otx[2:].lower():
+        raise SystemExit(f'loops: {lx} is not the spoof RC\'s reaction to {otx}')
+    lts = int(t['blockTimestamp'], 16)
+    b0 = int(cast('find-block', str(lts), rpc=rpc('1301'))) - 2
+    h, proxy, word = hub('1301'), CH['1301']['proxy'].lower(), spoof[2:].lower().rjust(64, '0')
+    found = None
+    for b in range(b0, b0 + SPOOF_WINDOW_S):
+        blk = json.loads(cast('rpc', 'eth_getBlockByNumber', hex(b), 'true', rpc=rpc('1301')) or 'null')
+        if not blk:
+            raise SystemExit(f'loops: 1301 block {b} not served yet; re-run later')
+        for x in blk['transactions']:
+            if (x.get('to') or '').lower() == proxy and word in x['input'].lower():
+                found = x
+                break
+        if found:
+            break
+    if not found:
+        raise SystemExit(f'loops: no 1301 delivery carrying the spoof RC within {SPOOF_WINDOW_S} blocks')
+    db = int(found['blockNumber'], 16)
+    r = json.loads(cast('receipt', '--json', found['hash'], rpc=rpc('1301')))
+    pc = lambda sig, blk: int(cast('call', '--block', str(blk), CH['1301']['proxy'], sig, h, rpc=rpc('1301')).split()[0])  # noqa: E731
+    bal = lambda blk: int(cast('balance', h, '--block', str(blk), rpc=rpc('1301')))  # noqa: E731
+    hub_logs = [l for l in r['logs'] if l['address'].lower() == h.lower()]
+    c99 = cast('call', h, 'conduct(uint32)(uint32,uint32,uint32,uint64)', '99', rpc=rpc('1301')).split()
+    row = {'spoofRC': spoof, 'originTx': otx, 'lasnaTx': lx, 'destTx': found['hash'], 'destBlock': db,
+           'destStatus': int(r['status'], 16), 'destGasUsed': int(r['gasUsed'], 16), 'hubLogs': len(hub_logs),
+           'proxyLogs': [{'topic0': l['topics'][0], 'data': l['data']} for l in r['logs']
+                         if l['address'].lower() == proxy],
+           'conduct99': [int(x) for x in c99[:4]] if c99 else None,
+           'hubBalanceBefore': bal(db - 1), 'hubBalanceAfter': bal(db),
+           'debtBefore': pc('debts(address)(uint256)', db - 1), 'debtAfter': pc('debts(address)(uint256)', db),
+           'reservesBefore': pc('reserves(address)(uint256)', db - 1), 'reservesAfter': pc('reserves(address)(uint256)', db)}
+    row['charged'] = (row['hubBalanceBefore'] - row['hubBalanceAfter']) + (row['reservesBefore'] - row['reservesAfter']) \
+        + (row['debtAfter'] - row['debtBefore'])
+    others = [x for x in json.loads(cast('rpc', 'eth_getBlockByNumber', hex(db), 'true', rpc=rpc('1301')))['transactions']
+              if x['hash'] != found['hash'] and (x.get('to') or '').lower() == proxy]
+    row['otherDeliveriesInBlock'] = len(others)  # a nonzero count makes the balance step not this delivery's alone
+    # the Hub frame's revert data from a callTracer (drpc serves debug_ on 1301; parity traces omit revert data)
+    ct = json.loads(cast('rpc', 'debug_traceTransaction', found['hash'], '{"tracer":"callTracer"}', rpc=DEBUG_1301))
+    hf = []
+
+    def walk(f):
+        if (f.get('to') or '').lower() == h.lower() and f.get('type') == 'CALL' and f['input'][2:10] == SEL_CONDUCT:
+            hf.append(f)
+        for c in f.get('calls', []):
+            walk(c)
+    walk(ct)
+    row['hubFrame'] = {'error': hf[0].get('error'), 'output': hf[0].get('output')} if len(hf) == 1 else None
+    row['word0IsSpoofRC'] = len(hf) == 1 and hf[0]['input'][10:74] == word
+    row['rejectedNotRc'] = len(hf) == 1 and bool(hf[0].get('error')) and (hf[0].get('output') or '')[:10] == NOT_RC
+    snap = trig[0].get('hubSnapshot')
+    if snap:  # the driver's snapshot at the trigger: nothing may have changed the Hub's funds before the delivery
+        row['snapshotAtTrigger'] = snap
+    row['pass'] = (row['hubLogs'] == 0 and all(v == 0 for v in (row['conduct99'] or [0])) and row['word0IsSpoofRC']
+                   and row['rejectedNotRc'])
+    doc = load()
+    save(doc, 'L-SPOOF', [row], 'a third-party RC\'s rcConduct to the 1301 Hub: rejected (no Hub log, conduct(99) '
+         'unchanged), and what the proxy charged the Hub for it (OQ-18, PB-12)')
+    print('loops: L-SPOOF', {k: row[k] for k in ('destStatus', 'hubLogs', 'charged', 'otherDeliveriesInBlock', 'pass')})
+
+
+def mcp_trace_rc(ch, origin_tx, log_index, rc_addr):
+    sys.path.insert(0, os.path.join(ROOT, 'script', 'rnk'))
+    from rmcp import call  # noqa: E402
+    tr = call('trace_origin_event', {'originChainId': int(ch), 'txHash': origin_tx, 'logIndex': log_index,
+                                     'rc': rc_addr, 'maxScanBlocks': 900})
+    if not isinstance(tr, dict) or not tr.get('verdict') or not isinstance(tr.get('data'), dict):
+        raise SystemExit(f'loops: the MCP trace of {origin_tx}#{log_index} failed or returned no data: refusing')
+    return tr
+
 # ------------------------------------------------------------------ selftest (offline: the seams replaced; s7 r1 M-03)
 
 def selftest():
@@ -642,7 +754,7 @@ def selftest():
     fails = []
     names = ('cast', 'lcon_origins', 'mcp_trace', 'lasna_scan', 'check_reaction', 'first_applied', 'ts', 'hub',
              'logs_chunked', 'load', 'deployments', 'rpc', 'callback_outcome', 'lasna_scan', 'cron_reactions',
-             'lasna_block_at')
+             'lasna_block_at', 'gas_set_logs', 'hub_entry')
     saved = {k: g[k] for k in names}
     g['rpc'] = lambda ch: 'http://selftest.invalid'  # no network: every chain read goes through a replaced seam
 
@@ -778,7 +890,8 @@ def selftest():
         g['first_applied'] = lambda *a: (None, 999)
         r = lcon_rows(NOW_OLD)['L-CON-AA'][0]
         ok(not r['delivered'] and 'no Applied' in r['why'], 'control: no Applied in a search covering 4 h: undelivered')
-        g['mcp_trace'] = lambda *a: {'verdict': 'NOT_SUBSCRIBED', 'data': {}}
+        g['mcp_trace'] = lambda *a: {'verdict': 'FILTER_MISMATCH', 'data': {},
+                                     'findings': [{'verdict': 'SEQUENCED_NOT_CARRIED'}]}  # the recorded answer
         refuses(lambda: lcon_rows(NOW_OLD), 'not carried', 'a log the subscription did not carry is no attempted loop')
         # K. callback_outcome (r1 m-03, r2 m-03)
         note = lambda kind, outcome: {'address': H, 'topics': [T_NOTE, '0x0', '0x0', '0x' + W(kind)],  # noqa: E731
@@ -791,6 +904,12 @@ def selftest():
         ok(saved['callback_outcome']('1301', '0x1', 'conduct')[0] is False, 'a Stale answer fails the cell')
         g['cast'] = lambda *a, rpc: json.dumps({'logs': []})
         ok(saved['callback_outcome']('1301', '0x1', 'conduct')[0] is True, 'control: a conduct delivery without Stale passes')
+        g['cast'] = lambda *a, rpc: json.dumps({'logs': [note(2, 1), note(2, 1)]})
+        ok(saved['callback_outcome']('1301', '0x1', 'exit')[0] is False, 'two EXIT notes in one delivery fail the cell')
+        g['cast'] = lambda *a, rpc: json.dumps({'logs': [note(1, 0), note(2, 1)]})
+        ok(saved['callback_outcome']('1301', '0x1', 'exit') == (True, 1), 'a STATE note beside the EXIT note is not an outcome')
+        g['cast'] = lambda *a, rpc: json.dumps({'logs': [{'address': '0x' + '77' * 20, 'topics': [T_STALE], 'data': '0x'}]})
+        ok(saved['callback_outcome']('1301', '0x1', 'conduct')[0] is True, 'a Stale from another contract is not the Hub\'s')
         # L. the Lasna scanners on fake blocks
         sys_tx = lambda h, rc_, li, t0w=T_ACTION: {'hash': h, 'to': SYSTEM, 'input': '0x0d0d0d0d' + ''.join(  # noqa: E731
             [W(rc_), W(0x40), W(1301), W(H), t0w[2:]] + ['0' * 64] * 7 + [otx[2:], W(li)])}
@@ -812,6 +931,72 @@ def selftest():
                                           sys_tx('0xothercron', '0x' + '99' * 20, 0, T_CRON100)]}}
         g['cast'] = lambda *a, rpc: json.dumps(cblocks.get(int(a[2], 16), {'transactions': []}))
         ok(saved['cron_reactions'](200, 200) == ['0xcron'], 'cron_reactions: this RC\'s Cron100 only')
+        # M. (r3 M-01) lcon_stats' own verdict: >= 50 loops over >= 3 dated batches
+        mkd = lambda d: {**mk(True), 'batch': d}  # noqa: E731
+        ok(lcon_stats('X', [mkd('2026-11-25')] * 50)['pass'] is False, 'stats verdict: 50 loops on one date fail')
+        ok(lcon_stats('X', [mkd('2026-11-25')] * 17 + [mkd('2026-11-26')] * 16 + [mkd('2026-11-27')] * 16)['pass'] is False,
+           'stats verdict: 49 loops over 3 dates fail')
+        ok(lcon_stats('X', [mkd('2026-11-25')] * 17 + [mkd('2026-11-26')] * 17 + [mkd('2026-11-27')] * 16)['pass'] is True,
+           'stats verdict: 50 loops over 3 dates pass')
+        # N. check_reaction's receipt guards
+        def rc_case(status='0x1', logs_=None, ch_='1301'):
+            d = {'tx': json.dumps({'to': SYSTEM, 'input': good_in, 'blockNumber': '0x5', 'blockTimestamp': '0x64'}),
+                 'receipt': json.dumps({'status': status, 'gasUsed': '0x1', 'logs': logs_ if logs_ is not None else [cb(1301, H)]})}
+            g['cast'] = lambda *a, rpc: d[a[0]]
+            return lambda: saved['check_reaction'](ch_, '0xL', otx, 7, H)
+        refuses(rc_case('0x0'), 'failed', 'a failed reaction receipt')
+        short = dict(cb(1301, H)); short['data'] = short['data'][:-64]
+        short['data'] = short['data'][:2 + 64 * 8] + W(0xa4) + short['data'][2 + 64 * 9:]
+        ok('1301' not in rc_case(logs_=[short])()['sends'], 'a 5-argument payload is not read as an rcConduct')
+        other = dict(cb(1301, H)); other['topics'] = other['topics'][:2] + ['0x' + W('0x' + '99' * 20)] + other['topics'][3:]
+        ok('1301' not in rc_case(logs_=[other])()['sends'], 'another RC\'s callback request is ignored')
+        refuses(rc_case(logs_=[cb(1301, H), cb(1301, H)]), 'two rcConduct', 'two snapshots to one chain in one reaction')
+        # O. lasna_block_at on a fake chain (the era guard and the boundary)
+        g['cast'] = lambda *a, rpc: str(RC_BLOCK + 1000) if a[0] == 'block-number' else str(T0 + (int(a[1]) - RC_BLOCK) * 2)
+        ok(saved['lasna_block_at'](T0 + 10) == RC_BLOCK + 5, 'lasna_block_at: the first block at the timestamp')
+        ok(saved['lasna_block_at'](T0 + 11) == RC_BLOCK + 6, 'lasna_block_at: the first block after a timestamp between blocks')
+        refuses(lambda: saved['lasna_block_at'](T0), 'outside the RC era', 'lasna_block_at: a time at or before the RC era')
+        # P. lasna_scan: only system txs; the walk stops only PAST t0 + 4 h
+        g['lasna_block_at'] = lambda t: 0x100
+        blocks2 = {0x100: {'timestamp': hex(T0), 'transactions': [{**sys_tx('0xnotsys', RC, 7), 'to': H}]},
+                   0x101: {'timestamp': hex(T0 + TIMEOUT_S), 'transactions': []},
+                   0x102: {'timestamp': hex(T0 + TIMEOUT_S), 'transactions': [sys_tx('0xlate', RC, 7)]}}
+        g['cast'] = lambda *a, rpc: json.dumps(blocks2.get(int(a[2], 16), {'timestamp': hex(T0 + TIMEOUT_S + 1), 'transactions': []}))
+        ok(saved['lasna_scan']('1301', otx, 7, T0)[0] == '0xlate',
+           'lasna_scan: a non-system tx never counts, and a block at exactly t0 + 4 h is still scanned')
+        # Q. lcon_rows: the cross-chain search starts at the destination's own block; the callback leg from the reaction
+        g['lcon_origins'] = lambda: [('XA', '1301', otx)]
+        g['ts'] = lambda ch, b: T0 if b == 10 else T0 + 30
+        g['hub'] = lambda ch: H
+        g['mcp_trace'] = lambda *a: {'verdict': 'REACTED', 'data': {'reaction': {'tx': '0xL'}}}
+        g['check_reaction'] = lambda *a: react
+        react['sends'] = {c: {'hub': H, 'gasLimit': 1, 'id': 1, 'actions': 1, 'seq': 4} for c in CH}
+        starts = {}
+        g['first_applied'] = lambda dest, h, i, s_, f, c: (starts.__setitem__(dest, f), (ap(5, 40), 40))[1]
+        g['cast'] = lambda *a, rpc: rec if a[0] == 'receipt' else ('777' if a[0] == 'find-block' else '20')
+        r = lcon_rows(NOW_NEW)
+        ok(starts == {'1301': 10, '11155111': 776}, 'the same-chain search starts at the origin block, the cross-chain one '
+           'at the destination block for the origin time')
+        ok(r['L-CON-AB'][0]['leg_callback_s'] == 28, 'the callback leg is measured from the reaction, not the origin')
+        # R. lgas_rows: a DEFERRED exit then a DONE exit: one failing row, then the passing one fills the cell
+        tbl = rc_gas_table()
+        lim = tbl[('1301', 'exit')]['gasLimit']
+        g['gas_set_logs'] = lambda: []
+        g['load'] = lambda: {'loops': [{'destChain': 1301, 'destTx': '0xd1'}, {'destChain': 1301, 'destTx': '0xd2'}]}
+        g['deployments'] = lambda ch: {}
+        g['hub'] = lambda ch: H
+        g['hub_entry'] = lambda ch, tx: ('exit', 1_200_000, None)
+        outc = {'0xd1': DEFERRED, '0xd2': 1}
+        def lg_cast(*a, rpc):
+            if a[0] == 'tx':
+                return json.dumps({'to': CH['1301']['proxy'], 'gas': hex(lim), 'input': '0x00'})
+            return json.dumps({'logs': [note(2, outc[a[2]])]})
+        g['cast'] = lg_cast
+        rows_, _ = lgas_rows()
+        ok([r_['pass'] for r_ in rows_] == [False, True] and rows_[0]['outcome'] == DEFERRED,
+           'lgas_rows: a DEFERRED exit fails its row and the next DONE exit fills the cell')
+        ok(lgas_key(rows_, {'pass': True})[1] == [f'{c}/{k}' for c in CH for k in KINDS if (c, k) != ('1301', 'exit')],
+           'lgas_key: the filled exit cell is not listed missing')
         # H. lcon_origins: only X_A / X_B paths; pending refuses
         g['deployments'] = lambda ch: {'lcon_YA_20261125': {'txs': [{'tx': otx, 'status': 'ok'}]}} if ch == '1301' else {}
         refuses(lambda: saved['lcon_origins'](), 'has no L-CON path', 'a Y_A step folded into L-CON-AA (r1 m-04)')
@@ -829,7 +1014,7 @@ if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else ''
     if what == '--selftest':
         sys.exit(0 if selftest() else 1)
-    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas}
+    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof}
     if what not in cmds:
         raise SystemExit(__doc__)
     cmds[what]()

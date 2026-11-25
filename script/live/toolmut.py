@@ -29,6 +29,36 @@ MUTANTS = [
     ('the proxy-sender check removed', "    if tx['to'].lower() != CH[dest]['proxy'].lower():", '    if False:', None),
     ('p95 lower-bound threshold off by one', "'p95IsLowerBound': und * 20 > len(rs)", "'p95IsLowerBound': und * 20 >= len(rs)", None),
     ('lgas_key ignores the Cron forward', "and bool(cron and cron['pass'])", '', None),
+    # r3's reviewer-supplied set (s7 loops r3 M-01's standing check: a reviewer's mutants join the author's)
+    ('stats verdict always true', "'pass': len(rs) >= 50 and len(batches) >= 3,", "'pass': True,", None),
+    ('stats verdict drops the 3-batch rule', "'pass': len(rs) >= 50 and len(batches) >= 3,", "'pass': len(rs) >= 50,", None),
+    ('an L-GAS row passes without its outcome', 'ok = gas == want[\'gasLimit\'] and not err and entry >= thr and good',
+     'ok = gas == want[\'gasLimit\'] and not err and entry >= thr', None),
+    ('an L-GAS cell locks to its first delivery', '            if ok:\n                seen.add((ch, kind))',
+     '            seen.add((ch, kind))', None),
+    ('outcome: any note count accepted', '    if len(outs) != 1:', '    if not outs:', None),
+    ('outcome: the note-kind filter removed', "and int(l['topics'][3], 16) in (2, 3):", ':', None),
+    ('outcome: Stale from any address', "    if any(l['address'].lower() == h and l['topics'][0] == T_STALE for l in r['logs']):",
+     "    if any(l['topics'][0] == T_STALE for l in r['logs']):", None),
+    ('reaction: the status check removed', "    if int(r['status'], 16) != 1:\n        raise SystemExit(f'loops: the reaction {lasna_tx} failed')",
+     '', None),
+    ('reaction: the payload-length check removed', 'if payload[:8] != SEL_CONDUCT or plen != 4 + 6 * 32:',
+     'if payload[:8] != SEL_CONDUCT:', None),
+    ('reaction: the RC-topic check removed', " or int(l['topics'][2], 16) != int(RC, 16):", ':', None),
+    ('reaction: the duplicate-destination check removed', '        if dest in sends:', '        if False:', None),
+    ('lasna_block_at: < becomes <=', 'lo, hi = (mid, hi) if bt(mid) < t else (lo, mid)', 'lo, hi = (mid, hi) if bt(mid) <= t else (lo, mid)', None),
+    ('lasna_block_at: the era guard removed', '    if bt(lo) >= t:', '    if False:', None),
+    ('the cross-chain search starts at the origin block', 'fb = ob if dest == ch else', 'fb = ob if True else', None),
+    ('lasna_scan: the SYSTEM check removed', """        for t in blk.get('transactions', []):
+            if (t.get('to') or '').lower() != SYSTEM:
+                continue
+            w = words(t['input'][10:])
+            if len(w) > 13 and (w[12], w[13], w[0]) == tail:""", """        for t in blk.get('transactions', []):
+            w = words(t['input'][10:])
+            if len(w) > 13 and (w[12], w[13], w[0]) == tail:""", None),
+    ('lasna_scan: stops AT t0 + 4 h', "if int(blk['timestamp'], 16) > t0 + TIMEOUT_S:", "if int(blk['timestamp'], 16) >= t0 + TIMEOUT_S:", None),
+    ('the callback leg measured from the origin', "'leg_callback_s': t1 - rx['ts']}", "'leg_callback_s': t1 - t0}", None),
+    ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 
 

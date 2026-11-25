@@ -17,6 +17,8 @@ destination delivery, latency) is collected afterwards by `script/live/loops.py`
   python3 script/live/drive.py cov-alloc VAULT --shares S [--dry]          the owner's guarded allocate
   python3 script/live/drive.py retire YA [--dry | --yes-irreversible]   the curator retires Y_A (B3 gone: L-CRON's
                                                      exit; only once the owner's Covenant holds Y_A)
+  python3 script/live/drive.py spoof-deploy lasna [--fund WEI] [--dry]   L-SPOOF: SpoofRC from the owner key, funded
+  python3 script/live/drive.py spoof-trigger x [--dry]                    L-SPOOF: the 1-unit mUSDC trigger on 1301
   python3 script/live/drive.py resolve STEP TX        a `pending` entry resolved from its receipt
   python3 script/live/drive.py --selftest            the refusals, offline
 
@@ -239,20 +241,33 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None):
     return rec, True
 
 
+# label (or its prefix) -> the log a landed send of that kind must carry (the same as each send's `expect`)
+EXPECT = {'action': T_ACTION, 'poke': T_EPOCH, 'factory': T_ALLOWED, 'covenant': T_CREATED, 'setRules': T_NOTE,
+          'fund': T_TRANSFER, 'allocate': T_NOTE, 'retire': T_RETIRED, 'spoof': T_TRANSFER}
+
+
 def resolve_pending(step, tx):
     """A `pending` entry (its receipt timed out at send time) resolved from its receipt by script (r2 m-05)."""
     ch = next((c for c in CH if step in json.load(open(os.path.join(ROOT, 'audits', f'deployments-{c}.json')))['steps']), None)
     if ch is None:
         refuse(f'no step {step}')
+    entries = json.load(open(os.path.join(ROOT, 'audits', f'deployments-{ch}.json')))['steps'][step]['txs']
+    mine_e = [e for e in entries if e['tx'] == tx and e.get('status') == 'pending']
+    if len(mine_e) != 1:
+        refuse(f'{tx} is not exactly one pending entry of {step}')  # s7 loops r3 m-03
+    want = EXPECT.get(mine_e[0]['label'].split('_')[0] if mine_e[0]['label'].split('_')[0] in EXPECT
+                      else mine_e[0]['label'])
+    if want is None:
+        refuse(f'no expected log known for label {mine_e[0]["label"]}')
     r = receipt(ch, tx, tries=3)
     if r is None:
         refuse(f'{tx}: still no receipt')
-    want = {'lcon': T_ACTION, 'poke': T_EPOCH}.get(step.split('_')[0])
-    mine = [l for l in r['logs'] if l['topics'] and want and l['topics'][0] == want]
+    mine = [l for l in r['logs'] if l['topics'] and l['topics'][0] == want]
+    ok = int(r['status'], 16) == 1 and len(mine) == 1
     record_update(ch, step, tx, {'block': int(r['blockNumber'], 16), 'gasUsed': int(r['gasUsed'], 16),
-                                 'status': 'ok' if int(r['status'], 16) == 1 else 'FAILED',
+                                 'status': 'ok' if ok else 'FAILED',
                                  'logIndex': int(mine[0]['logIndex'], 16) if len(mine) == 1 else None})
-    print(f'drive: {step} {tx} resolved')
+    print(f'drive: {step} {tx} resolved: {"ok" if ok else "FAILED (status or the expected log)"}')
 
 
 def preflight(v, n=1, filters=None):
@@ -403,12 +418,76 @@ def retire(name, dry, yes):
     print(f'drive: retire {name} {"(dry: does not revert)" if dry else "landed"}')
 
 
+# ------------------------------------------------------------------ L-SPOOF (spec §9.5, OQ-18, PB-12)
+
+LASNA = 'https://lasna-rpc.rnk.dev/'
+RC_DEPLOYER = '0x67941b1eA81913B45a6eE1d9B2e1aFfa98b2aea1'  # F-007: its only tx was the RC creation; never signs
+DEAD = '0x000000000000000000000000000000000000dEaD'
+T_SPOOFED = '0x4b0a55ddffba14bae97855025ebc9b10d98f19d584131d8fc461896fed8f7b4c'  # SpoofRC.Spoofed(uint256,address,uint32,uint64)
+
+
+def spoof_deploy(fund, dry):
+    """SpoofRC on Lasna from the OWNER key (never the RC deployer, F-007), funded with `fund` wei of lREACT as
+    reserves through the system contract's depositTo; recorded in audits/deployments-5318007.json step `lspoof`."""
+    me = signer()
+    if me.lower() == RC_DEPLOYER.lower():
+        refuse('the signer is the RC deployer (F-007)')
+    a = json.load(open(os.path.join(ROOT, 'out', 'SpoofRC.sol', 'SpoofRC.json')))
+    _, hub_ = reagent('1301')
+    token = tokens('1301')[0]
+    code = a['bytecode']['object'] + _run(['cast', 'abi-encode', 'f(address,address,address)', token, me, hub_])[2:]
+    est = int(cast('estimate', '--from', me, '--create', code, rpc=LASNA))  # the dry run of the creation
+    if dry:
+        print(f'drive: dry run: SpoofRC creation estimates {est} gas on Lasna (token {token}, hub {hub_})')
+        return
+    doc = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))
+    if 'lspoof' in doc['steps']:
+        refuse('lspoof already recorded: the spoof RC exists')
+    r = json.loads(_run(['cast', 'send', '--json', *wallet(), '--rpc-url', LASNA, '--gas-limit', str(est * 3 // 2),
+                         '--create', code]))
+    ok = int(r['status'], 16) == 1
+    rec = {'from': me, 'tx': r['transactionHash'], 'status': 'ok' if ok else 'FAILED', 'address': r.get('contractAddress'),
+           'gasUsed': int(r['gasUsed'], 16), 'token': token, 'hub': hub_}
+    doc['steps']['lspoof'] = {'source': 'receipts (script/live/drive.py)', **stamp(),
+                              'recorded_at': dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
+                              'note': 'L-SPOOF: a third-party RC (script/live/SpoofRC.sol) from the owner key', 'txs': [rec]}
+    open(os.path.join(ROOT, 'audits', 'deployments-5318007.json'), 'w').write(json.dumps(doc, indent=1) + '\n')
+    if not ok:
+        refuse(f'SpoofRC creation failed: {r["transactionHash"]}')
+    d = json.loads(_run(['cast', 'send', '--json', *wallet(), '--rpc-url', LASNA, '--value', str(fund),
+                         '0x8888888888888888888888888888888888888888', 'depositTo(address)', rec['address']]))
+    rec2 = {'label': 'depositTo', 'tx': d['transactionHash'], 'status': 'ok' if int(d['status'], 16) == 1 else 'FAILED',
+            'value': str(fund)}
+    doc['steps']['lspoof']['txs'].append(rec2)
+    open(os.path.join(ROOT, 'audits', 'deployments-5318007.json'), 'w').write(json.dumps(doc, indent=1) + '\n')
+    print(f'drive: SpoofRC {rec["address"]} funded ({rec2["status"]})')
+
+
+def spoof_trigger(dry):
+    """One unit of mUSDC from the owner to 0x…dEaD on 1301: the only log SpoofRC subscribes to."""
+    doc = json.load(open(os.path.join(ROOT, 'audits', 'deployments-5318007.json')))
+    if 'lspoof' not in doc['steps'] and not dry:
+        refuse('no SpoofRC recorded: deploy it first')
+    token = tokens('1301')[0]
+    step = f'lspoof_{dt.datetime.now(dt.timezone.utc):%Y%m%d}'
+    _, hub_ = reagent('1301')
+    proxy = '0x775c9B990ADe401060B78D0e98684eEf8d2466C1'
+    blk = int(cast('block-number', rpc=rpc('1301')))
+    snap = {'block': blk, 'balance': int(cast('balance', '--block', str(blk), hub_, rpc=rpc('1301'))),
+            'debt': int(cast('call', '--block', str(blk), proxy, 'debts(address)(uint256)', hub_, rpc=rpc('1301')).split()[0]),
+            'reserves': int(cast('call', '--block', str(blk), proxy, 'reserves(address)(uint256)', hub_, rpc=rpc('1301')).split()[0])}
+    send('1301', token, 'transfer(address,uint256)', DEAD, '1', expect=(token, T_TRANSFER), dry=dry, step=step,
+         label='spoof_trigger', extra={'hubSnapshot': snap})  # r3 m-04: the Hub's funds before the trigger
+    print(f'drive: spoof trigger {"(dry: does not revert)" if dry else "sent"}')
+
+
 # ------------------------------------------------------------------ selftest (offline: the seams replaced)
 
 def selftest():
     fails = 0
     g = globals()
     saved = {k: g[k] for k in ('signer', 'cast', 'budget_used', 'mcp_filters', 'head', 'logs', 'rpc')}
+    saved_root = g['ROOT']
     g['rpc'] = lambda ch: 'http://selftest.invalid'
     v = {'name': 'XA', 'chain': '1301', 'bundler': '0x' + '11' * 20, 'vault': '0x' + '22' * 20, 'hook': '0x' + '33' * 20,
          'deployBlock': 1}
@@ -474,6 +553,41 @@ def selftest():
         g['cast'] = saved['cast']
         try:
             resolve('ZZ')
+        except Refused:
+            pass
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, 'audits'))
+            json.dump({'steps': {'lcon_XA_x': {'txs': [{'label': 'action_XA', 'tx': '0xaa', 'status': 'pending'}]}}},
+                      open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
+            json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-11155111.json'), 'w'))
+            g['ROOT'], realr = td, g['receipt']
+            try:
+                for rr, want_status, label in (({'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': []}, 'FAILED',
+                                                 'a landed tx without its expected log resolves as FAILED'),
+                                                ({'status': '0x0', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': [{'topics': [T_ACTION], 'logIndex': '0x0'}]},
+                                                 'FAILED', 'a reverted tx resolves as FAILED'),
+                                                ({'status': '0x1', 'blockNumber': '0x1', 'gasUsed': '0x1', 'logs': [{'topics': [T_ACTION], 'logIndex': '0x3'}]},
+                                                 'ok', 'control: a landed tx with its Action resolves ok')):
+                    d = json.load(open(os.path.join(td, 'audits', 'deployments-1301.json')))
+                    d['steps']['lcon_XA_x']['txs'][0]['status'] = 'pending'
+                    json.dump(d, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
+                    g['receipt'] = lambda ch, tx, tries=30, _r=rr: _r
+                    resolve_pending('lcon_XA_x', '0xaa')
+                    got = json.load(open(os.path.join(td, 'audits', 'deployments-1301.json')))['steps']['lcon_XA_x']['txs'][0]['status']
+                    print(('selftest ok: ' if got == want_status else 'selftest FAIL: ') + label)
+                    fails += got != want_status
+                try:
+                    resolve_pending('lcon_XA_x', '0xbb')
+                    print('selftest FAIL (not refused): a foreign hash')
+                    fails += 1
+                except Refused as e:
+                    print('selftest ok: a foreign hash is refused' if 'not exactly one pending' in str(e) else f'selftest FAIL: {e}')
+                    fails += 0 if 'not exactly one pending' in str(e) else 1
+            finally:
+                g['ROOT'], g['receipt'] = saved_root, realr
+        try:
+            resolve('ZZ')
             print('selftest FAIL (not refused): an unknown vault')
             fails += 1
         except Refused as e:
@@ -523,6 +637,10 @@ def main(argv):
         cov_alloc(name, opt('--shares', 0), '--dry' in argv)
     elif cmd == 'retire':
         retire(name, '--dry' in argv, '--yes-irreversible' in argv)
+    elif cmd == 'spoof-deploy':
+        spoof_deploy(opt('--fund', 5 * 10**17), '--dry' in argv) if name in ('', 'lasna') else refuse('spoof-deploy lasna')
+    elif cmd == 'spoof-trigger':
+        spoof_trigger('--dry' in argv)
     elif cmd == 'resolve':
         resolve_pending(name, argv[2] if len(argv) > 2 else '')
     else:
