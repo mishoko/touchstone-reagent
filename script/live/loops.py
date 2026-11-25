@@ -246,14 +246,14 @@ def not_carried(tr):
     return any(v in NOT_CARRIED for v in vs)
 
 
-def check_reaction(ch, lasna_tx, origin_tx, log_index, emitter):
+def check_reaction(ch, lasna_tx, origin_tx, log_index, emitter, topic0=None):
     """The Lasna tx's own input (the system's call carrying `react(LogRecord)`) must name this RC, chain, emitter,
     Action topic, origin tx and log index: the attribution rests on Lasna data. Returns the reaction and the rcConduct
     it requested per destination chain (seq, id, gasLimit) from the system's callback-request logs."""
     t = json.loads(cast('tx', '--json', lasna_tx, rpc=LASNA))
     w = words(t['input'][10:])
     want = {'rc': RC[2:].lower().rjust(64, '0'), 'chain': hex(int(ch))[2:].rjust(64, '0'),
-            'emitter': emitter[2:].lower().rjust(64, '0'), 'topic0': T_ACTION[2:], 'tx': origin_tx[2:].lower(),
+            'emitter': emitter[2:].lower().rjust(64, '0'), 'topic0': (topic0 or T_ACTION)[2:], 'tx': origin_tx[2:].lower(),
             'logIndex': hex(log_index)[2:].rjust(64, '0')}
     got = {'rc': w[0], 'chain': w[2], 'emitter': w[3], 'topic0': w[4], 'tx': w[12], 'logIndex': w[13]} if len(w) > 13 else {}
     if (t.get('to') or '').lower() != SYSTEM or got != want:
@@ -1327,15 +1327,156 @@ def selftest():
         ok(saved['lcon_origins']() == [('XA', '1301', otx)], 'control: X_A origins collected, failed sends skipped')
     finally:
         g.update(saved)
+    # ---- s8 hero rows (L-PAUSE / L-OFFLINE): a passing row, then each check broken alone fails its row only
+    good = dict(appliedTx='0xd', appliedTs=100, originTs=50, pausedBefore=False, pausedAt=True, refusedStatus=0,
+                refusedSelector=HUB_PAUSED, refusedTs=130, refusedNonce=8, lastOkNonce=7, lastOkTs=10, lastOkStatus=1)
+    vp, vo = hero_verdict(good)
+    ok(vp['pass'] and vo['pass'], 'hero: control: a full pause and offline row passes')
+    for over, which, label in (({'appliedTx': None}, 'p', 'no Applied on the other chain'),
+                               ({'pausedBefore': True}, 'p', 'already paused before the Applied (not caused by it)'),
+                               ({'pausedAt': False}, 'p', 'not paused at the Applied'),
+                               ({'refusedStatus': 1}, 'p', 'the agent\'s send after the pause landed'),
+                               ({'refusedSelector': '0x12345678'}, 'p', 'refused for another error'),
+                               ({'refusedSelector': None}, 'p', 'a refused tx whose replay passes'),
+                               ({'refusedTs': 90}, 'p', 'the refusal precedes the Applied'),
+                               ({'refusedNonce': 9}, 'o', 'the agent sent between (nonce gap)'),
+                               ({'lastOkStatus': 0}, 'o', 'the control allocation failed'),
+                               ({'lastOkTs': 60}, 'o', 'the control is after the breach'),
+                               ({'lastOkNonce': None}, 'o', 'no control allocation')):
+        vp, vo = hero_verdict({**good, **over})
+        bad = (not vp['pass']) if which == 'p' else (not vo['pass'] and vp['pass'])
+        ok(bad, f'hero: {label} fails its row')
     print(f'loops selftest: {n_ok[0]} cells passed,', 'OK' if not fails else f'FAIL ({len(fails)})')
     return not fails
+
+
+# ------------------------------------------------------------------ the hero runs L-PAUSE / L-OFFLINE (spec §9.5; s8)
+
+T_LATCHED = '0x829ba179a839c310d7073c7e340910e1a491fd6eb6c22836dc89137bf4d5a346'  # ITouchstoneHook.BreachLatched
+AGENT = '0xACCb871E94bC1d728A5f969928fB8680C3523492'      # the reference agent key (s8; script/agent/)
+COVENANT = '0xB02b6081546c23CA2191D3Ce0647b64f5Ef4D15f'   # the owner's Covenant (same address on both chains)
+SEL_AGENT_ALLOC = '0xbdd2fad4'                            # ICovenant.agentAllocate
+HUB_PAUSED = '0x67be7162'                                 # CovenantBase.HubPaused()
+AGENT_LOG = os.path.join(ROOT, 'output', 'agent', 'agent-11155111.jsonl')
+
+
+def hero_verdict(r):
+    """Pure (selftest): the two rows' checks from the collected facts.
+    L-PAUSE: the latch reached the other chain's Hub (an Applied >= the reaction's seq), the Covenant was not paused
+    the block before that Applied and is paused at it, and the agent's first send after it reverted with HubPaused.
+    L-OFFLINE: the agent's last send before the latch landed, its next send (nonce + 1: nothing in between) is that
+    refused one, and the order is lastOk < latch <= Applied <= refused."""
+    p = dict(delivered=bool(r.get('appliedTx')), pausedBefore=r.get('pausedBefore') is False,
+             pausedAt=r.get('pausedAt') is True, refusedOnChain=r.get('refusedStatus') == 0,
+             hubPaused=r.get('refusedSelector') == HUB_PAUSED,
+             refusedAfterApplied=r.get('refusedTs') is not None and r.get('appliedTs') is not None
+             and r['refusedTs'] >= r['appliedTs'])
+    o = dict(controlLanded=r.get('lastOkStatus') == 1,
+             noSendBetween=r.get('lastOkNonce') is not None and r.get('refusedNonce') == r['lastOkNonce'] + 1,
+             order=None not in (r.get('lastOkTs'), r.get('originTs'), r.get('appliedTs'), r.get('refusedTs'))
+             and r['lastOkTs'] < r['originTs'] <= r['appliedTs'] <= r['refusedTs'])
+    o['pauseRowPasses'] = all(p.values())
+    return {**p, 'pass': all(p.values())}, {**o, 'pass': all(o.values())}
+
+
+def agent_txs(ch):
+    """The agent's live sends, indexed by its own log (output/, not evidence: like the MCP, an index only) and each
+    re-read from the chain: from = AGENT, to = the Covenant, selector agentAllocate; status, nonce, block from chain."""
+    if not os.path.exists(AGENT_LOG):
+        raise SystemExit(f'loops: no agent log at {AGENT_LOG}: nothing indexes the agent\'s sends')
+    hs = []
+    for line in open(AGENT_LOG):
+        e = json.loads(line)
+        if e.get('action') == 'allocate' and e.get('tx') and not e.get('dry') and e['tx'] not in hs:
+            hs.append(e['tx'])
+    out = []
+    for h in hs:
+        t = json.loads(cast('tx', '--json', h, rpc=rpc(ch)))
+        r = json.loads(cast('receipt', '--json', h, rpc=rpc(ch)))
+        if t['from'].lower() != AGENT.lower() or (t['to'] or '').lower() != COVENANT.lower() \
+                or not t['input'].startswith(SEL_AGENT_ALLOC):
+            raise SystemExit(f'loops: {h} is not the agent\'s agentAllocate on the Covenant')
+        b = int(r['blockNumber'], 16)
+        out.append({'tx': h, 'block': b, 'ts': ts(ch, b), 'nonce': int(t['nonce'], 16), 'status': int(r['status'], 16),
+                    'from': t['from'], 'input': t['input']})
+    return sorted(out, key=lambda x: x['nonce'])
+
+
+def revert_selector(ch, a):
+    """The 4-byte error of the agent's reverted call, replayed by eth_call at the state before its block."""
+    r = subprocess.run(['cast', 'call', '--rpc-url', rpc(ch), '--from', a['from'], '--block', str(a['block'] - 1),
+                        COVENANT, a['input']], capture_output=True, text=True)
+    if r.returncode == 0:
+        return None  # the replay passes: no revert to name
+    import re
+    m = re.search(r'(?:custom error |data: "?)(0x[0-9a-fA-F]{8})', redact(r.stderr + r.stdout))
+    return m.group(1).lower() if m else 'undecoded'
+
+
+def paused_at(ch, block):
+    return cast('call', '--block', str(block), hub(ch), 'paused(address,uint32)(bool)', COVENANT, '1', rpc=rpc(ch)) == 'true'
+
+
+def lhero():
+    steps = deployments('1301')
+    lat = [(k, t) for k, st in sorted(steps.items()) if k.startswith('lbreach_XA_') for t in st['txs']
+           if t.get('label') == 'refresh' and t.get('breachLatched') == 1 and t.get('status') == 'ok']
+    if len(lat) != 1:
+        raise SystemExit(f'loops: {len(lat)} recorded latches on X_A (want exactly 1 for this run)')
+    otx = lat[0][1]['tx']
+    r = json.loads(cast('receipt', '--json', otx, rpc=rpc('1301')))
+    ev = [l for l in r['logs'] if l['topics'] and l['topics'][0] == T_LATCHED]
+    if len(ev) != 1:
+        raise SystemExit(f'loops: {otx} carries {len(ev)} BreachLatched logs')
+    hook, li, ob = ev[0]['address'], int(ev[0]['logIndex'], 16), int(r['blockNumber'], 16)
+    t0 = ts('1301', ob)
+    tr = mcp_trace('1301', otx, li)
+    lx = (tr['data'].get('reaction') or {}).get('tx')
+    if not lx:
+        raise SystemExit(f'loops: {otx}: no reaction found yet ({tr["verdict"]}); re-run later')
+    rx = check_reaction('1301', lx, otx, li, hook, topic0=T_LATCHED)
+    dest = '11155111'
+    if dest not in rx['sends']:
+        raise SystemExit(f'loops: the reaction {lx} sent no rcConduct to {dest}')
+    snd = rx['sends'][dest]
+    fb = int(cast('find-block', str(t0), rpc=rpc(dest))) - 1
+    e, upto = first_applied(dest, hub(dest), snd['id'], snd['seq'], fb, fb + TIMEOUT_S // BLOCKTIME[dest] + 10)
+    row = {'originChain': 1301, 'originTx': otx, 'originBlock': ob, 'logIndex': li, 'originTs': t0, 'hook': hook.lower(),
+           'lasnaTx': rx['tx'], 'lasnaTs': rx['ts'], 'curator': snd['id'], 'seq': snd['seq'], 'destChain': int(dest),
+           'covenant': COVENANT, 'agent': AGENT}
+    if e is None:
+        raise SystemExit(f'loops: no Applied >= seq {snd["seq"]} on {dest} yet (searched to {upto}); re-run later')
+    db = int(e['blockNumber'], 16)
+    row.update(appliedTx=e['transactionHash'], appliedBlock=db, appliedTs=ts(dest, db), latency_s=ts(dest, db) - t0,
+               pausedBefore=paused_at(dest, db - 1), pausedAt=paused_at(dest, db))
+    ag = agent_txs(dest)
+    pre = [a for a in ag if a['ts'] < t0]
+    post = [a for a in ag if a['ts'] >= row['appliedTs']]
+    if pre:
+        last = pre[-1]
+        row.update(lastOkTx=last['tx'], lastOkNonce=last['nonce'], lastOkTs=last['ts'], lastOkStatus=last['status'])
+    if post:
+        ref = post[0]
+        row.update(refusedTx=ref['tx'], refusedNonce=ref['nonce'], refusedTs=ref['ts'], refusedBlock=ref['block'],
+                   refusedStatus=ref['status'], refusedSelector=revert_selector(dest, ref) if ref['status'] == 0 else None)
+    vp, vo = hero_verdict(row)
+    doc = load()
+    save(doc, 'L-PAUSE', [{**row, 'verdict': vp}], 'L-PAUSE: a 1301 breach of X_A (BreachLatched, script/live/drive.py '
+         'breach) -> the RC reaction on Lasna -> Applied on the 11155111 Hub (paused there from that block) -> the '
+         'agent\'s next agentAllocate reverts HubPaused (spec §9.5, C-02)')
+    doc = load()
+    save(doc, 'L-OFFLINE', [{**row, 'verdict': vo}], 'L-OFFLINE: the agent\'s last allocation landed before the '
+         'breach, it sent nothing until after the pause was delivered (nonce + 1), and that allocation was refused '
+         '(spec §3.7, §9.5, C-03)')
+    print('loops: L-PAUSE', vp)
+    print('loops: L-OFFLINE', vo)
 
 
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else ''
     if what == '--selftest':
         sys.exit(0 if selftest() else 1)
-    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron}
+    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron, 'lhero': lhero}
     if what not in cmds:
         raise SystemExit(__doc__)
     cmds[what]()

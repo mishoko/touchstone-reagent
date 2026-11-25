@@ -78,6 +78,10 @@ MUTANTS = [
     ('hub_entry: every error retried', "            if 'not available' not in last and 'does not exist' not in last:\n                raise", "            if False:\n                raise", None),
     ('L-GAS: an EARLY exit fills its cell', "fills = ok and (kind not in ('exit', 'plan') or outcome == 1)", "fills = ok", None),
     ('L-CRON: other changes not attributed', "'backToBaseline', 'othersNotCron'))", "'backToBaseline'))", None),
+    ('hero: the pause-before check dropped', "pausedBefore=r.get('pausedBefore') is False,", 'pausedBefore=True,', None),
+    ('hero: any refusal error accepted', "hubPaused=r.get('refusedSelector') == HUB_PAUSED,", 'hubPaused=True,', None),
+    ('hero: the nonce adjacency dropped', "noSendBetween=r.get('lastOkNonce') is not None and r.get('refusedNonce') == r['lastOkNonce'] + 1,", 'noSendBetween=True,', None),
+    ('hero: the order not checked', "and r['lastOkTs'] < r['originTs'] <= r['appliedTs'] <= r['refusedTs'])", "and True)", None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 
