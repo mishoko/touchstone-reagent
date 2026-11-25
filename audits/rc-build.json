@@ -1,0 +1,21 @@
+{
+ "commit": "cbf0dfa",
+ "dirty": false,
+ "src_sha": "26de10206487b77f",
+ "recorded_at": "2026-11-25T04:24:06+00:00",
+ "generated_by": "script/deploy/rc.py pin",
+ "modules": {
+  "RcB6": {
+   "initcodeSha": "dcca9b78e8508e0aba20c7fbd21566e9f5205ab44ae2a7bb18973cc3a3d55ac9",
+   "runtimeMaskedSha": "5de87297f4d4acc81f5429e1291400c3dacbf069ed91cc812afc6d57f7fd4aa4"
+  },
+  "RcExt": {
+   "initcodeSha": "b2955bbad1e19be45d7210d9438e456affbb3143be2d1388fdf3dea80413daf8",
+   "runtimeMaskedSha": "e0f819b2ed8cac51ecf1061ac7c1c898f16fffb08879428f23974b7c9f219287"
+  },
+  "ReagentRC": {
+   "initcodeSha": "9cc2012de194c42df42c4e11b17e6f761b6ac9ee45c9a76812c766835e18244d",
+   "runtimeMaskedSha": "fc510b4d2614f72bf22b8e7f06b8885b54ab19dac81c2fee118aaae42a7cf707"
+  }
+ }
+}
