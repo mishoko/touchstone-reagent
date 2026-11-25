@@ -29,7 +29,14 @@ contract SpoofRC is SmokePayer {
 
     constructor(address token, address from, address hub) payable SmokePayer(SYSTEM) {
         (TOKEN, FROM, HUB) = (token, from, hub);
-        IRnkSystem(SYSTEM).subscribe(CHAIN, token, TRANSFER_T0, uint256(uint160(from)), uint256(uint160(DEAD)), IGNORE);
+        _filter(true);
+    }
+
+    /// @dev subscribe and unsubscribe from the same six stored arguments (an unsubscribe that differs does nothing).
+    function _filter(bool on) internal {
+        (uint256 t1, uint256 t2) = (uint256(uint160(FROM)), uint256(uint160(DEAD)));
+        if (on) IRnkSystem(SYSTEM).subscribe(CHAIN, TOKEN, TRANSFER_T0, t1, t2, IGNORE);
+        else IRnkSystem(SYSTEM).unsubscribe(CHAIN, TOKEN, TRANSFER_T0, t1, t2, IGNORE);
     }
 
     function react(Log calldata log) external {
@@ -44,7 +51,7 @@ contract SpoofRC is SmokePayer {
         IRnkSystem(SYSTEM).requestCallbackV_1_0(
             IRnkSystem.CallbackV1({chainId: CHAIN, recipient: HUB, gasLimit: GAS_LIMIT, payload: payload})
         );
-        IRnkSystem(SYSTEM).unsubscribe(CHAIN, TOKEN, TRANSFER_T0, uint256(uint160(FROM)), uint256(uint160(DEAD)), IGNORE);
+        _filter(false);
         emit Spoofed(log.txHash, HUB, ID, 1);
     }
 }
