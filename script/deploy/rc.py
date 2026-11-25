@@ -16,8 +16,10 @@
   python3 script/deploy/rc.py register   addHub and addFactory on both chains, fund the RC's reserves; recorded
   python3 script/deploy/rc.py --selftest the refusals, offline: swapped keys, a mutated artifact, a dirty tree
 
-Keys: DEPLOYER_PK (owner), RC_DEPLOYER_PK (its ONLY transaction is the RC creation); never printed, never on argv
-(cast reads ETH_PRIVATE_KEY from the environment). Before ANY send: the keys' identities are asserted (F-010 H3-02),
+Keys: the owner (DEPLOYER_PK) and the RC deployer (RC_DEPLOYER_PK, its ONLY transaction is the RC creation); never
+printed, never on argv. cast 1.5 no longer reads ETH_PRIVATE_KEY (s6), so the keys travel as encrypted keystores:
+RC_KEYSTORE_DIR holds `owner` and `rcdep` (made once by `cast wallet import -i`), RC_KEYSTORE_PW names the password
+file; only their paths reach argv. Before ANY send: the keys' identities are asserted (F-010 H3-02),
 and every artifact sent is checked against the reviewed-build pin after a forced rebuild (H3-01).
 """
 import json, os, re, subprocess, sys, hashlib, tempfile, datetime as dt
@@ -36,34 +38,41 @@ RC_FUND = '5ether'  # the provisional floor (spec §6: RC >= 5 lREACT)
 MODULES = ('RcB6', 'RcExt', 'ReagentRC')
 
 
+KEYSTORE = {'DEPLOYER_PK': 'owner', 'RC_DEPLOYER_PK': 'rcdep'}
+
+
+def _wallet(key, env=os.environ):
+    d, pw = env.get('RC_KEYSTORE_DIR'), env.get('RC_KEYSTORE_PW')
+    if not d or not pw:
+        raise SystemExit('rc: RC_KEYSTORE_DIR and RC_KEYSTORE_PW must both be set')
+    ks = os.path.join(d, KEYSTORE[key])
+    if not os.path.isfile(ks) or not os.path.isfile(pw):
+        raise SystemExit(f'rc: no keystore for {key}')
+    return ['--keystore', ks, '--password-file', pw]
+
+
 def cast(*a, key=None, rpc=LASNA):
-    env = dict(os.environ)
-    if key:
-        env['ETH_PRIVATE_KEY'] = os.environ[key]
-    r = subprocess.run(['cast', *a, '--rpc-url', rpc], capture_output=True, text=True, env=env)
+    w = _wallet(key) if key else []
+    r = subprocess.run(['cast', *a, *w, '--rpc-url', rpc], capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(f'rc: cast {a[0]} failed: {(r.stderr or r.stdout).strip()[-300:]}')
     return r.stdout.strip()
 
 
-def addr_of(pk):
-    r = subprocess.run(['cast', 'wallet', 'address'], capture_output=True, text=True,
-                       env={**os.environ, 'ETH_PRIVATE_KEY': pk})
+def addr_of(key, env=os.environ):
+    r = subprocess.run(['cast', 'wallet', 'address', *_wallet(key, env)], capture_output=True, text=True)
     if r.returncode != 0:
-        raise SystemExit('rc: a key does not parse (not printed)')
+        raise SystemExit('rc: a keystore does not open (not printed)')
     return r.stdout.strip()
 
 
 def assert_keys(env=os.environ):
     """F-010 H3-02: before any send, the RC deployer key IS the reserved deployer and the owner key is NOT."""
-    owner_pk, rc_pk = env.get('DEPLOYER_PK'), env.get('RC_DEPLOYER_PK')
-    if not owner_pk or not rc_pk:
-        raise SystemExit('rc: DEPLOYER_PK and RC_DEPLOYER_PK must both be set')
-    if addr_of(rc_pk).lower() != RC_DEPLOYER.lower():
-        raise SystemExit('rc: RC_DEPLOYER_PK does not derive to the RC deployer: refusing before any send')
-    if addr_of(owner_pk).lower() == RC_DEPLOYER.lower():
-        raise SystemExit('rc: DEPLOYER_PK derives to the RC deployer (swapped keys?): refusing before any send')
-    return addr_of(owner_pk)
+    if addr_of('RC_DEPLOYER_PK', env).lower() != RC_DEPLOYER.lower():
+        raise SystemExit('rc: the rcdep keystore does not derive to the RC deployer: refusing before any send')
+    if addr_of('DEPLOYER_PK', env).lower() == RC_DEPLOYER.lower():
+        raise SystemExit('rc: the owner keystore derives to the RC deployer (swapped keys?): refusing before any send')
+    return addr_of('DEPLOYER_PK', env)
 
 
 def load():
@@ -283,8 +292,6 @@ def register():
 
 def selftest():
     """The refusals, with no network and no real key: swapped keys, a mutated artifact, a dirty tree."""
-    k1 = '0x' + '11' * 32
-    k2 = '0x' + '22' * 32
     fails = 0
 
     def refused(fn, label):
@@ -297,9 +304,22 @@ def selftest():
         print('selftest FAIL:', label)
         fails += 1
 
-    # (1) keys: neither fake key is the RC deployer → refused before any send
-    refused(lambda: assert_keys({'DEPLOYER_PK': k1, 'RC_DEPLOYER_PK': k2}), 'a wrong RC deployer key is refused')
-    refused(lambda: assert_keys({'DEPLOYER_PK': k1}), 'a missing key is refused')
+    # (1) keys: two random keystores (neither is the RC deployer) → refused by the identity check before any send;
+    #     the same keystores swapped (owner = the RC deployer's slot) likewise; a missing keystore → refused
+    with tempfile.TemporaryDirectory() as t:
+        pw = os.path.join(t, 'pw')
+        open(pw, 'w').write('selftest')
+        for n in ('owner', 'rcdep'):
+            os.makedirs(os.path.join(t, n + '.d'))
+            subprocess.run(['cast', 'wallet', 'new', os.path.join(t, n + '.d'), '--unsafe-password', 'selftest'],
+                           capture_output=True, check=True)
+            f = os.listdir(os.path.join(t, n + '.d'))[0]
+            os.rename(os.path.join(t, n + '.d', f), os.path.join(t, n))
+        env = {'RC_KEYSTORE_DIR': t, 'RC_KEYSTORE_PW': pw}
+        addr_of('RC_DEPLOYER_PK', env)  # the fake keystores open: the refusal below is the identity check
+        refused(lambda: assert_keys(env), 'a wrong RC deployer keystore is refused')
+        os.remove(os.path.join(t, 'owner'))
+        refused(lambda: assert_keys(env), 'a missing keystore is refused')
     # (2) a mutated artifact against a pin of the clean one → refused
     with tempfile.TemporaryDirectory() as t:
         for m in MODULES:
