@@ -333,6 +333,43 @@
      "to": "0x4e59b44847b379578588920ca78fbf26c0b4956c"
     }
    ]
+  },
+  "ldyn_bundler_XB": {
+   "script": "TsDeploy.s.sol",
+   "commit": "6fc785a",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:41:01+00:00",
+   "note": "s6 L-DYN: the curator bundler for ldyn_bundler_XB (DEPLOY_VAULT=false; registered on the RC before its vault deploys)",
+   "txs": [
+    {
+     "type": "CREATE",
+     "tx": "0xf7c82864772c239dfee393248830a8e433a0445d8a1e743cafca9466a567e1d4",
+     "block": 12208157,
+     "gasUsed": 14419550,
+     "status": "ok",
+     "contract": "CuratorBundler",
+     "address": "0x2470f03b132e2687250fadd18304f01efd4f0eb0"
+    }
+   ]
+  },
+  "lpay_fund": {
+   "source": "receipts",
+   "commit": "6fc785a",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:42:14+00:00",
+   "note": "s6 L-PAY: the Hub funded by a plain transfer (0.05ether), balance only, zero reserves, before its first callback (rcVault on the L-DYN deploy)",
+   "txs": [
+    {
+     "label": "hub_fund",
+     "tx": "0x8f1650ae2f711770689dd7f9c77e1045fb8956f1ec2f18c0f418332666de6dc8",
+     "block": 12208162,
+     "gasUsed": 21062,
+     "status": "ok",
+     "to": "0xb41433c9585d230a2607f253e1ea844923e07a91"
+    }
+   ]
   }
  }
 }

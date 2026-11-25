@@ -85,6 +85,56 @@
      "tx": "0x0f9c72feae700014097a6eddc287360a46606ce9b7cd5b3586533d0fba268a9e"
     }
    ]
+  },
+  "ldyn_registry": {
+   "source": "receipts",
+   "commit": "6fc785a",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:41:35+00:00",
+   "note": "s6 L-DYN: curators X (1) and Y (2); bundlers X_A, Y_A (1301) and X_B (11155111) registered before their vaults deploy (spec \u00a712)",
+   "txs": [
+    {
+     "label": "addCurator_1",
+     "tx": "0x0ceaa50580ba4256106d0111260dbe1c65c2c7b7abab4b21954258069b908370",
+     "block": 9201194,
+     "gasUsed": 44976,
+     "status": "ok",
+     "to": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9"
+    },
+    {
+     "label": "addCurator_2",
+     "tx": "0xd5df173c76dc106c8073d18a6b278755a20a5759d782067e217ab0368c5a6160",
+     "block": 9201196,
+     "gasUsed": 44976,
+     "status": "ok",
+     "to": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9"
+    },
+    {
+     "label": "addBundler_XA",
+     "tx": "0xd246c16eb59a130b0ff5d935f7403f001e13ebf7d619855a00908878c393e8d8",
+     "block": 9201198,
+     "gasUsed": 67839,
+     "status": "ok",
+     "to": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9"
+    },
+    {
+     "label": "addBundler_YA",
+     "tx": "0x5e962d2ca02fe949ee9b669c34012a7e471c23d1520b100af4389c129c8fe46b",
+     "block": 9201200,
+     "gasUsed": 67839,
+     "status": "ok",
+     "to": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9"
+    },
+    {
+     "label": "addBundler_XB",
+     "tx": "0x593774fa2c885671b330fe8dc347fc94f13b84eb9e6ecd443aee77ac2745b4ff",
+     "block": 9201202,
+     "gasUsed": 67790,
+     "status": "ok",
+     "to": "0xfbcdba49a040ca5965377f73bb327f2f2b7dc4c9"
+    }
+   ]
   }
  }
 }
