@@ -1346,6 +1346,27 @@ def selftest():
         vp, vo = hero_verdict({**good, **over})
         bad = (not vp['pass']) if which == 'p' else (not vo['pass'] and vp['pass'])
         ok(bad, f'hero: {label} fails its row')
+    # ---- s8 L-PLAN verdict
+    rd = dict(delivered=True, byProxy=True, outcome=PLAN_DONE, reason=0, noteBlock=90)
+    rs = dict(delivered=True, byProxy=True, outcome=PLAN_SKIPPED, reason=SKIP_PAUSED, noteBlock=150)
+    ok(lplan_verdict([rd, rs], 100)['pass'], 'plan: control: DONE before and SKIPPED(PAUSED) after the breach pass')
+    for rows_, label in (([rs], 'no DONE'), ([rd], 'no SKIPPED'), ([rd, {**rs, 'reason': 5}], 'SKIPPED for slippage'),
+                         ([{**rd, 'noteBlock': 120}, rs], 'the DONE after the breach'),
+                         ([rd, {**rs, 'noteBlock': 95}], 'the SKIPPED before the breach'),
+                         ([rd, {**rs, 'byProxy': False}], 'a note not delivered by the proxy'),
+                         ([{**rd, 'delivered': False}, rs], 'an undelivered DONE')):
+        ok(not lplan_verdict(rows_, 100)['pass'], f'plan: {label} fails')
+    # callback_requests counts only this RC's requests (a foreign RC's request log in the same tx is ignored)
+    def req(rc_addr):
+        data = '0x' + ''.join(w.rjust(64, '0') for w in ('0', '0', '0', '0', hex(1301)[2:], 'ab' * 20, hex(1686304)[2:],
+                                                         '0', '4')) + SEL_PLAN + '0' * 56
+        return {'address': SYSTEM, 'topics': [T_CALLBACK, '0x0', '0x' + rc_addr[2:].lower().rjust(64, '0')], 'data': data}
+    saved_cast = g['cast']
+    g['cast'] = lambda *a, rpc: json.dumps({'logs': [req(RC), req('0x' + '99' * 20)]})
+    got = callback_requests('0xlasna')
+    g['cast'] = saved_cast
+    ok(len(got) == 1 and got[0]['dest'] == '1301' and got[0]['payload'][:8] == SEL_PLAN,
+       'plan: callback_requests keeps this RC\'s request only (a foreign RC\'s is ignored)')
     print(f'loops selftest: {n_ok[0]} cells passed,', 'OK' if not fails else f'FAIL ({len(fails)})')
     return not fails
 
@@ -1472,11 +1493,104 @@ def lhero():
     print('loops: L-OFFLINE', vo)
 
 
+# ------------------------------------------------------------------ the hero run L-PLAN (spec §3.7, §9.5; s8)
+
+T_EPOCH = '0x52ac8c0ec192dc514cc63f10118a6ba589667d3548a5ffcb0886465085529050'  # RcBase.T_EPOCH (EpochRecorded)
+SEL_PLAN = 'ae7a4572'      # IReagentHub.rcAllocate
+SKIP_PAUSED = 1            # Outcome.SKIP_PAUSED
+PLAN_DONE, PLAN_SKIPPED = 1, 2
+
+
+def callback_requests(lasna_tx):
+    """Every callback the RC requested in one reaction (the system's request logs): dest chain, Hub, gas, payload."""
+    r = json.loads(cast('receipt', '--json', lasna_tx, rpc=LASNA))
+    out = []
+    for l in r['logs']:
+        mine = l['address'].lower() == SYSTEM and l['topics'][0] == T_CALLBACK and int(l['topics'][2], 16) == int(RC, 16)
+        if not mine:
+            continue
+        d = words(l['data'])
+        plen = int(d[8], 16)
+        out.append({'dest': str(int(d[4], 16)), 'hub': '0x' + d[5][-40:], 'gasLimit': int(d[6], 16),
+                    'payload': ''.join(d[9:])[:2 * plen]})
+    return out
+
+
+def plan_notes(ch, c, frm, to):
+    """The Hub's PLAN notes (kind 3) for Covenant `c` in [frm, to]: vault, epoch, outcome, reason, and the sender."""
+    es, _ = logs_chunked(ch, hub(ch), frm, to, T_NOTE)
+    out = []
+    for e in sorted(es, key=lambda x: (int(x['blockNumber'], 16), int(x['logIndex'], 16))):
+        if int(e['topics'][3], 16) != 3 or int(e['topics'][2], 16) != int(c, 16):
+            continue
+        w = words(e['data'])[2:]
+        out.append({'tx': e['transactionHash'], 'block': int(e['blockNumber'], 16), 'vault': '0x' + w[0][-40:],
+                    'epoch': int(w[1], 16), 'outcome': int(w[2], 16), 'reason': int(w[3], 16)})
+    return out
+
+
+def lplan_verdict(rows, latch_block):
+    """Pure (selftest): L-PLAN passes with a delivered DONE before the breach and a delivered SKIPPED(PAUSED) after
+    it, each the RC's plan callback for that EpochRecorded, delivered by the proxy."""
+    d = [r for r in rows if r.get('delivered') and r.get('byProxy')]
+    done = any(r['outcome'] == PLAN_DONE and r['noteBlock'] < latch_block for r in d)
+    skip = any(r['outcome'] == PLAN_SKIPPED and r['reason'] == SKIP_PAUSED and r['noteBlock'] > latch_block for r in d)
+    return {'doneBeforeBreach': done, 'skippedPausedAfter': skip, 'pass': done and skip}
+
+
+def lplan():
+    ch = '1301'
+    steps = deployments(ch)
+    lat = [t for k, st in sorted(steps.items()) if k.startswith('lbreach_XA_') for t in st['txs']
+           if t.get('label') == 'refresh' and t.get('breachLatched') == 1 and t.get('status') == 'ok']
+    if len(lat) != 1:
+        raise SystemExit(f'loops: {len(lat)} recorded latches on X_A (want 1)')
+    latch_block = lat[0]['block']
+    pokes = [t for k, st in sorted(steps.items()) if k.startswith('poke_XA_') for t in st['txs'] if t.get('status') == 'ok']
+    rows = []
+    for p in pokes:
+        r = json.loads(cast('receipt', '--json', p['tx'], rpc=rpc(ch)))
+        for l in [l for l in r['logs'] if l['topics'] and l['topics'][0] == T_EPOCH]:
+            vault, li, e = l['address'].lower(), int(l['logIndex'], 16), int(l['topics'][1], 16)
+            ob = int(r['blockNumber'], 16)
+            row = {'originTx': p['tx'], 'originBlock': ob, 'logIndex': li, 'originTs': ts(ch, ob), 'vault': vault,
+                   'epoch': e}
+            tr = mcp_trace(ch, p['tx'], li)
+            lx = (tr['data'].get('reaction') or {}).get('tx')
+            if not lx:
+                rows.append({**row, 'delivered': False, 'why': f'no reaction ({tr["verdict"]})'})
+                continue
+            check_reaction(ch, lx, p['tx'], li, vault, topic0=T_EPOCH)
+            plans = [q for q in callback_requests(lx) if q['payload'][:8] == SEL_PLAN and q['dest'] == ch]
+            row.update(lasnaTx=lx, planSent=len(plans))
+            if not plans:
+                rows.append({**row, 'delivered': False, 'why': 'the reaction sent no plan callback'})
+                continue
+            a = [plans[0]['payload'][8 + 64 * i:8 + 64 * (i + 1)] for i in range(4)]
+            cov, pv, pe = '0x' + a[1][-40:], '0x' + a[2][-40:], int(a[3], 16)
+            row.update(covenant=cov, planEpoch=pe)
+            ns = [n for n in plan_notes(ch, cov, ob, ob + 900) if n['vault'] == pv and n['epoch'] == pe]
+            if not ns:
+                raise SystemExit(f'loops: {p["tx"]}: no PLAN note for epoch {pe} yet; re-run later')
+            n = ns[0]
+            t = json.loads(cast('tx', '--json', n['tx'], rpc=rpc(ch)))
+            rows.append({**row, 'delivered': True, 'noteTx': n['tx'], 'noteBlock': n['block'],
+                         'noteTs': ts(ch, n['block']), 'outcome': n['outcome'], 'reason': n['reason'],
+                         'byProxy': t['to'].lower() == CH[ch]['proxy'].lower(),
+                         'latency_s': ts(ch, n['block']) - row['originTs']})
+    v = lplan_verdict(rows, latch_block)
+    doc = load()
+    save(doc, 'L-PLAN', [{**r, 'latchBlock': latch_block} for r in rows] + [{'verdict': v, 'latchBlock': latch_block}],
+         'L-PLAN: each X_A EpochRecorded (drive.py poke) -> the RC reaction -> its rcAllocate -> the PLAN note on the '
+         '1301 Hub: DONE before the breach, SKIPPED(PAUSED) after it (spec §3.7, §9.5)')
+    print('loops: L-PLAN', v)
+
+
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else ''
     if what == '--selftest':
         sys.exit(0 if selftest() else 1)
-    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron, 'lhero': lhero}
+    cmds = {'ldyn': ldyn, 'lpay': lpay, 'lcon': lcon, 'lgas': lgas, 'lspoof': lspoof, 'lcron': lcron, 'lhero': lhero, 'lplan': lplan}
     if what not in cmds:
         raise SystemExit(__doc__)
     cmds[what]()

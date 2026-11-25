@@ -82,6 +82,9 @@ MUTANTS = [
     ('hero: any refusal error accepted', "hubPaused=r.get('refusedSelector') == HUB_PAUSED,", 'hubPaused=True,', None),
     ('hero: the nonce adjacency dropped', "noSendBetween=r.get('lastOkNonce') is not None and r.get('refusedNonce') == r['lastOkNonce'] + 1,", 'noSendBetween=True,', None),
     ('hero: the order not checked', "and r['lastOkTs'] < r['originTs'] <= r['appliedTs'] <= r['refusedTs'])", "and True)", None),
+    ('plan: any SKIPPED reason accepted', "r['outcome'] == PLAN_SKIPPED and r['reason'] == SKIP_PAUSED and", "r['outcome'] == PLAN_SKIPPED and", None),
+    ('plan: requests of another RC counted', "and int(l['topics'][2], 16) == int(RC, 16)\n", "\n", None),
+    ('plan: the proxy not required', "d = [r for r in rows if r.get('delivered') and r.get('byProxy')]", "d = [r for r in rows if r.get('delivered')]", None),
     ('not-carried verdicts ignored', '        if not lx and not_carried(tr):', '        if False:', None),
 ]
 
