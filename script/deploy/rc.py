@@ -2,6 +2,13 @@
 """The ReagentRC deploy on Lasna (spec §3.2, §9.2 R-DEPLOY; F-007, F-013), recorded by script into
 `audits/deployments-5318007.json` (R-04).
 
+  python3 script/deploy/rc.py check --post  the post-deploy check (every session's pre-flight since R-DEPLOY): the RC
+                                         deployer's nonce is exactly 1 (its one transaction, F-007), the live RC code
+                                         is the recorded runtime and the reviewed-build pin (immutables masked), OWNER
+                                         and EXT are the recorded ones, and the Hubs' checks below
+  python3 script/deploy/rc.py runtime    record the live RC's masked runtime (step `rc_runtime`) for test_R_DEPLOY__
+  python3 script/deploy/rc.py receipts STEP NOTE LABEL:CHAIN:TX ...   record funding txs (faucet, depositTo) from
+                                         their receipts (R-04: never typed by hand)
   python3 script/deploy/rc.py check      the pre-flight: RC deployer nonce 0 (latest AND pending) and funded, the
                                          reserved address free, both live Hubs' RC() = the reserved address and their
                                          needs() equal to the RC's NEED constants and to audits/gas-need.json
@@ -172,17 +179,44 @@ def rc_needs():
     return out
 
 
-def check():
+def post_errors(n, pn, live, rec, pin_masked, live_masked, owner, ext):
+    """The post-deploy conditions (pure, so the selftest runs them offline)."""
+    errs = []
+    if n != 1 or pn != 1:
+        errs.append(f'RC deployer nonce latest {n} / pending {pn} != 1 (its one transaction, the RC creation): F-007')
+    if live in ('0x', ''):
+        errs.append('no code at the reserved address')
+        return errs
+    if hashlib.sha256(bytes.fromhex(live[2:])).hexdigest() != rec.get('runtimeSha'):
+        errs.append('the live RC runtime differs from the one recorded at the deploy')
+    if live_masked != pin_masked:
+        errs.append('the live RC runtime (masked) differs from the reviewed-build pin')
+    if owner.lower() != str(rec.get('owner', '')).lower():
+        errs.append('OWNER() differs from the recorded owner')
+    if ext.lower() != str(rec.get('ext', '')).lower():
+        errs.append('EXT() differs from the recorded RcExt')
+    return errs
+
+
+def check(post=False):
     errs = []
     n = int(cast('nonce', RC_DEPLOYER))
     pn = int(cast('nonce', '--block', 'pending', RC_DEPLOYER))
-    if n != 0 or pn != 0:
-        errs.append(f'RC deployer nonce latest {n} / pending {pn} != 0: the reserved address is lost or a send is in flight (F-007)')
-    bal = int(cast('balance', RC_DEPLOYER))
-    if bal < 10**18:
-        errs.append(f'RC deployer balance {bal} < 1 lREACT')
-    if cast('code', RESERVED) not in ('0x', ''):
-        errs.append('code already at the reserved address')
+    if post:
+        live = cast('code', RESERVED)
+        rec = load()['steps']['rc']
+        check_build(rebuild=False)  # the local artifact (its immutable map) is the pinned build
+        errs += post_errors(n, pn, live, rec, json.load(open(PIN))['modules']['ReagentRC']['runtimeMaskedSha'],
+                            masked_runtime(art('ReagentRC'), live) if live not in ('0x', '') else '',
+                            cast('call', RESERVED, 'OWNER()(address)'), cast('call', RESERVED, 'EXT()(address)'))
+    else:
+        if n != 0 or pn != 0:
+            errs.append(f'RC deployer nonce latest {n} / pending {pn} != 0: the reserved address is lost or a send is in flight (F-007)')
+        bal = int(cast('balance', RC_DEPLOYER))
+        if bal < 10**18:
+            errs.append(f'RC deployer balance {bal} < 1 lREACT')
+        if cast('code', RESERVED) not in ('0x', ''):
+            errs.append('code already at the reserved address')
     if cast('compute-address', RC_DEPLOYER, '--nonce', '0').split()[-1].lower() != RESERVED.lower():
         errs.append('CREATE(RC deployer, 0) is not the reserved address')
     needs = rc_needs()
@@ -204,7 +238,7 @@ def check():
             errs.append(f'{ch}: audits/gas-need.json NEEDs differ from the live Hub (D5-05)')
     for x in errs:
         print('rc check:', x)
-    print('rc check', 'OK' if not errs else 'FAIL')
+    print('rc check' + (' --post' if post else ''), 'OK' if not errs else 'FAIL')
     return not errs
 
 
@@ -267,6 +301,42 @@ def deploy_rc():
     rec.update(runtimeSha=hashlib.sha256(bytes.fromhex(live[2:])).hexdigest(), owner=me, ext=ext, b6=b6, asserted=True)
     _record(doc, 'rc', rec)
     print('ReagentRC', RESERVED, 'asserted')
+
+
+def record_runtime():
+    """Step `rc_runtime`: the live RC's runtime hashes (plain and immutable-masked) and its OWNER / EXT, read now;
+    refused unless the post-deploy check passes (s7-close r1 m-01: test_R_DEPLOY__ pins the RC's own runtime)."""
+    if not check(post=True):
+        raise SystemExit('rc runtime: the post-deploy check failed; nothing recorded')
+    live = cast('code', RESERVED)
+    doc = load()
+    _record(doc, 'rc_runtime', {'source': 'eth_getCode', 'address': RESERVED,
+                                'runtimeSha': hashlib.sha256(bytes.fromhex(live[2:])).hexdigest(),
+                                'runtimeMaskedSha': masked_runtime(art('ReagentRC'), live),
+                                'owner': cast('call', RESERVED, 'OWNER()(address)'),
+                                'ext': cast('call', RESERVED, 'EXT()(address)')})
+    print('rc runtime: recorded')
+
+
+RPC_ENV = {'1301': 'UNICHAIN_SEPOLIA_RPC_URL', '11155111': 'ETH_SEPOLIA_RPC_URL'}
+
+
+def record_receipts(step, note, specs):
+    """A funding step (faucet request, depositTo) recorded from its receipts: LABEL:CHAIN:TX, CHAIN 5318007 = Lasna."""
+    doc = load()
+    if step in doc['steps']:
+        raise SystemExit(f'rc: {step} already recorded')
+    txs = []
+    for spec in specs:
+        label, ch, tx = spec.split(':')
+        rpc = LASNA if ch == '5318007' else os.environ[RPC_ENV[ch]]
+        r = json.loads(cast('receipt', '--json', tx, rpc=rpc))
+        t = json.loads(cast('tx', '--json', tx, rpc=rpc))
+        txs.append({'label': label, 'chain': int(ch), 'tx': tx, 'block': int(r['blockNumber'], 16),
+                    'gasUsed': int(r['gasUsed'], 16), 'status': 'ok' if r['status'] in ('0x1', 1) else 'FAILED',
+                    'from': t['from'], 'to': r['to'], 'value': str(int(t['value'], 16))})
+    _record(doc, step, {'source': 'receipts', 'note': note, 'txs': txs})
+    print(step, 'recorded', len(txs), 'txs')
 
 
 def register():
@@ -356,13 +426,28 @@ def selftest():
         open(os.path.join(t, '.gitignore'), 'w').write('*.mutorig\nout/\npin.json\n')
         open(os.path.join(t, 'src', 'X.sol.mutorig'), 'w').write('x')
         refused(lambda: check_build(t, p, rebuild=False), 'a *.mutorig in src/ is refused', '.mutorig')
+    # (3) the post-deploy conditions (offline): a correct read passes; each wrong read is refused by its own check
+    code = '0x6001'
+    rec = {'runtimeSha': hashlib.sha256(bytes.fromhex(code[2:])).hexdigest(), 'owner': '0xAa', 'ext': '0xBb'}
+    good = dict(n=1, pn=1, live=code, rec=rec, pin_masked='m', live_masked='m', owner='0xaa', ext='0xbb')
+    cases = [({}, ''), ({'n': 2}, 'its one transaction'), ({'pn': 2}, 'its one transaction'), ({'n': 0, 'pn': 0}, 'its one transaction'),
+             ({'live': '0x'}, 'no code'), ({'live': '0x6002'}, 'recorded at the deploy'),
+             ({'live_masked': 'x'}, 'reviewed-build pin'), ({'owner': '0xcc'}, 'OWNER()'), ({'ext': '0xcc'}, 'EXT()')]
+    for over, must in cases:
+        e = post_errors(**{**good, **over})
+        ok = (not e) if not must else (len(e) == 1 and must in e[0])
+        print('selftest ok:' if ok else 'selftest FAIL:', 'post-deploy', over or 'control passes', e)
+        fails += 0 if ok else 1
     print('rc selftest', 'OK' if not fails else 'FAIL')
     return not fails
 
 
 if __name__ == '__main__':
     what = sys.argv[1] if len(sys.argv) > 1 else 'check'
-    cmds = {'check': lambda: sys.exit(0 if check() else 1), 'pin': pin, '--selftest': lambda: sys.exit(0 if selftest() else 1),
+    if what == 'receipts':
+        record_receipts(sys.argv[2], sys.argv[3], sys.argv[4:])
+        sys.exit(0)
+    cmds = {'check': lambda: sys.exit(0 if check('--post' in sys.argv[2:]) else 1), 'runtime': record_runtime, 'pin': pin, '--selftest': lambda: sys.exit(0 if selftest() else 1),
             'b6': lambda: deploy_module('rcb6', 'RcB6'),
             'ext': lambda: deploy_module('rcext', 'RcExt', 'f(address)', (load()['steps']['rcb6']['address'],)),
             'rc': deploy_rc, 'register': register}
