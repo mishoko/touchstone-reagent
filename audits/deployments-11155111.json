@@ -596,6 +596,38 @@
      "block": 12209960,
      "gasUsed": 709437,
      "logIndex": null
+    },
+    {
+     "label": "action_XB",
+     "tx": "0xe791840882cbddb36ed50e1ce3e4054767f6e1eac4f7752429c0dd5d3e1376ff",
+     "status": "ok",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "gasLimit": 1161544,
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12209982,
+     "gasUsed": 720106,
+     "logIndex": 279
+    },
+    {
+     "label": "action_XB",
+     "tx": "0xc801676de2e8a3f3e12560174ffd18b1b60082d7e4fe97bdbe20c5dd2cfc46e2",
+     "status": "FAILED",
+     "to": "0x2470f03b132e2687250fadd18304f01efd4f0eb0",
+     "function": "setPositions",
+     "gasLimit": 1255617,
+     "range": [
+      195140,
+      197140
+     ],
+     "liveRef": 196142,
+     "block": 12210000,
+     "gasUsed": 1199101,
+     "logIndex": null
     }
    ]
   }

@@ -225,11 +225,15 @@ def expected_logs(r, expect):
             and all(len(l['topics']) > i and int(l['topics'][i], 16) == int(w, 16) for i, w in need.items())]
 
 
-GAS_MARGIN = (3, 2)  # gas limit = 1.5 x the node's estimate (s8)
+GAS_MARGIN = (3, 2)  # gas limit = max(1.5 x the node's estimate, the chain's floor) (s8)
+# floors: the estimate is taken before a grid/epoch boundary the tx may cross at inclusion (a Sepolia Action at 1.5 x
+# the estimate, 1,255,617, still ran out of gas inside the vault's own unlock callback; Action 1 used 1,839,517);
+# unused gas is not charged
+GAS_FLOOR = {'1301': 2_000_000, '11155111': 4_000_000}
 
 
-def gas_limit(estimate):
-    return int(str(estimate).split()[0]) * GAS_MARGIN[0] // GAS_MARGIN[1]
+def gas_limit(estimate, ch):
+    return max(int(str(estimate).split()[0]) * GAS_MARGIN[0] // GAS_MARGIN[1], GAS_FLOOR[ch])
 
 
 def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_max=1):
@@ -242,7 +246,7 @@ def send(ch, to, sig, *args, expect, dry, step, label, extra=None, post=None, n_
         return None, True
     # an explicit gas limit with a margin: the node's bare estimate ran a Sepolia Action out of gas live (s8: limit
     # 742,263, used 709,437, status 0; the same call costs 0.68M-1.84M as the vault's state moves, TRAPS s8)
-    lim = gas_limit(cast('estimate', '--from', me, to, sig, *args, rpc=rpc(ch)))
+    lim = gas_limit(cast('estimate', '--from', me, to, sig, *args, rpc=rpc(ch)), ch)
     h = _run(['cast', 'send', '--async', *wallet(), '--rpc-url', rpc(ch), '--gas-limit', str(lim), to, sig,
               *args]).split()[-1]
     record(ch, step, label, {'tx': h, 'status': 'pending', 'to': to.lower(), 'function': sig.split('(')[0],
@@ -740,7 +744,7 @@ def selftest():
             json.dump({'steps': {}}, open(os.path.join(td, 'audits', 'deployments-1301.json'), 'w'))
             saved4 = {k: g[k] for k in ('_run', 'receipt', 'cast', 'wallet')}
             g['ROOT'] = td
-            g['cast'] = lambda *a, rpc: '100000' if a[0] == 'estimate' else 'true'
+            g['cast'] = lambda *a, rpc: '1600000' if a[0] == 'estimate' else 'true'
             g['wallet'] = lambda: []
             sent = []
             g['_run'] = lambda args, _s=sent: _s.append(args) or '0x' + 'cc' * 32
@@ -760,10 +764,12 @@ def selftest():
                 good_ = t_['status'] == want_st and t_.get('logIndex') == want_li
                 print(('selftest ok: ' if good_ else 'selftest FAIL: ') + label)
                 fails += not good_
-            # s8: every live send carries --gas-limit 1.5 x the estimate (100000 -> 150000) and records it
+            # s8: every live send carries --gas-limit max(1.5 x the estimate, the floor) and records it: on 1301 an
+            # estimate of 1.6M sends 2.4M (the margin), and gas_limit gives the floor for small estimates
             a_ = sent[-1] if sent else []
-            lim_ok = '--gas-limit' in a_ and a_[a_.index('--gas-limit') + 1] == '150000' and t_.get('gasLimit') == 150000
-            print(('selftest ok: ' if lim_ok else 'selftest FAIL: ') + 'a send carries the 1.5 x estimate gas limit')
+            lim_ok = '--gas-limit' in a_ and a_[a_.index('--gas-limit') + 1] == '2400000' and t_.get('gasLimit') == 2400000
+            lim_ok = lim_ok and gas_limit('100000', '1301') == 2_000_000 and gas_limit('100000', '11155111') == 4_000_000
+            print(('selftest ok: ' if lim_ok else 'selftest FAIL: ') + 'a send carries max(1.5 x estimate, floor) as its gas limit')
             fails += not lim_ok
             cv = '0x' + '44' * 20
             note_ = lambda cov, kind: {'address': '0x' + '55' * 20, 'topics': [T_NOTE, '0x0', '0x' + cov[2:].rjust(64, '0'), hex(kind)], 'logIndex': '0x0'}  # noqa: E731
