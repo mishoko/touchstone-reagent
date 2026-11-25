@@ -777,6 +777,126 @@
      "block": 68753467,
      "gasUsed": 500629,
      "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x9df566886901a39668b6146c60901592166447933174ffd8ec6ae734e0b2c6ee",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756510,
+     "gasUsed": 484177,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x6ce5029ad46085e8db9e324a9b7390449db3e5eef54f4d33514234a245864195",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756577,
+     "gasUsed": 499330,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x487285f0159bfcd58cb32d9a21ded90141bab823c3e555439ae2c4656a774e21",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756645,
+     "gasUsed": 499330,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x9923f07a0e1a2e244a156a0f3b9567d76a1e6eeeab612cb01f1a1e401af98efa",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756713,
+     "gasUsed": 510969,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x7ada914e141b7c6e96e40649ed793e1b16d56bef7692a4c94cf6a089b77816d9",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756782,
+     "gasUsed": 544584,
+     "logIndex": 13
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x86252eb8130f474b5300ffd9309afe9650cbf3537ecb26726f665afdfb46177f",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756850,
+     "gasUsed": 500629,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x2a71b19265b39b5c8eb725844ac85c34ca73e449c9a47e7677cb4f32563ac5f7",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756918,
+     "gasUsed": 500629,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x937761ed86747d3863f240c883c8b743bed8b32fdf40542810dad4ff3ff11d7e",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68756987,
+     "gasUsed": 500629,
+     "logIndex": 12
     }
    ]
   },
@@ -944,6 +1064,16 @@
      "function": "poke",
      "block": 68752851,
      "gasUsed": 541253,
+     "logIndex": 7
+    },
+    {
+     "label": "poke_XA",
+     "tx": "0x88618e3ddc155ff93f4ce227d4b9222f011378298cd0228ee349a17fe991b715",
+     "status": "ok",
+     "to": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+     "function": "poke",
+     "block": 68756447,
+     "gasUsed": 544109,
      "logIndex": 7
     }
    ]
