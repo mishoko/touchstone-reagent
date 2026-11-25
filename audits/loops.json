@@ -62,8 +62,14 @@
    "originTx": "0x5a1b9576fefa4f14f141a52141caebf5f4ac90c075ea0b7f1e4d6d3c5749ef5b",
    "originBlock": 68740093,
    "destTx": "0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088",
+   "destTo": "0x775c9b990ade401060b78d0e98684eef8d2466c1",
    "destBlock": 68740134,
    "destTopic0": "0x4a93a23c2057d5ed35e9b920e7650109f5cfb0417a8dfea5c7a960a04cc02af4",
+   "prior_hub_logs": 0,
+   "deliveries_in_block": [
+    "0x499259d0b27e80a3e6059b1a0a7088375058d3990c0cd44523747a5bece76bbf",
+    "0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088"
+   ],
    "balance_before": 10000000000000000,
    "balance_after": 9999568807150000,
    "charged": 431192850000,
@@ -79,8 +85,13 @@
    "originTx": "0x8f1650ae2f711770689dd7f9c77e1045fb8956f1ec2f18c0f418332666de6dc8",
    "originBlock": 12208162,
    "destTx": "0x6195de50baf14362b6280177f04bda142ad3de99a1416b71e60b078fdd3f1ca7",
+   "destTo": "0xaa14d9cd0f788ca23d11805986c1d8bd035d23b4",
    "destBlock": 12208165,
    "destTopic0": "0xce93009ccd5ff6e5058f9aacacf4db6e4bdf49a9fbab795441ddeebee88b1615",
+   "prior_hub_logs": 0,
+   "deliveries_in_block": [
+    "0x6195de50baf14362b6280177f04bda142ad3de99a1416b71e60b078fdd3f1ca7"
+   ],
    "balance_before": 50000000000000000,
    "balance_after": 49999999994933878,
    "charged": 5066122,
@@ -100,10 +111,10 @@
    "n": 3
   },
   "L-PAY": {
-   "commit": "eeb1efd",
+   "commit": "4f83b25",
    "dirty": true,
    "src_sha": "26de10206487b77f",
-   "recorded_at": "2026-11-25T07:59:39+00:00",
+   "recorded_at": "2026-11-25T08:11:58+00:00",
    "note": "a Hub with zero reserves and only a balance receives its first callback (any kind): paid from the balance, debt 0 (spec \u00a712 L-PAY, T-HUB-PAY (c), s2 D1-01)",
    "n": 2
   }

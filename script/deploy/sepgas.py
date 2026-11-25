@@ -4,7 +4,7 @@
 
 For each callback kind:
   1. `forge test` (SEPGAS_DUMP=1, test/SepGasTwin.t.sol) builds the T-GAS worst-case state at chain id 11155111 with
-     the LIVE deterministic addresses (the Hub is 0x5887… with the deployed runtime) on a timeline that ends just
+     the LIVE deterministic addresses (the Hub is 0xb414…7a91 since s6 with the deployed runtime) on a timeline that ends just
      above Sepolia's head, and dumps every account the callback touches (code, balance, the pre-call value of each
      accessed slot);
   2. `eth_simulateV1` on Sepolia replays the callback with those accounts as state overrides (Glamsterdam pricing),

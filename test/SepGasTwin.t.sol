@@ -35,7 +35,7 @@ contract HubForgeNeed is ReagentHub {
 
 /// @notice The 11155111 gas twins' state source (spec §5.6 method (a), §9.1 T-SEPGAS-*): the T-GAS worst-case state
 ///         of each kind is built at chain id 11155111 with the LIVE deterministic addresses (RC 0xFbcD…, admin =
-///         the deployer EOA, so the Hub is 0x5887… with the deployed runtime), then dumped for
+///         the deployer EOA, so the Hub is 0xb414…7a91 (since s6) with the deployed runtime), then dumped for
 ///         `script/deploy/sepgas.py`, which replays the callback by `eth_simulateV1` on Sepolia with the dumped
 ///         accounts as state overrides (Glamsterdam pricing). Runs only with SEPGAS_DUMP=1.
 contract SepGasTwinDump is GasNeedTest {

@@ -144,10 +144,21 @@ def lpay():
         if not ev:
             raise SystemExit(f'loops: {ch}: the first charge at {b} has no Hub log')
         l = min(ev, key=lambda x: int(x['logIndex'], 16))
+        # nothing reached the Hub before b (every delivery emits a Hub event), and the named tx is a delivery from
+        # the callback proxy (s6 tools r2 m-1, m-2)
+        prior = logs(ch, h, fb + 1, b - 1, '') if b - 1 > fb else []
+        if prior:
+            raise SystemExit(f'loops: {ch}: {len(prior)} Hub logs before the first balance step at {b}')
+        txs = sorted({x['transactionHash'] for x in ev})
+        tos = {t: json.loads(cast('tx', '--json', t, rpc=rpc(ch)))['to'].lower() for t in txs}
+        if any(v != CH[ch]['proxy'].lower() for v in tos.values()):
+            raise SystemExit(f'loops: {ch}: block {b} holds a Hub tx not sent by the callback proxy')
+        to = tos[l['transactionHash']]
         before, after = bal(b - 1), bal(b)
         debt, res = call('debts(address)(uint256)', b), call('reserves(address)(uint256)', b)
         rows.append({'chain': int(ch), 'hub': h, 'funded': value, 'originTx': f['tx'], 'originBlock': fb,
-                     'destTx': l['transactionHash'], 'destBlock': b, 'destTopic0': l['topics'][0],
+                     'destTx': l['transactionHash'], 'destTo': to, 'destBlock': b, 'destTopic0': l['topics'][0],
+                     'prior_hub_logs': 0, 'deliveries_in_block': txs,  # `charged` covers all of them
                      'balance_before': before, 'balance_after': after, 'charged': before - after,
                      'debt': debt, 'reserves': res, 'pass': before == value and after < before and debt == 0 and res == 0})
     doc = load()

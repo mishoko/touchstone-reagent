@@ -1,8 +1,8 @@
 {
  "generated_by": "script/deploy/gasneed.py",
  "from": "test/GasNeed.t.sol (T-GAS-*)",
- "generated_at": "2026-11-25T08:02:58+00:00",
- "commit": "eeb1efd",
+ "generated_at": "2026-11-25T08:11:15+00:00",
+ "commit": "4f83b25",
  "dirty": true,
  "src_sha": "26de10206487b77f",
  "method": "entry gas = minimum succeeding entry gas at a constructed worst-case state built in setUp, the search the first state-touching step of its test body (every account and slot cold, F-011; vm.cool cools accounts only); 11155111: method (a), 1.3 x the eth_simulateV1 twin minimum (sepolia_twins, per row: same src/, pass; spec 5.6, 14 #76); method (b) = that + fresh slots x (110,980 - 22,274) + creations x (210,421 - 53,799) kept as information (spec 5.6, 6); NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F",
@@ -91,8 +91,8 @@
     },
     "11155111": {
      "method": "a",
-     "twin_measured": 1707195,
-     "need_min": 2219354,
+     "twin_measured": 1598230,
+     "need_min": 2077699,
      "method_b_entry": 1473433,
      "method_b_need_min": 1915463,
      "need": 2220000,
@@ -113,8 +113,8 @@
     },
     "11155111": {
      "method": "a",
-     "twin_measured": 1772379,
-     "need_min": 2304093,
+     "twin_measured": 1546667,
+     "need_min": 2010668,
      "method_b_entry": 1784506,
      "method_b_need_min": 2319858,
      "need": 2310000,
@@ -125,16 +125,16 @@
  },
  "sepolia_twins": {
   "generated_by": "script/deploy/sepgas.py",
-  "method": "For each callback kind:\n  1. `forge test` (SEPGAS_DUMP=1, test/SepGasTwin.t.sol) builds the T-GAS worst-case state at chain id 11155111 with\n     the LIVE deterministic addresses (the Hub is 0x5887\u2026 with the deployed runtime) on a timeline that ends just\n     above Sepolia's head, and dumps every account the callback touches (code, balance, the pre-call value of each\n     accessed slot);\n  2. `eth_simulateV1` on Sepolia replays the callback with those accounts as state overrides (Glamsterdam pricing),\n     from the proxy address (its code overridden by a forwarder that calls the Hub with exactly the entry gas a\n     delivery at a chosen gasLimit brings: 63/64 \u00b7 (gasLimit \u2212 F)), the Hub's own code left as deployed (checked\n     equal to the dumped code);\n  3. runs: at the \u00a75.6 formula gasLimit (the success event), 1% under (DEFERRED for exit and plan, else a failure),\n     the positive control (the formula at the forge NEED: a failure; for exit and plan through the forge-NEED Hub\n     runtime: RELAY_FAILED or no success), and for A-SEPGAS63 the exit at the pre-check threshold \u2212 1 (DEFERRED).",
-  "commit": "eeb1efd",
+  "method": "For each callback kind:\n  1. `forge test` (SEPGAS_DUMP=1, test/SepGasTwin.t.sol) builds the T-GAS worst-case state at chain id 11155111 with\n     the LIVE deterministic addresses (the Hub is 0xb414\u20267a91 since s6 with the deployed runtime) on a timeline that ends just\n     above Sepolia's head, and dumps every account the callback touches (code, balance, the pre-call value of each\n     accessed slot);\n  2. `eth_simulateV1` on Sepolia replays the callback with those accounts as state overrides (Glamsterdam pricing),\n     from the proxy address (its code overridden by a forwarder that calls the Hub with exactly the entry gas a\n     delivery at a chosen gasLimit brings: 63/64 \u00b7 (gasLimit \u2212 F)), the Hub's own code left as deployed (checked\n     equal to the dumped code);\n  3. runs: at the \u00a75.6 formula gasLimit (the success event), 1% under (DEFERRED for exit and plan, else a failure),\n     the positive control (the formula at the forge NEED: a failure; for exit and plan through the forge-NEED Hub\n     runtime: RELAY_FAILED or no success), and for A-SEPGAS63 the exit at the pre-check threshold \u2212 1 (DEFERRED).",
+  "commit": "4f83b25",
   "dirty": true,
   "src_sha": "26de10206487b77f",
-  "generated_at": "2026-11-25T08:02:17+00:00",
+  "generated_at": "2026-11-25T08:09:15+00:00",
   "rcConduct": {
    "need": 150000,
    "gasLimit": 458279,
    "entry": 211619,
-   "block": 12208321,
+   "block": 12208360,
    "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "APPLIED",
@@ -159,7 +159,7 @@
    "need": 437000,
    "gasLimit": 784080,
    "entry": 532330,
-   "block": 12208322,
+   "block": 12208361,
    "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "BOUND",
@@ -184,7 +184,7 @@
    "need": 500000,
    "gasLimit": 855598,
    "entry": 602730,
-   "block": 12208322,
+   "block": 12208362,
    "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "ANSWERED",
@@ -209,16 +209,16 @@
    "need": 2220000,
    "gasLimit": 2808138,
    "entry": 2524762,
-   "block": 12208323,
+   "block": 12208442,
    "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "DONE",
-    "gasUsed": 1604948,
+    "gasUsed": 1507028,
     "pass": true
    },
    "measured": {
-    "hubEntryMin": 1746195,
-    "covenantNeedUpper": 1707195,
+    "hubEntryMin": 1637230,
+    "covenantNeedUpper": 1598230,
     "threshold": 2295238,
     "under1000": "FAILED",
     "pass": true
@@ -233,7 +233,7 @@
     "what": "the forge-NEED Hub runtime at the forge-NEED formula limit",
     "entry": 1027365,
     "outcome": "FAILED",
-    "gasUsed": 653477,
+    "gasUsed": 749867,
     "pass": true
    },
    "a_sepgas63": {
@@ -248,16 +248,16 @@
    "need": 2310000,
    "gasLimit": 2910306,
    "entry": 2625334,
-   "block": 12208324,
+   "block": 12208323,
    "hubCodeSha": "6401fb733303e1dd",
    "formula": {
     "outcome": "DONE",
-    "gasUsed": 1702244,
+    "gasUsed": 1490119,
     "pass": true
    },
    "measured": {
-    "hubEntryMin": 1811379,
-    "covenantNeedUpper": 1772379,
+    "hubEntryMin": 1585667,
+    "covenantNeedUpper": 1546667,
     "threshold": 2386666,
     "under1000": "EARLY/SKIPPED",
     "pass": true
