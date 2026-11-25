@@ -544,6 +544,121 @@
      ]
     }
    ]
+  },
+  "lcon_XA_20261125": {
+   "source": "receipts (script/live/drive.py)",
+   "commit": "ac68924",
+   "dirty": false,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T10:41:26+00:00",
+   "note": "loop-driver origins (spec \u00a79.5); evidence by script/live/loops.py",
+   "txs": [
+    {
+     "label": "action_XA",
+     "tx": "0x7f13ffdb6745c3512598c27fea989fd7e49dac1158a1268685ba8c9891cd4c77",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68750859,
+     "gasUsed": 923372,
+     "logIndex": 15
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x407056821ff288912ced1718b7013c39d616b4089e787a03cdb9219e62cff13d",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68750926,
+     "gasUsed": 499079,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0xa80257e3a75da8b7b21e4c1dd6036b79e502250e83eaa770118103adb0e4b63c",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68750993,
+     "gasUsed": 499593,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x43f684f9e2edab32e8d9b8f98b78a238258b0b71e100dee67678f40874fcae92",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68751061,
+     "gasUsed": 528105,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0xaff976a48739faabd7ff3d89ec4dcdda55f23863943353086947037ecd6318d5",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68751131,
+     "gasUsed": 530775,
+     "logIndex": 13
+    },
+    {
+     "label": "action_XA",
+     "tx": "0xa8faaf7af3008e04c2e1c2dd280ccbb118656b1ac954277e560b3ab894f67bbf",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68751199,
+     "gasUsed": 504434,
+     "logIndex": 14
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x51c985685e6225c73992637a91f977f24de3bbb839ab7016d88e5915f84b7e6a",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "range": [
+      195190,
+      197190
+     ],
+     "liveRef": 196191,
+     "block": 68751266,
+     "gasUsed": 504948,
+     "logIndex": 13
+    }
+   ]
   }
  }
 }
