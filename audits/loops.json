@@ -1,0 +1,120 @@
+{
+ "generated_by": "script/live/loops.py",
+ "loops": {
+  "L-PAY": {
+   "commit": "9001fa3",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:46:58+00:00",
+   "note": "a Hub with zero reserves and a balance receives its first callback: paid from the balance, debt 0 (spec \u00a712 L-PAY, T-HUB-PAY (c), s2 D1-01)",
+   "n": 2,
+   "rows": [
+    {
+     "chain": 1301,
+     "hub": "0xb41433C9585d230A2607f253E1EA844923e07a91",
+     "funding": {
+      "tx": "0x5a1b9576fefa4f14f141a52141caebf5f4ac90c075ea0b7f1e4d6d3c5749ef5b",
+      "block": 68740093
+     },
+     "first_callback": {
+      "tx": "0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088",
+      "block": 68740134,
+      "event": "VaultBound"
+     },
+     "balance_before": 10000000000000000,
+     "balance_after": 9999568807150000,
+     "charged": 431192850000,
+     "debt": 0,
+     "reserves": 0,
+     "pass": true
+    },
+    {
+     "chain": 11155111,
+     "hub": "0xb41433C9585d230A2607f253E1EA844923e07a91",
+     "funding": {
+      "tx": "0x8f1650ae2f711770689dd7f9c77e1045fb8956f1ec2f18c0f418332666de6dc8",
+      "block": 12208162
+     },
+     "first_callback": {
+      "tx": "0x56a544f0feed436d37a77a996c41b83dc360eb4c9f2c2573d9d92ce122769cfe",
+      "block": 12208176,
+      "event": "VaultBound"
+     },
+     "balance_before": 49999999989867756,
+     "balance_after": 49999999975446998,
+     "charged": 14420758,
+     "debt": 0,
+     "reserves": 0,
+     "pass": true
+    }
+   ]
+  },
+  "L-DYN": {
+   "commit": "9001fa3",
+   "dirty": true,
+   "src_sha": "26de10206487b77f",
+   "recorded_at": "2026-11-25T07:46:52+00:00",
+   "note": "a registered bundler deploys its vault -> the RC subscribes from react() -> the Hub binds the vault (rcVault delivered); spec \u00a712 L-DYN, C-08",
+   "n": 3,
+   "rows": [
+    {
+     "chain": 1301,
+     "step": "ldyn_vault_XA",
+     "vault": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+     "id": 1,
+     "origin": {
+      "tx": "0x383a1ebf172c5dab9bdc2fbc2f50850bd3bda28e409c1a898e2de87eccdb2818",
+      "block": 68740130,
+      "ts": 1795592558
+     },
+     "delivery": {
+      "tx": "0xcdbfad08d30d32627b2002accb22774e7a1cd6e13a429b16acce23efc9821088",
+      "block": 68740134,
+      "ts": 1795592562,
+      "event": "VaultBound"
+     },
+     "latency_blocks": 4,
+     "latency_s": 4
+    },
+    {
+     "chain": 1301,
+     "step": "ldyn_vault_YA",
+     "vault": "0x50ad0a9ef6c8f87b4e926fe1ab3ae2285cdde362",
+     "id": 2,
+     "origin": {
+      "tx": "0x560934ed8ae1844012bc23939002ea61361f9bed33535fb4d85a7d8f30fd4649",
+      "block": 68740186,
+      "ts": 1795592614
+     },
+     "delivery": {
+      "tx": "0xf070ffd832a1a467ac9ff6fe187b312823cbbb812e5f03646237cf110ff868ba",
+      "block": 68740190,
+      "ts": 1795592618,
+      "event": "VaultBound"
+     },
+     "latency_blocks": 4,
+     "latency_s": 4
+    },
+    {
+     "chain": 11155111,
+     "step": "ldyn_vault_XB",
+     "vault": "0x67ff755e233c3f550303c658ab8c55953f231a46",
+     "id": 1,
+     "origin": {
+      "tx": "0x6bb6248ae51c29a34de3babd0e17f71171695fa4a20f4a1ceb590d379860cb49",
+      "block": 12208175,
+      "ts": 1795592688
+     },
+     "delivery": {
+      "tx": "0x56a544f0feed436d37a77a996c41b83dc360eb4c9f2c2573d9d92ce122769cfe",
+      "block": 12208176,
+      "ts": 1795592700,
+      "event": "VaultBound"
+     },
+     "latency_blocks": 1,
+     "latency_s": 12
+    }
+   ]
+  }
+ }
+}
