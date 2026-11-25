@@ -53,7 +53,8 @@ def _wallet(key, env=os.environ):
 
 def cast(*a, key=None, rpc=LASNA):
     w = _wallet(key) if key else []
-    r = subprocess.run(['cast', *a, *w, '--rpc-url', rpc], capture_output=True, text=True)
+    # options before the positionals: `send --create <CODE> [SIG] [ARGS]...` takes anything after CODE as ARGS (s6)
+    r = subprocess.run(['cast', a[0], *w, '--rpc-url', rpc, *a[1:]], capture_output=True, text=True)
     if r.returncode != 0:
         raise SystemExit(f'rc: cast {a[0]} failed: {(r.stderr or r.stdout).strip()[-300:]}')
     return r.stdout.strip()
