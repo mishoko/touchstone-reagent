@@ -1017,6 +1017,134 @@
      "block": 68762355,
      "gasUsed": 500471,
      "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x4625cc9acd81c6672c4cc48c9d7c2dff26d719b783f7ff5fec0de040889aa766",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767527,
+     "gasUsed": 619768,
+     "logIndex": 10
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x4935c6e7209f3cfc5b60072636911e214eda37999d887c0e57a1eb017492c588",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767596,
+     "gasUsed": 530434,
+     "logIndex": 13
+    },
+    {
+     "label": "action_XA",
+     "tx": "0xfc04ed32caa4d4ff2de9709aaa3cb51bb9b3e32301e7773a250d305f5149b9f7",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767665,
+     "gasUsed": 497979,
+     "logIndex": 16
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x10071edf94ccd59254dee690db0ebc3985f6efec503a0a09200afd7dc67d310d",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767734,
+     "gasUsed": 497979,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x243fdeadc4e93845f0b97882f59b7fc1f34f1a2e8a5475ae58d8d59102bc041e",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767803,
+     "gasUsed": 509618,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x2dc6a8301bc7fbbc65b9aed9f6986aa757a1fb857d0ace20f36807ad1b0ab152",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767873,
+     "gasUsed": 507734,
+     "logIndex": 13
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x79e55c1af7f242a3e1882e9a36765fedc6e45a7f2574f5f9b45c879816eaff0b",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68767942,
+     "gasUsed": 497979,
+     "logIndex": 12
+    },
+    {
+     "label": "action_XA",
+     "tx": "0x7b4fcf97bd17b881a5e48bd17bb45057114b4bcba58097e58deae6e3aebd0a55",
+     "status": "ok",
+     "to": "0x79b674f45297d9de6a44a36a0161ae348872d782",
+     "function": "setPositions",
+     "gasLimit": 2000000,
+     "range": [
+      195180,
+      197180
+     ],
+     "liveRef": 196189,
+     "block": 68768016,
+     "gasUsed": 497979,
+     "logIndex": 12
     }
    ]
   },
@@ -1205,6 +1333,17 @@
      "block": 68761806,
      "gasUsed": 563209,
      "logIndex": 7
+    },
+    {
+     "label": "poke_XA",
+     "tx": "0x5904e526ff15cafecd70f6e53488c7c8a4479527cca16a846dd1153d834b331b",
+     "status": "ok",
+     "to": "0x308a85113ae15d4b184dfd0b70eb397850f3fa59",
+     "function": "poke",
+     "gasLimit": 2000000,
+     "block": 68767256,
+     "gasUsed": 355423,
+     "logIndex": 2
     }
    ]
   },
