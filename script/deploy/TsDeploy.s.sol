@@ -34,12 +34,16 @@ interface IV3Slot0 {
 ///         deploys, spec §12); optional BUNDLER (an existing bundler of this sender, e.g. one the RC registered: the
 ///         vault is deployed through it, no new bundler; s6 L-DYN); optional BROADCAST_PK (the sending key, read from
 ///         the environment so it never appears on argv; s6).
-///         Run: `REF_POOL=<pool> forge script script/deploy/TsDeploy.s.sol --rpc-url <rpc> --private-key $DEPLOYER_PK
-///         --broadcast --slow --gas-estimate-multiplier 115` (1301's per-transaction cap is 2^24).
+///         Run: `BROADCAST_PK=0x… REF_POOL=<pool> forge script script/deploy/TsDeploy.s.sol --rpc-url <rpc> --sender <signer>
+///         --broadcast --slow --gas-estimate-multiplier 115` (1301's per-transaction cap is 2^24; the key stays in the
+///         environment). On 11155111 send `deployAndPlace` from the dry run's calldata with an explicit limit (TRAPS).
 contract TsDeploy is Script {
     uint24 internal constant FEE = 500;
     int24 internal constant SPACING = 10;
     uint256 internal constant SEED1 = 2e18;
+    // script storage, not locals: run() is at the stack limit (s6)
+    uint256 internal pk;
+    address internal me;
 
     error History();
     error NotDemoToken();
@@ -66,25 +70,24 @@ contract TsDeploy is Script {
         IUniswapV3PoolOracle r = IUniswapV3PoolOracle(refPool);
         IERC20 t0 = IERC20(r.token0());
         IERC20 t1 = IERC20(r.token1());
-        if (DemoToken(address(t0)).minter() != msg.sender || DemoToken(address(t1)).minter() != msg.sender) revert NotDemoToken();
+        pk = vm.envOr("BROADCAST_PK", uint256(0));
+        me = pk != 0 ? vm.addr(pk) : msg.sender; // the signer funds and owns the bundler (s6 tools r1 m-3)
+        if (DemoToken(address(t0)).minter() != me || DemoToken(address(t1)).minter() != me) revert NotDemoToken();
         // token0 = mUSDC (6 dp), token1 = mWETH (18 dp, the B6 unit) on both chains (spec §3.1; tools review m-7)
         if (DemoToken(address(t0)).decimals() != 6 || DemoToken(address(t1)).decimals() != 18) revert Decimals();
         // the reference holds enough history slots before the hook sees it (TRAPS s2: BadRef at 250 < 400)
         (,,, uint16 card,,,) = IV3Slot0(refPool).slot0();
         if (card < t.MIN_CARD) revert Cardinality(card, t.MIN_CARD);
 
-        uint256 pk = vm.envOr("BROADCAST_PK", uint256(0));
         if (pk != 0) vm.startBroadcast(pk);
         else vm.startBroadcast();
-        address me = pk != 0 ? vm.addr(pk) : msg.sender;
         bytes memory vaultCode = type(TouchstoneVault).creationCode;
         bytes memory extCode = type(TouchstoneVaultExtension).creationCode;
         bytes memory hookCode = type(TouchstoneHook).creationCode;
         TouchstoneFactory factory = existing != address(0)
             ? TouchstoneFactory(existing)
             : new TouchstoneFactory(c.poolManager, keccak256(vaultCode), keccak256(extCode), keccak256(hookCode));
-        address existingB = vm.envOr("BUNDLER", address(0));
-        CuratorBundler bundler = existingB != address(0) ? CuratorBundler(existingB) : new CuratorBundler(me, factory);
+        CuratorBundler bundler = _bundler(existing, factory, me, deployVault);
         console2.log("factory", address(factory));
         console2.log("bundler (curator)", address(bundler));
         if (!deployVault) {
@@ -128,6 +131,21 @@ contract TsDeploy is Script {
         console2.log("reference tick", int256(refTick));
         console2.log("range lo", int256(lo));
         console2.log("range hi", int256(hi));
+    }
+
+    /// @dev An existing bundler (BUNDLER) must be this signer's, on this factory, and unused when a vault is deployed
+    ///      (s6 tools r1 m-4); its RC registration (`addBundler`) is the caller's duty, checked afterwards by
+    ///      `script/live/loops.py ldyn`. Otherwise a new bundler owned by the signer.
+    function _bundler(address existing, TouchstoneFactory factory, address signer, bool deployVault)
+        internal
+        returns (CuratorBundler b)
+    {
+        address eb = vm.envOr("BUNDLER", address(0));
+        if (eb == address(0)) return new CuratorBundler(signer, factory);
+        require(existing != address(0), "TsDeploy: BUNDLER needs FACTORY");
+        b = CuratorBundler(eb);
+        require(b.OWNER() == signer && address(b.FACTORY()) == address(factory), "TsDeploy: BUNDLER is not this signer's on FACTORY");
+        require(!deployVault || address(b.vault()) == address(0), "TsDeploy: BUNDLER already deployed its vault");
     }
 
     function _twap(address pool, uint32 window) internal view returns (int24) {

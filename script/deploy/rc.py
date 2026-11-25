@@ -22,7 +22,7 @@ RC_KEYSTORE_DIR holds `owner` and `rcdep` (made once by `cast wallet import -i`)
 file; only their paths reach argv. Before ANY send: the keys' identities are asserted (F-010 H3-02),
 and every artifact sent is checked against the reviewed-build pin after a forced rebuild (H3-01).
 """
-import json, os, re, subprocess, sys, hashlib, tempfile, datetime as dt
+import json, os, re, shutil, subprocess, sys, hashlib, tempfile, datetime as dt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from prov import stamp  # noqa: E402
@@ -297,18 +297,24 @@ def selftest():
     """The refusals, with no network and no real key: swapped keys, a mutated artifact, a dirty tree."""
     fails = 0
 
-    def refused(fn, label):
+    def refused(fn, label, must=''):
+        """The refusal must be the stated one: its message contains `must` (s6 tools r1 m-1)."""
         nonlocal fails
         try:
             fn()
-        except SystemExit:
-            print('selftest ok:', label)
+        except SystemExit as e:
+            if must in str(e):
+                print('selftest ok:', label)
+                return
+            print('selftest FAIL (refused for another reason):', label, '->', e)
+            fails += 1
             return
         print('selftest FAIL:', label)
         fails += 1
 
-    # (1) keys: two random keystores (neither is the RC deployer) → refused by the identity check before any send;
-    #     the same keystores swapped (owner = the RC deployer's slot) likewise; a missing keystore → refused
+    # (1) keys, each refusal by its own check (s6 tools r1 m-1): (a) an rcdep keystore that is not the RC deployer;
+    #     (b) the RC deployer's keystore in the owner slot (swapped); (c) a missing owner keystore
+    global RC_DEPLOYER
     with tempfile.TemporaryDirectory() as t:
         pw = os.path.join(t, 'pw')
         open(pw, 'w').write('selftest')
@@ -319,10 +325,17 @@ def selftest():
             f = os.listdir(os.path.join(t, n + '.d'))[0]
             os.rename(os.path.join(t, n + '.d', f), os.path.join(t, n))
         env = {'RC_KEYSTORE_DIR': t, 'RC_KEYSTORE_PW': pw}
-        addr_of('RC_DEPLOYER_PK', env)  # the fake keystores open: the refusal below is the identity check
-        refused(lambda: assert_keys(env), 'a wrong RC deployer keystore is refused')
-        os.remove(os.path.join(t, 'owner'))
-        refused(lambda: assert_keys(env), 'a missing keystore is refused')
+        real = RC_DEPLOYER
+        try:
+            refused(lambda: assert_keys(env), 'a wrong RC deployer keystore is refused', 'does not derive to the RC deployer')
+            RC_DEPLOYER = addr_of('RC_DEPLOYER_PK', env)  # the fake rcdep plays the RC deployer
+            assert assert_keys(env) == addr_of('DEPLOYER_PK', env)  # control: the right pair passes
+            shutil.copy(os.path.join(t, 'rcdep'), os.path.join(t, 'owner'))
+            refused(lambda: assert_keys(env), 'swapped keys (the RC deployer in the owner slot) are refused', 'swapped')
+            os.remove(os.path.join(t, 'owner'))
+            refused(lambda: assert_keys(env), 'a missing keystore is refused', 'no keystore for DEPLOYER_PK')
+        finally:
+            RC_DEPLOYER = real
     # (2) a mutated artifact against a pin of the clean one → refused
     with tempfile.TemporaryDirectory() as t:
         for m in MODULES:
@@ -338,9 +351,11 @@ def selftest():
         code = a['deployedBytecode']['object']
         a['deployedBytecode']['object'] = code[:-2] + ('00' if code[-2:] != '00' else '01')
         json.dump(a, open(os.path.join(t, 'out', 'RcExt.sol', 'RcExt.json'), 'w'))
-        refused(lambda: check_build(t, p, rebuild=False), 'a mutated artifact is refused')
+        refused(lambda: check_build(t, p, rebuild=False), 'a mutated artifact is refused', 'differs from the reviewed build')
+        # git ignores it (as a mutation leaves it untracked-but-ignored), so the refusal is the *.mutorig check itself
+        open(os.path.join(t, '.gitignore'), 'w').write('*.mutorig\nout/\npin.json\n')
         open(os.path.join(t, 'src', 'X.sol.mutorig'), 'w').write('x')
-        refused(lambda: check_build(t, p, rebuild=False), 'a *.mutorig in src/ is refused')
+        refused(lambda: check_build(t, p, rebuild=False), 'a *.mutorig in src/ is refused', '.mutorig')
     print('rc selftest', 'OK' if not fails else 'FAIL')
     return not fails
 

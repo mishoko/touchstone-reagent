@@ -61,20 +61,19 @@ def main():
            **stamp(),
            'method': 'entry gas = minimum succeeding entry gas at a constructed worst-case state built in setUp, the search the '
                      'first state-touching step of its test body (every account and slot cold, F-011; vm.cool cools accounts only); '
-                     '11155111: method (a), 1.3 x the eth_simulateV1 twin minimum (sepolia_twins, same src/); method (b) = that + fresh '
+                     '11155111: method (a), 1.3 x the eth_simulateV1 twin minimum (sepolia_twins, per row: same src/, pass; spec 5.6, 14 #76); method (b) = that + fresh '
                      'slots x (110,980 - 22,274) + creations x (210,421 - 53,799) kept as information (spec 5.6, 6); '
                      'NEED = 1.3 x, rounded up; gasLimit = ceil(1.1 (NEED 64/63 + RESERVE) 64/63) + F',
            'F': F, 'RESERVE': RESERVE, 'kinds': {}}
     bad = []
     CODE = code_needs()
-    # the 11155111 twins (sepgas.py) certify the 11155111 NEEDs only if they passed against the current src/
+    # spec §5.6 / §14 #76 (owner ruling s6): a kind's NEED[11155111] is certified by its post-deploy twin (method (a))
+    # once one exists; the twin row must be measured on the current src/ and pass, else the kind fails; with no twin
+    # row, method (b) certifies (the pre-deploy estimate)
     path0 = os.path.join(ROOT, 'audits', 'gas-need.json')
     tw0 = (json.load(open(path0)) if os.path.exists(path0) else {}).get('sepolia_twins', {})
-    TWINS = {}
-    if tw0 and tw0.get('src_sha') == stamp().get('src_sha'):
-        TWINS = {k: v for k, v in tw0.items() if isinstance(v, dict) and v.get('pass') is True and 'measured' in v}
-    else:
-        print('gasneed: no 11155111 twins for this src/ (run sepgas.py): 11155111 checked by method (b)')
+    src_now = stamp().get('src_sha')
+    TWINS = {k: v for k, v in tw0.items() if isinstance(v, dict) and 'measured' in v}
     for kind in ('rcConduct', 'rcVault', 'rcBudget', 'rcExit', 'rcAllocate'):
         p = os.path.join(ROOT, 'output', f'gas-need-{kind}.json')
         d = json.load(open(p))
@@ -93,10 +92,13 @@ def main():
             need = CODE[kind][ch]
             rec = {'entry': entry, 'need_min': need_min}
             tw = TWINS.get(kind) if ch == '11155111' else None
+            if ch == '11155111' and tw is None:
+                print(f'gasneed: {kind} on 11155111: no twin row, certified by method (b) (spec §5.6)')
+            if tw is not None and (tw.get('src_sha') != src_now or tw.get('pass') is not True):
+                bad.append(f'{kind} on 11155111: its twin is stale or failed (src {tw.get("src_sha")} vs {src_now}, '
+                           f'pass {tw.get("pass")}): re-run sepgas.py (spec §14 #76)')
             if tw is not None:
-                # spec 5.6/6 (s3): 11155111 NEEDs are certified by method (a), the eth_simulateV1 twins on Sepolia
-                # pricing; method (b) above is kept as information only (s6: the cold 1301 entry moved it 0.4% above
-                # the plan NEED while the twin still certifies it)
+                # spec §5.6 / §14 #76: method (a) certifies; method (b) is kept as information only
                 ms = tw['measured']
                 base = ms['covenantNeedUpper'] if 'covenantNeedUpper' in ms else ms['entryMin']
                 rec = {'method': 'a', 'twin_measured': base, 'need_min': math.ceil(base * 1.3),

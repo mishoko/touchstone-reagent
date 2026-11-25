@@ -244,6 +244,7 @@ def main(argv):
     for k in kinds:
         ref = dump(k)  # the default timeline: its length fixes the aligned start
         row = run_kind(k, needs, ref)
+        row['src_sha'] = stamp()['src_sha']  # per row: gasneed.py gates each kind on its own twin (s6 tools r1 m-2)
         tw[k] = row
         ok &= row['pass']
         print(k, 'PASS' if row['pass'] else 'FAIL', json.dumps({x: v for x, v in row.items() if x != 'hubCodeSha'}), flush=True)
